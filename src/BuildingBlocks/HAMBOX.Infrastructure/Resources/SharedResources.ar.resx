@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Errors.Validation.Title" xml:space="preserve">
+    <value>خطأ في التحقق</value>
+  </data>
+  <data name="Errors.Validation.Detail" xml:space="preserve">
+    <value>حدث خطأ واحد أو أكثر في التحقق.</value>
+  </data>
+  <data name="Errors.Unauthorized.Title" xml:space="preserve">
+    <value>غير مصرح</value>
+  </data>
+  <data name="Errors.Unauthorized.Detail" xml:space="preserve">
+    <value>ليس لديك صلاحية لتنفيذ هذا الإجراء.</value>
+  </data>
+  <data name="Errors.Internal.Title" xml:space="preserve">
+    <value>خطأ داخلي في الخادم</value>
+  </data>
+  <data name="Errors.Internal.Detail" xml:space="preserve">
+    <value>حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.</value>
+  </data>
+  <data name="Errors.Identity_EmailAlreadyExists" xml:space="preserve">
+    <value>يوجد مستخدم مسجل بهذا البريد الإلكتروني بالفعل.</value>
+  </data>
+  <data name="Errors.Identity_InvalidCredentials" xml:space="preserve">
+    <value>البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="Errors.Identity_EmailNotConfirmed" xml:space="preserve">
+    <value>لم يتم تأكيد البريد الإلكتروني.</value>
+  </data>
+  <data name="Errors.Identity_AccountNotActive" xml:space="preserve">
+    <value>حساب المستخدم غير نشط.</value>
+  </data>
+  <data name="Errors.Identity_InvalidToken" xml:space="preserve">
+    <value>الرمز غير صالح أو تم استخدامه مسبقاً.</value>
+  </data>
+  <data name="Errors.Identity_TokenExpired" xml:space="preserve">
+    <value>انتهت صلاحية الرمز.</value>
+  </data>
+  <data name="Errors.Identity_AccountLocked" xml:space="preserve">
+    <value>تم قفل الحساب بسبب محاولات دخول فاشلة متعددة.</value>
+  </data>
+  <data name="Errors.Identity_UserNotFound" xml:space="preserve">
+    <value>لم يتم العثور على المستخدم.</value>
+  </data>
+  <data name="Errors.Identity_AuthenticationRequired" xml:space="preserve">
+    <value>يلزم تسجيل الدخول لتنفيذ هذا الإجراء.</value>
+  </data>
+  <data name="Errors.Identity_InvalidCurrentPassword" xml:space="preserve">
+    <value>كلمة المرور الحالية غير صحيحة.</value>
+  </data>
+  <data name="Errors.Identity_ProfileUpdateFailed" xml:space="preserve">
+    <value>تعذر تحديث الملف الشخصي.</value>
+  </data>
+</root>

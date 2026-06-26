@@ -1,0 +1,6 @@
+@HAMBOX.API_HostAddress = http://localhost:5163
+
+GET {{HAMBOX.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

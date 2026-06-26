@@ -1,0 +1,8 @@
+services:
+  hambox-api:
+    ports:
+      - "5000:8080"
+      - "5001:8081"
+  sqlserver:
+    ports:
+      - "1433:1433"

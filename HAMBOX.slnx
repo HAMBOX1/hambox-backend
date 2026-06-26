@@ -1,0 +1,36 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/API/">
+    <Project Path="src/API/HAMBOX.API/HAMBOX.API.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/HAMBOX.Application/HAMBOX.Application.csproj" />
+    <Project Path="src/BuildingBlocks/HAMBOX.Contracts/HAMBOX.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/HAMBOX.Domain/HAMBOX.Domain.csproj" />
+    <Project Path="src/BuildingBlocks/HAMBOX.Infrastructure/HAMBOX.Infrastructure.csproj" />
+    <Project Path="src/BuildingBlocks/HAMBOX.SharedKernel/HAMBOX.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Application/HAMBOX.Modules.Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Domain/HAMBOX.Modules.Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Infrastructure/HAMBOX.Modules.Catalog.Infrastructure.csproj" />
+    <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Presentation/HAMBOX.Modules.Catalog.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Commerce/">
+    <Project Path="src/Modules/Commerce/HAMBOX.Modules.Commerce.Application/HAMBOX.Modules.Commerce.Application.csproj" />
+    <Project Path="src/Modules/Commerce/HAMBOX.Modules.Commerce.Domain/HAMBOX.Modules.Commerce.Domain.csproj" />
+    <Project Path="src/Modules/Commerce/HAMBOX.Modules.Commerce.Infrastructure/HAMBOX.Modules.Commerce.Infrastructure.csproj" />
+    <Project Path="src/Modules/Commerce/HAMBOX.Modules.Commerce.Presentation/HAMBOX.Modules.Commerce.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Application/HAMBOX.Modules.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Domain/HAMBOX.Modules.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Infrastructure/HAMBOX.Modules.Identity.Infrastructure.csproj" />
+    <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Presentation/HAMBOX.Modules.Identity.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HAMBOX.IntegrationTests/HAMBOX.IntegrationTests.csproj" />
+    <Project Path="tests/HAMBOX.UnitTests/HAMBOX.UnitTests.csproj" />
+  </Folder>
+</Solution>

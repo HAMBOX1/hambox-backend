@@ -1,0 +1,97 @@
+using HAMBOX.Domain.Entities;
+using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Permissions;
+using HAMBOX.Modules.Identity.Domain.Roles;
+using HAMBOX.Modules.Identity.Domain.Sessions;
+using HAMBOX.Modules.Identity.Domain.Tokens;
+using HAMBOX.Modules.Identity.Domain.Users;
+using Microsoft.EntityFrameworkCore;
+
+namespace HAMBOX.Modules.Identity.Infrastructure.Persistence;
+
+/// <summary>
+/// Represents the Entity Framework Core database context for the Identity module.
+/// </summary>
+public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) 
+    : DbContext(options), IIdentityDbContext
+{
+    /// <summary>
+    /// Gets or sets the users table.
+    /// </summary>
+    public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
+
+    /// <summary>
+    /// Gets or sets the roles table.
+    /// </summary>
+    public DbSet<ApplicationRole> Roles => Set<ApplicationRole>();
+
+    /// <summary>
+    /// Gets or sets the permissions table.
+    /// </summary>
+    public DbSet<Permission> Permissions => Set<Permission>();
+
+    /// <summary>
+    /// Gets or sets the refresh tokens table.
+    /// </summary>
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    /// <summary>
+    /// Gets or sets the email verification tokens table.
+    /// </summary>
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+
+    /// <summary>
+    /// Gets or sets the password reset tokens table.
+    /// </summary>
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
+    /// <summary>
+    /// Gets or sets the user sessions table.
+    /// </summary>
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+    /// <summary>
+    /// Gets or sets the login history table.
+    /// </summary>
+    public DbSet<LoginHistory> LoginHistory => Set<LoginHistory>();
+
+    /// <summary>
+    /// Gets or sets the user roles join table.
+    /// </summary>
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasDefaultSchema("identity");
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+
+        ApplyGlobalQueryFilters(modelBuilder);
+    }
+
+    /// <summary>
+    /// Applies global query filters for soft-deletable entities.
+    /// </summary>
+    private static void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+            var property = System.Linq.Expressions.Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+            var condition = System.Linq.Expressions.Expression.Equal(
+                property,
+                System.Linq.Expressions.Expression.Constant(false));
+            var lambda = System.Linq.Expressions.Expression.Lambda(condition, parameter);
+
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+        }
+    }
+}

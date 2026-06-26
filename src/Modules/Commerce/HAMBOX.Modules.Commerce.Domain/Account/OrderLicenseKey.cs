@@ -1,0 +1,76 @@
+using HAMBOX.Domain.Entities;
+
+namespace HAMBOX.Modules.Commerce.Domain.Account;
+
+/// <summary>
+/// Represents a license key issued for an order line item.
+/// </summary>
+public sealed class OrderLicenseKey : Entity
+{
+    private OrderLicenseKey()
+    {
+    }
+
+    private OrderLicenseKey(
+        Guid id,
+        Guid orderId,
+        Guid orderItemId,
+        Guid productId,
+        string licenseKey)
+        : base(id)
+    {
+        OrderId = orderId;
+        OrderItemId = orderItemId;
+        ProductId = productId;
+        LicenseKey = licenseKey;
+    }
+
+    /// <summary>
+    /// Gets the order identifier.
+    /// </summary>
+    public Guid OrderId { get; private set; }
+
+    /// <summary>
+    /// Gets the order item identifier.
+    /// </summary>
+    public Guid OrderItemId { get; private set; }
+
+    /// <summary>
+    /// Gets the product identifier.
+    /// </summary>
+    public Guid ProductId { get; private set; }
+
+    /// <summary>
+    /// Gets the license key value.
+    /// </summary>
+    public string LicenseKey { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Creates a license key for an order item.
+    /// </summary>
+    public static OrderLicenseKey Create(
+        Guid orderId,
+        Guid orderItemId,
+        Guid productId,
+        string licenseKey)
+    {
+        if (orderId == Guid.Empty)
+        {
+            throw new ArgumentException("Order identifier must not be empty.", nameof(orderId));
+        }
+
+        if (orderItemId == Guid.Empty)
+        {
+            throw new ArgumentException("Order item identifier must not be empty.", nameof(orderItemId));
+        }
+
+        if (productId == Guid.Empty)
+        {
+            throw new ArgumentException("Product identifier must not be empty.", nameof(productId));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(licenseKey);
+
+        return new OrderLicenseKey(Guid.NewGuid(), orderId, orderItemId, productId, licenseKey);
+    }
+}
