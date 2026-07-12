@@ -50,7 +50,7 @@ internal sealed class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQue
             .Where(r => r.UserId == _currentUserService.UserId && productIds.Contains(r.ProductId))
             .ToDictionaryAsync(r => r.ProductId, cancellationToken);
 
-        var invoiceUrl = $"/api/v1/account/orders/{order.Id}/invoice";
+        string? invoiceUrl = null;
         var supportUrl = $"/support/orders/{order.OrderNumber}";
 
         return Result.Success(CommerceMapper.ToOrderDetailDto(

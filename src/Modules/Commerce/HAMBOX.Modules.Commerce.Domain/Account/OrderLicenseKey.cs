@@ -16,12 +16,16 @@ public sealed class OrderLicenseKey : Entity
         Guid orderId,
         Guid orderItemId,
         Guid productId,
+        Guid? productVariantId,
+        Guid? digitalInventoryCodeId,
         string licenseKey)
         : base(id)
     {
         OrderId = orderId;
         OrderItemId = orderItemId;
         ProductId = productId;
+        ProductVariantId = productVariantId;
+        DigitalInventoryCodeId = digitalInventoryCodeId;
         LicenseKey = licenseKey;
     }
 
@@ -40,6 +44,10 @@ public sealed class OrderLicenseKey : Entity
     /// </summary>
     public Guid ProductId { get; private set; }
 
+    public Guid? ProductVariantId { get; private set; }
+
+    public Guid? DigitalInventoryCodeId { get; private set; }
+
     /// <summary>
     /// Gets the license key value.
     /// </summary>
@@ -52,7 +60,9 @@ public sealed class OrderLicenseKey : Entity
         Guid orderId,
         Guid orderItemId,
         Guid productId,
-        string licenseKey)
+        string licenseKey,
+        Guid? productVariantId = null,
+        Guid? digitalInventoryCodeId = null)
     {
         if (orderId == Guid.Empty)
         {
@@ -71,6 +81,13 @@ public sealed class OrderLicenseKey : Entity
 
         ArgumentException.ThrowIfNullOrWhiteSpace(licenseKey);
 
-        return new OrderLicenseKey(Guid.NewGuid(), orderId, orderItemId, productId, licenseKey);
+        return new OrderLicenseKey(
+            Guid.NewGuid(),
+            orderId,
+            orderItemId,
+            productId,
+            productVariantId,
+            digitalInventoryCodeId,
+            licenseKey);
     }
 }

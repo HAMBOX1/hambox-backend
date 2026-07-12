@@ -4,4 +4,4 @@ using System;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Categories.UpdateCategory;
 
-public record UpdateCategoryCommand(Guid Id, string NameAr, string NameEn, string Slug, bool IsActive) : IRequest<Result>;
+public record UpdateCategoryCommand(Guid Id, string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId) : IRequest<Result>;

@@ -1,5 +1,7 @@
 namespace HAMBOX.Modules.Commerce.Application.Contracts.Account;
 
+using HAMBOX.Modules.Commerce.Application.Contracts.Memberships;
+
 /// <summary>
 /// Represents a wishlist item.
 /// </summary>
@@ -33,7 +35,13 @@ public sealed record UserNotificationDto(
     string Body,
     string Category,
     bool IsRead,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    string? ActionUrl = null);
+
+/// <summary>
+/// Represents a customer-owned license key reveal response.
+/// </summary>
+public sealed record RevealCustomerLibraryKeyDto(string LicenseKey);
 
 /// <summary>
 /// Represents a referral tier definition.
@@ -64,13 +72,17 @@ public sealed record ReferralDashboardDto(
     IReadOnlyList<ReferralHistoryDto> RecentHistory);
 
 /// <summary>
-/// Represents membership information derived from order totals.
+/// Represents membership information from the active plan subscription.
 /// </summary>
 public sealed record MembershipCardDto(
-    string Tier,
+    string PlanName,
+    string? BadgeLabel,
+    string Status,
+    DateTime? ExpiresOnUtc,
+    decimal? DiscountPercent,
+    decimal ReferralMultiplier,
     decimal LifetimeSpend,
-    decimal NextTierThreshold,
-    decimal ProgressPercent);
+    IReadOnlyList<MembershipBenefitDto> Benefits);
 
 /// <summary>
 /// Represents a wishlist preview item on the account dashboard.
@@ -136,7 +148,8 @@ public sealed record OrderLicenseKeyDto(
     Guid OrderItemId,
     Guid ProductId,
     string ProductNameEn,
-    string LicenseKey);
+    string MaskedLicenseKey,
+    Guid LicenseKeyId);
 
 /// <summary>
 /// Represents review eligibility for an order item.
@@ -170,3 +183,28 @@ public sealed record OrderDetailDto(
     string? SupportUrl,
     IReadOnlyList<OrderItemReviewStatusDto> ItemReviewStatuses,
     DateTimeOffset CreatedOnUtc);
+
+/// <summary>
+/// Represents a purchased digital product in the customer library.
+/// </summary>
+public sealed record CustomerLibraryItemDto(
+    Guid Id,
+    Guid OrderId,
+    Guid OrderItemId,
+    Guid ProductId,
+    Guid? ProductVariantId,
+    string ProductNameEn,
+    string? ProductImageUrl,
+    string? Platform,
+    string? Edition,
+    string? Region,
+    DateTimeOffset PurchaseDate,
+    string OrderNumber,
+    string OrderStatus,
+    string DeliveryStatus,
+    string MaskedLicenseKey,
+    bool CanReveal,
+    string? RedeemInstructions,
+    string? InvoiceUrl,
+    string? SupportUrl,
+    bool IsRecentPurchase);

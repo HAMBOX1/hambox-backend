@@ -10,7 +10,9 @@ using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.Modules.Identity.Infrastructure.Authentication;
 using HAMBOX.Modules.Identity.Infrastructure.Localization;
+using HAMBOX.Modules.Identity.Infrastructure.Middleware;
 using HAMBOX.Modules.Identity.Infrastructure.Persistence;
+using HAMBOX.Modules.Identity.Infrastructure.PlatformSettings;
 using HAMBOX.Modules.Identity.Infrastructure.Services;
 using HamboxSecurityStampValidator = HAMBOX.Modules.Identity.Infrastructure.Authentication.SecurityStampValidator;
 using IHamboxSecurityStampValidator = HAMBOX.Modules.Identity.Application.Abstractions.ISecurityStampValidator;
@@ -20,6 +22,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -55,6 +58,7 @@ public static class IdentityInfrastructureExtensions
         var jwtSettingsSection = configuration.GetSection(JwtSettings.SectionName);
         services.Configure<JwtSettings>(jwtSettingsSection);
         services.Configure<LockoutSettings>(configuration.GetSection(LockoutSettings.SectionName));
+        services.Configure<AdminOtpSettings>(configuration.GetSection(AdminOtpSettings.SectionName));
 
         var emailSettingsSection = configuration.GetSection(EmailSettings.SectionName);
         services.Configure<EmailSettings>(emailSettingsSection);
@@ -109,6 +113,7 @@ public static class IdentityInfrastructureExtensions
                 {
                     var userIdValue = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
                     var securityStamp = context.Principal?.FindFirst(IdentityClaimTypes.SecurityStamp)?.Value;
+                    var sessionIdValue = context.Principal?.FindFirst(IdentityClaimTypes.SessionId)?.Value;
 
                     if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(securityStamp))
                     {
@@ -125,6 +130,20 @@ public static class IdentityInfrastructureExtensions
                     if (!isValid)
                     {
                         context.Fail("The access token has been revoked.");
+                        return;
+                    }
+
+                    if (Guid.TryParse(sessionIdValue, out var sessionId))
+                    {
+                        var sessionValidator = context.HttpContext.RequestServices.GetRequiredService<ISessionValidator>();
+                        var sessionActive = await sessionValidator.IsSessionActiveAsync(
+                            sessionId,
+                            context.HttpContext.RequestAborted);
+
+                        if (!sessionActive)
+                        {
+                            context.Fail("The session has ended.");
+                        }
                     }
                 }
             };
@@ -137,6 +156,14 @@ public static class IdentityInfrastructureExtensions
                 options.AddPolicy(permission, policy =>
                     policy.AddRequirements(new PermissionRequirement(permission)));
             }
+
+            options.AddPolicy(AuthorizationPolicies.PermissionMatrix, policy =>
+                policy.AddRequirements(new AnyPermissionRequirement(
+                    PermissionConstants.Permissions.View,
+                    PermissionConstants.Roles.View)));
+
+            options.AddPolicy(AuthorizationPolicies.CustomerContext, policy =>
+                policy.AddRequirements(new CustomerContextRequirement()));
         });
 
         // 3. Register Core Services
@@ -146,14 +173,30 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<SmtpEmailService>();
         services.AddScoped<LoggingEmailService>();
-        services.AddScoped<IEmailService>(sp =>
-            sp.GetRequiredService<IOptions<EmailSettings>>().Value.Enabled
-                ? sp.GetRequiredService<SmtpEmailService>()
-                : sp.GetRequiredService<LoggingEmailService>());
+        services.AddScoped<PlatformRoutingEmailService>();
+        services.AddScoped<IEmailService>(sp => sp.GetRequiredService<PlatformRoutingEmailService>());
         services.AddScoped<IUserClaimsService, UserClaimsService>();
         services.AddScoped<IHamboxSecurityStampValidator, HamboxSecurityStampValidator>();
+        services.AddScoped<ISessionValidator, SessionValidator>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, CustomerContextAuthorizationHandler>();
+        services.AddScoped<IAdminAccessResolver, AdminAccessResolver>();
+        services.AddSingleton<IOtpCodeGenerator, OtpCodeGenerator>();
+        services.AddScoped<IAuthTokenIssuer, AuthTokenIssuer>();
+        services.AddSingleton<IClientInfoParser, ClientInfoParser>();
         services.AddScoped<IUserLanguagePreferenceResolver, UserLanguagePreferenceResolver>();
+
+        services.AddMemoryCache();
+        services.AddDataProtection();
+        services.AddSingleton<IPlatformSettingsSecretProtector, PlatformSettingsSecretProtector>();
+        services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
+        services.AddScoped<IPlatformSettingsProvider>(sp => sp.GetRequiredService<IPlatformSettingsService>());
+
+        services.AddScoped<IPermissionResolver, PermissionResolver>();
+        services.AddScoped<IRbacAuthorizationService, RbacAuthorizationService>();
+        services.AddScoped<IAuthorizationAuditService, AuthorizationAuditService>();
+        services.AddScoped<IUserAuthorizationInvalidationService, UserAuthorizationInvalidationService>();
 
         // 4. Register FluentValidation Validators
         services.AddValidatorsFromAssembly(typeof(RegisterCommandValidator).Assembly);

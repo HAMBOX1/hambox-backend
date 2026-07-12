@@ -10,16 +10,24 @@ using HAMBOX.Modules.Catalog.Infrastructure.Extensions;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
 using HAMBOX.Modules.Catalog.Presentation.Extensions;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.GetCart;
+using HAMBOX.Modules.Commerce.Application.Extensions;
 using HAMBOX.Modules.Commerce.Infrastructure.Extensions;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 using HAMBOX.Modules.Commerce.Presentation.Extensions;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Infrastructure.Extensions;
+using HAMBOX.Modules.Identity.Infrastructure.Middleware;
 using HAMBOX.Modules.Identity.Infrastructure.Persistence;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
+using HAMBOX.Modules.Themes.Application.Features.Themes;
+using HAMBOX.Modules.Themes.Infrastructure.Extensions;
+using HAMBOX.Modules.Themes.Infrastructure.Persistence;
+using HAMBOX.Modules.Themes.Presentation.Extensions;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Serilog;
+using System.Text.Json.Serialization;
 
 // ──── Bootstrap Serilog ────────────────────────────────────────
 Log.Logger = new LoggerConfiguration()
@@ -55,6 +63,7 @@ try
         config.RegisterServicesFromAssembly(typeof(RegisterCommand).Assembly);
         config.RegisterServicesFromAssembly(typeof(CreateCategoryCommand).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetCartQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetThemesQuery).Assembly);
         config.AddOpenBehavior(typeof(LoggingBehavior<,>));
         config.AddOpenBehavior(typeof(ValidationBehavior<,>));
     });
@@ -68,13 +77,25 @@ try
     builder.Services.AddIdentityInfrastructure(builder.Configuration);
     builder.Services.AddCatalogInfrastructure(builder.Configuration);
     builder.Services.AddCommerceInfrastructure(builder.Configuration);
+    builder.Services.AddCommerceApplication();
+    builder.Services.AddThemesInfrastructure(builder.Configuration);
 
     builder.Services.Configure<FormOptions>(options =>
     {
         options.MultipartBodyLengthLimit = 10 * 1024 * 1024;
     });
 
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
     var app = builder.Build();
+
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    });
 
     // ──── Database Migrations (Dev-Only) ──────────────────────
     if (app.Environment.IsDevelopment())
@@ -82,8 +103,16 @@ try
         await app.ApplyMigrationsAsync<IdentityDbContext>();
         await app.ApplyMigrationsAsync<CatalogDbContext>();
         await app.ApplyMigrationsAsync<CommerceDbContext>();
+        await app.ApplyMigrationsAsync<ThemesDbContext>();
+        await PromotionDataSeeder.SeedAsync(app.Services);
+        await MembershipDataSeeder.SeedAsync(app.Services);
+        await ThemeDataSeeder.SeedAsync(app.Services);
         await app.SeedIdentityDevelopmentDataAsync();
         app.UseHamboxSwagger();
+    }
+    else if (app.Environment.IsProduction())
+    {
+        await app.SeedProductionDemoDataAsync();
     }
 
     // ──── Middleware Pipeline (order matters) ──────────────────
@@ -94,7 +123,12 @@ try
     app.UseResponseCompression();
 
     app.UseCors("HamboxCors");
-    app.UseHttpsRedirection();
+
+    // Avoid 307 redirects to HTTPS in dev — they break the Angular proxy and strip Authorization headers.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
     var fileStorageSettings = app.Configuration
         .GetSection(FileStorageSettings.SectionName)
@@ -118,11 +152,14 @@ try
     app.UseAuthentication();
     app.UseApplyUserCulture();
     app.UseAuthorization();
+    app.UseMiddleware<HAMBOX.Modules.Commerce.Infrastructure.Middleware.ApiRequestLoggingMiddleware>();
+    app.UseMaintenanceMode();
 
     // ──── Endpoints ───────────────────────────────────────────
     app.MapIdentityEndpoints();
     app.MapCatalogEndpoints();
     app.MapCommerceEndpoints();
+    app.MapThemesEndpoints();
     app.MapLocalizationEndpoints();
     app.MapHealthChecks("/health");
 

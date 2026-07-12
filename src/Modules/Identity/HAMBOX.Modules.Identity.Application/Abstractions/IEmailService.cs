@@ -34,4 +34,14 @@ public interface IEmailService
         DateTimeOffset expiresAt,
         string token,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends an admin portal login OTP code to the specified address.
+    /// </summary>
+    Task SendAdminLoginOtpAsync(
+        Guid userId,
+        string email,
+        string code,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken = default);
 }

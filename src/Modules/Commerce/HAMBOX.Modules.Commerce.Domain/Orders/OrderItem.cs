@@ -1,4 +1,5 @@
 using HAMBOX.Domain.Entities;
+using HAMBOX.Modules.Commerce.Domain.Enums;
 
 namespace HAMBOX.Modules.Commerce.Domain.Orders;
 
@@ -18,16 +19,24 @@ public sealed class OrderItem : Entity
     private OrderItem(
         Guid id,
         Guid orderId,
-        Guid productId,
+        OrderLineItemType lineItemType,
+        Guid? productId,
+        Guid? membershipPlanId,
+        Guid? productVariantId,
         string productNameEn,
+        string? variantSku,
         int quantity,
         decimal unitPrice,
         decimal lineTotal)
         : base(id)
     {
         OrderId = orderId;
+        LineItemType = lineItemType;
         ProductId = productId;
+        MembershipPlanId = membershipPlanId;
+        ProductVariantId = productVariantId;
         ProductNameEn = productNameEn;
+        VariantSku = variantSku;
         Quantity = quantity;
         UnitPrice = unitPrice;
         LineTotal = lineTotal;
@@ -38,10 +47,18 @@ public sealed class OrderItem : Entity
     /// </summary>
     public Guid OrderId { get; private set; }
 
+    public OrderLineItemType LineItemType { get; private set; }
+
     /// <summary>
-    /// Gets the product identifier.
+    /// Gets the product identifier when this is a product line.
     /// </summary>
-    public Guid ProductId { get; private set; }
+    public Guid? ProductId { get; private set; }
+
+    public Guid? MembershipPlanId { get; private set; }
+
+    public Guid? ProductVariantId { get; private set; }
+
+    public string? VariantSku { get; private set; }
 
     /// <summary>
     /// Gets the product name in English at the time of purchase.
@@ -64,14 +81,16 @@ public sealed class OrderItem : Entity
     public decimal LineTotal { get; private set; }
 
     /// <summary>
-    /// Creates a new order item.
+    /// Creates a new product order item.
     /// </summary>
     internal static OrderItem Create(
         Guid orderId,
         Guid productId,
         string productNameEn,
         int quantity,
-        decimal unitPrice)
+        decimal unitPrice,
+        Guid? productVariantId = null,
+        string? variantSku = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(productNameEn);
 
@@ -93,6 +112,51 @@ public sealed class OrderItem : Entity
         ArgumentOutOfRangeException.ThrowIfNegative(unitPrice);
 
         var lineTotal = unitPrice * quantity;
-        return new OrderItem(Guid.NewGuid(), orderId, productId, productNameEn, quantity, unitPrice, lineTotal);
+        return new OrderItem(
+            Guid.NewGuid(),
+            orderId,
+            OrderLineItemType.Product,
+            productId,
+            null,
+            productVariantId,
+            productNameEn,
+            variantSku,
+            quantity,
+            unitPrice,
+            lineTotal);
+    }
+
+    internal static OrderItem CreateMembership(
+        Guid orderId,
+        Guid membershipPlanId,
+        string planName,
+        decimal unitPrice)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(planName);
+
+        if (orderId == Guid.Empty)
+        {
+            throw new ArgumentException("Order identifier must not be empty.", nameof(orderId));
+        }
+
+        if (membershipPlanId == Guid.Empty)
+        {
+            throw new ArgumentException("Membership plan identifier must not be empty.", nameof(membershipPlanId));
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(unitPrice);
+
+        return new OrderItem(
+            Guid.NewGuid(),
+            orderId,
+            OrderLineItemType.Membership,
+            null,
+            membershipPlanId,
+            null,
+            planName,
+            null,
+            1,
+            unitPrice,
+            unitPrice);
     }
 }

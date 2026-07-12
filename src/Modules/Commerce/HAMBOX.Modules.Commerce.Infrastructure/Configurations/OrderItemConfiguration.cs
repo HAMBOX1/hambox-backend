@@ -16,8 +16,14 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
 
         builder.HasKey(i => i.Id);
 
-        builder.Property(i => i.ProductId)
-            .IsRequired();
+        builder.Property(i => i.ProductId);
+
+        builder.Property(i => i.MembershipPlanId);
+
+        builder.Property(i => i.LineItemType)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         builder.Property(i => i.ProductNameEn)
             .IsRequired()
@@ -33,6 +39,8 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
         builder.Property(i => i.LineTotal)
             .IsRequired()
             .HasColumnType("decimal(18,2)");
+
+        builder.Property(i => i.VariantSku).HasMaxLength(100);
 
         builder.Property(i => i.CreatedOnUtc)
             .IsRequired();

@@ -15,11 +15,12 @@ public sealed class CartItem : Entity
     {
     }
 
-    private CartItem(Guid id, Guid shoppingCartId, Guid productId, int quantity, decimal unitPrice)
+    private CartItem(Guid id, Guid shoppingCartId, Guid productId, Guid? productVariantId, int quantity, decimal unitPrice)
         : base(id)
     {
         ShoppingCartId = shoppingCartId;
         ProductId = productId;
+        ProductVariantId = productVariantId;
         Quantity = quantity;
         UnitPrice = unitPrice;
     }
@@ -34,6 +35,8 @@ public sealed class CartItem : Entity
     /// </summary>
     public Guid ProductId { get; private set; }
 
+    public Guid? ProductVariantId { get; private set; }
+
     /// <summary>
     /// Gets the quantity in the cart.
     /// </summary>
@@ -47,7 +50,7 @@ public sealed class CartItem : Entity
     /// <summary>
     /// Creates a new cart item.
     /// </summary>
-    internal static CartItem Create(Guid shoppingCartId, Guid productId, int quantity, decimal unitPrice)
+    internal static CartItem Create(Guid shoppingCartId, Guid productId, int quantity, decimal unitPrice, Guid? productVariantId = null)
     {
         if (shoppingCartId == Guid.Empty)
         {
@@ -66,7 +69,7 @@ public sealed class CartItem : Entity
 
         ArgumentOutOfRangeException.ThrowIfNegative(unitPrice);
 
-        return new CartItem(Guid.NewGuid(), shoppingCartId, productId, quantity, unitPrice);
+        return new CartItem(Guid.NewGuid(), shoppingCartId, productId, productVariantId, quantity, unitPrice);
     }
 
     /// <summary>

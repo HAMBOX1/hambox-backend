@@ -32,6 +32,9 @@ internal sealed class UserNotificationConfiguration : IEntityTypeConfiguration<U
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.Property(n => n.ActionUrl)
+            .HasMaxLength(500);
+
         builder.Property(n => n.IsRead)
             .IsRequired();
 

@@ -38,6 +38,19 @@ internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSe
 
         builder.Property(s => s.EndedOnUtc);
 
+        builder.Property(s => s.AuthContext)
+            .IsRequired()
+            .HasMaxLength(32)
+            .HasDefaultValue("customer");
+
+        builder.Property(s => s.RefreshTokenId);
+
+        builder.Property(s => s.BrowserName)
+            .HasMaxLength(128);
+
+        builder.Property(s => s.DeviceName)
+            .HasMaxLength(128);
+
         // Base entity properties
         builder.Property(s => s.CreatedOnUtc)
             .IsRequired();

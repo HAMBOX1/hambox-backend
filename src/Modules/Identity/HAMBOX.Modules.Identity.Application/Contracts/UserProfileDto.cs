@@ -23,4 +23,6 @@ public sealed record UserProfileDto(
     string Status,
     string PreferredLanguage,
     string PreferredCurrency,
-    DateTimeOffset MemberSince);
+    DateTimeOffset MemberSince,
+    IReadOnlyCollection<string> Roles,
+    IReadOnlyCollection<string> Permissions);

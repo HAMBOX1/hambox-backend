@@ -31,8 +31,16 @@ internal sealed class CartItemConfiguration : IEntityTypeConfiguration<CartItem>
 
         builder.Property(i => i.ModifiedOnUtc);
 
+        builder.Property(i => i.ProductVariantId);
+
+        builder.HasIndex(i => new { i.ShoppingCartId, i.ProductId, i.ProductVariantId })
+            .IsUnique()
+            .HasDatabaseName("IX_CartItems_ShoppingCartId_ProductId_VariantId")
+            .HasFilter("[ProductVariantId] IS NOT NULL");
+
         builder.HasIndex(i => new { i.ShoppingCartId, i.ProductId })
             .IsUnique()
-            .HasDatabaseName("IX_CartItems_ShoppingCartId_ProductId");
+            .HasDatabaseName("IX_CartItems_ShoppingCartId_ProductId_NoVariant")
+            .HasFilter("[ProductVariantId] IS NULL");
     }
 }

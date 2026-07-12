@@ -33,6 +33,11 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(c => c.IsActive)
             .IsRequired();
 
+        builder.Property(c => c.ParentId);
+
+        builder.HasIndex(c => c.ParentId)
+            .HasDatabaseName("IX_Categories_ParentId");
+
         // Audit properties (IAuditable)
         builder.Property(c => c.CreatedBy)
             .HasMaxLength(256);

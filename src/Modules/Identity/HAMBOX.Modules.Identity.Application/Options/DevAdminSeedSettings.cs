@@ -1,7 +1,38 @@
 namespace HAMBOX.Modules.Identity.Application.Options;
 
 /// <summary>
-/// Settings for seeding a development admin account.
+/// A single development admin account to seed.
+/// </summary>
+public sealed class DevAdminAccountSeed
+{
+    /// <summary>
+    /// Gets or sets the admin account email address.
+    /// </summary>
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the admin account password.
+    /// </summary>
+    public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the admin account first name.
+    /// </summary>
+    public string FirstName { get; set; } = "Dev";
+
+    /// <summary>
+    /// Gets or sets the admin account last name.
+    /// </summary>
+    public string LastName { get; set; } = "Admin";
+
+    /// <summary>
+    /// Gets or sets the seeded role name (for example, Owner or Administrator).
+    /// </summary>
+    public string Role { get; set; } = "Owner";
+}
+
+/// <summary>
+/// Settings for seeding development admin accounts.
 /// </summary>
 public sealed class DevAdminSeedSettings
 {
@@ -11,32 +42,63 @@ public sealed class DevAdminSeedSettings
     public const string SectionName = "DevAdminSeed";
 
     /// <summary>
-    /// Gets a value indicating whether the development admin seed runs at startup.
+    /// Gets or sets a value indicating whether the development admin seed runs at startup.
     /// </summary>
-    public bool Enabled { get; init; }
+    public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets the admin account email address.
+    /// Gets or sets the primary admin account email address.
     /// </summary>
-    public string Email { get; init; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets the admin account password.
+    /// Gets or sets the primary admin account password.
     /// </summary>
-    public string Password { get; init; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets the admin account first name.
+    /// Gets or sets the primary admin account first name.
     /// </summary>
-    public string FirstName { get; init; } = "Dev";
+    public string FirstName { get; set; } = "Dev";
 
     /// <summary>
-    /// Gets the admin account last name.
+    /// Gets or sets the primary admin account last name.
     /// </summary>
-    public string LastName { get; init; } = "Admin";
+    public string LastName { get; set; } = "Admin";
 
     /// <summary>
-    /// Gets the seeded role name (for example, Admin or SuperAdmin).
+    /// Gets or sets the primary seeded role name.
     /// </summary>
-    public string Role { get; init; } = "Admin";
+    public string Role { get; set; } = "Owner";
+
+    /// <summary>
+    /// Gets or sets additional development admin accounts to seed.
+    /// </summary>
+    public List<DevAdminAccountSeed> AdditionalAccounts { get; set; } = [];
+
+    /// <summary>
+    /// Returns all configured admin accounts for seeding.
+    /// </summary>
+    public IEnumerable<DevAdminAccountSeed> EnumerateAccounts()
+    {
+        if (!string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Password))
+        {
+            yield return new DevAdminAccountSeed
+            {
+                Email = Email,
+                Password = Password,
+                FirstName = FirstName,
+                LastName = LastName,
+                Role = Role,
+            };
+        }
+
+        foreach (var account in AdditionalAccounts)
+        {
+            if (!string.IsNullOrWhiteSpace(account.Email) && !string.IsNullOrWhiteSpace(account.Password))
+            {
+                yield return account;
+            }
+        }
+    }
 }

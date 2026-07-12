@@ -32,6 +32,12 @@ internal sealed class DeleteCategoryCommandHandler : IRequestHandler<DeleteCateg
             return Result.Failure(new Error("Categories.HasProducts", "Cannot delete category with products"));
         }
 
+        var hasChildren = await _dbContext.Categories.AnyAsync(c => c.ParentId == request.Id, cancellationToken);
+        if (hasChildren)
+        {
+            return Result.Failure(CatalogErrors.CategoryHasChildren);
+        }
+
         _dbContext.Categories.Remove(category);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

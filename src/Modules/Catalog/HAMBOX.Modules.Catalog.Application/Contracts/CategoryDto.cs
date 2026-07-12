@@ -13,4 +13,5 @@ public sealed record CategoryDto(
     string NameAr,
     string NameEn,
     string Slug,
-    bool IsActive);
+    bool IsActive,
+    Guid? ParentId);

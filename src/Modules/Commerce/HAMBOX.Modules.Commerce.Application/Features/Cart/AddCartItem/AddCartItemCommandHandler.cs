@@ -16,15 +16,21 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IInventoryEngine _inventoryEngine;
+    private readonly CartResponseBuilder _cartResponseBuilder;
 
     public AddCartItemCommandHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IInventoryEngine inventoryEngine,
+        CartResponseBuilder cartResponseBuilder)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
+        _inventoryEngine = inventoryEngine;
+        _cartResponseBuilder = cartResponseBuilder;
     }
 
     public async Task<Result<Contracts.CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
@@ -42,6 +48,25 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
             return Result.Failure<Contracts.CartDto>(CatalogErrors.ProductNotActive);
         }
 
+        decimal unitPrice = product.Price;
+
+        if (request.ProductVariantId is Guid variantId)
+        {
+            var variant = await _catalogDbContext.ProductVariants
+                .FirstOrDefaultAsync(v => v.Id == variantId && v.ProductId == request.ProductId, cancellationToken);
+
+            if (variant is null || variant.Status != ProductVariantStatus.Active || !variant.IsVisible)
+            {
+                return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantNotFound);
+            }
+
+            unitPrice = variant.PriceOverride ?? product.Price;
+        }
+        else if (await _inventoryEngine.ProductHasVariantsAsync(request.ProductId, cancellationToken))
+        {
+            return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantRequired);
+        }
+
         var (cart, guestSessionId) = await CartResolver.GetOrCreateCartAsync(
             _commerceDbContext,
             _currentUserService,
@@ -49,29 +74,35 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
             createGuestSessionIfMissing: true,
             cancellationToken);
 
-        var existingItem = cart.Items.FirstOrDefault(i => i.ProductId == request.ProductId);
+        var existingItem = cart.Items.FirstOrDefault(i =>
+            i.ProductId == request.ProductId && i.ProductVariantId == request.ProductVariantId);
         var newQuantity = existingItem is null
             ? request.Quantity
             : existingItem.Quantity + request.Quantity;
 
-        if (product.AvailableStock < newQuantity)
+        if (request.ProductVariantId is Guid stockVariantId)
+        {
+            var stock = await _inventoryEngine.GetVariantStockAsync(stockVariantId, cancellationToken);
+            if (stock.Available < newQuantity)
+            {
+                return Result.Failure<Contracts.CartDto>(
+                    CatalogErrors.InsufficientInventoryQuantity(
+                        stock.Available,
+                        newQuantity,
+                        existingItem?.Quantity ?? 0));
+            }
+        }
+        else if (product.AvailableStock < newQuantity)
         {
             return Result.Failure<Contracts.CartDto>(CatalogErrors.InsufficientStock);
         }
 
-        cart.AddOrUpdateItem(request.ProductId, newQuantity, product.Price);
+        cart.AddOrUpdateItem(request.ProductId, newQuantity, unitPrice, request.ProductVariantId);
 
+        await CartPersistenceHelper.PrepareForSaveAsync(_commerceDbContext, cart, cancellationToken);
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
-        var productIds = cart.Items.Select(i => i.ProductId).ToList();
-        var products = await _catalogDbContext.Products
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        return Result.Success(CommerceMapper.ToCartDto(
-            cart,
-            guestSessionId,
-            products,
-            _currentUserService.IsAuthenticated));
+        var dto = await _cartResponseBuilder.BuildAsync(cart, guestSessionId, countryCode: null, cancellationToken);
+        return Result.Success(dto);
     }
 }

@@ -41,6 +41,17 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.Property(o => o.PaymentProvider)
+            .HasMaxLength(50);
+
+        builder.Property(o => o.PaymentTransactionId)
+            .HasMaxLength(100);
+
+        builder.Property(o => o.PaymentStatus)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(o => o.Subtotal)
             .IsRequired()
             .HasColumnType("decimal(18,2)");
@@ -56,6 +67,18 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.TotalAmount)
             .IsRequired()
             .HasColumnType("decimal(18,2)");
+
+        builder.Property(o => o.Kind)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(o => o.MembershipAction)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(o => o.MembershipPlanId);
+        builder.Property(o => o.MembershipSubscriptionId);
 
         builder.Property(o => o.CreatedOnUtc)
             .IsRequired();

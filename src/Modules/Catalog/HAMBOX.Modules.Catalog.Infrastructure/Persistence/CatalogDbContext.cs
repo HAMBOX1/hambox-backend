@@ -1,8 +1,10 @@
 using HAMBOX.Domain.Entities;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
+using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,6 +35,19 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     /// Gets or sets the product drafts table.
     /// </summary>
     public DbSet<ProductDraft> ProductDrafts => Set<ProductDraft>();
+
+    public DbSet<ProductPlan> ProductPlans => Set<ProductPlan>();
+    public DbSet<ProductOptionGroup> ProductOptionGroups => Set<ProductOptionGroup>();
+    public DbSet<ProductOption> ProductOptions => Set<ProductOption>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+    public DbSet<ProductVariantOption> ProductVariantOptions => Set<ProductVariantOption>();
+    public DbSet<InventorySupplier> InventorySuppliers => Set<InventorySupplier>();
+    public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
+    public DbSet<DigitalInventoryCode> DigitalInventoryCodes => Set<DigitalInventoryCode>();
+    public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
+    public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
+    public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
+    public DbSet<ProductViewEvent> ProductViewEvents => Set<ProductViewEvent>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

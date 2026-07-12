@@ -49,6 +49,46 @@ internal static class EmailMessageBuilder
             expiresAtUtc);
     }
 
+    /// <summary>
+    /// Builds an admin portal login OTP message.
+    /// </summary>
+    public static MimeMessage BuildAdminOtpMessage(
+        EmailSettings settings,
+        string recipientEmail,
+        string code,
+        DateTimeOffset expiresAtUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientEmail);
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(settings.FromName, settings.FromAddress));
+        message.To.Add(MailboxAddress.Parse(recipientEmail));
+        message.Subject = "HAMBOX Admin Portal verification code";
+
+        var expiryText = expiresAtUtc.ToString("u");
+        var plainText = $"""
+            Admin Portal sign-in verification
+
+            Your one-time verification code is: {code}
+
+            This code expires on {expiryText} (UTC).
+
+            If you did not attempt to sign in, secure your account immediately.
+            """;
+
+        var html = $"""
+            <p><strong>Admin Portal sign-in verification</strong></p>
+            <p>Your one-time verification code is:</p>
+            <p style="font-size:24px;letter-spacing:4px;"><strong>{code}</strong></p>
+            <p>This code expires on <strong>{expiryText}</strong> (UTC).</p>
+            <p>If you did not attempt to sign in, secure your account immediately.</p>
+            """;
+
+        message.Body = new BodyBuilder { TextBody = plainText, HtmlBody = html }.ToMessageBody();
+        return message;
+    }
+
     private static MimeMessage BuildMessage(
         EmailSettings settings,
         string recipientEmail,

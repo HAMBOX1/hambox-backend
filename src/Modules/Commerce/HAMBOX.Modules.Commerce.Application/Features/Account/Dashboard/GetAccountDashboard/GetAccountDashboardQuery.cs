@@ -2,9 +2,12 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
+using HAMBOX.Modules.Commerce.Application.Contracts.Memberships;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
+using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -18,15 +21,21 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IMembershipEngine _membershipEngine;
+    private readonly MembershipOperationsService _membershipOperations;
 
     public GetAccountDashboardQueryHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IMembershipEngine membershipEngine,
+        MembershipOperationsService membershipOperations)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
+        _membershipEngine = membershipEngine;
+        _membershipOperations = membershipOperations;
     }
 
     public async Task<Result<AccountDashboardDto>> Handle(
@@ -40,11 +49,27 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
 
         var userId = _currentUserService.UserId;
 
+        await EnsureDefaultMembershipAsync(userId, cancellationToken);
+
         var lifetimeSpend = await _commerceDbContext.Orders
             .Where(o => o.UserId == userId)
             .SumAsync(o => o.TotalAmount, cancellationToken);
 
-        var (tier, nextThreshold, progress) = MembershipTierResolver.Resolve(lifetimeSpend);
+        var snapshot = await _membershipEngine.ResolveAsync(userId, cancellationToken);
+        var subscription = await _commerceDbContext.MembershipSubscriptions
+            .Where(s => s.UserId == userId && s.Status == MembershipSubscriptionStatus.Active)
+            .OrderByDescending(s => s.ExpiresOnUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var membershipCard = new MembershipCardDto(
+            snapshot.PlanName,
+            snapshot.BadgeLabel,
+            subscription?.Status.ToString() ?? "Active",
+            subscription?.ExpiresOnUtc,
+            snapshot.DiscountPercentage,
+            snapshot.ReferralMultiplier,
+            lifetimeSpend,
+            snapshot.Benefits.Select(b => new MembershipBenefitDto(b.Type, b.Value, b.DisplayName, 0)).ToList());
 
         var wishlistItems = await _commerceDbContext.WishlistItems
             .Where(w => w.UserId == userId)
@@ -116,10 +141,32 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
             .ToList();
 
         return Result.Success(new AccountDashboardDto(
-            new MembershipCardDto(tier, lifetimeSpend, nextThreshold, progress),
+            membershipCard,
             wishlistPreview,
             AccountMapper.ToReferralSummaryDto(referralProfile),
             activity,
             unreadCount));
+    }
+
+    private async Task EnsureDefaultMembershipAsync(string userId, CancellationToken cancellationToken)
+    {
+        var hasActive = await _commerceDbContext.MembershipSubscriptions
+            .AnyAsync(s => s.UserId == userId && s.Status == MembershipSubscriptionStatus.Active, cancellationToken);
+
+        if (hasActive)
+        {
+            return;
+        }
+
+        var defaultPlan = await _commerceDbContext.MembershipPlans
+            .FirstOrDefaultAsync(p => p.IsDefault && p.Status == MembershipPlanStatus.Active, cancellationToken);
+
+        if (defaultPlan is null)
+        {
+            return;
+        }
+
+        await _membershipOperations.AssignAsync(userId, defaultPlan.Id, false, userId, cancellationToken);
+        await _commerceDbContext.SaveChangesAsync(cancellationToken);
     }
 }

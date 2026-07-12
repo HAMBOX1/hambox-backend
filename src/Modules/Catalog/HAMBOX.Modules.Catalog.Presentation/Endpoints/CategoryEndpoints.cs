@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Application.Features.Categories;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.DeleteCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategories;
@@ -83,7 +84,7 @@ internal static class CategoryEndpoints
         // POST /api/v1/categories
         group.MapPost("", async Task<Results<Created<Guid>, BadRequest<ProblemDetails>>> ([FromBody] CreateCategoryRequest request, ISender sender) =>
         {
-            var command = new CreateCategoryCommand(request.NameAr, request.NameEn, request.Slug);
+            var command = new CreateCategoryCommand(request.NameAr, request.NameEn, request.Slug, request.ParentId);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -100,12 +101,12 @@ internal static class CategoryEndpoints
             });
         })
         .WithName("CreateCategory")
-        .RequirePermission(PermissionConstants.Categories.Create);
+        .RequirePermission(PermissionConstants.Catalog.Categories.Create);
 
         // PUT /api/v1/categories/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateCategoryRequest request, ISender sender) =>
         {
-            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive);
+            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive, request.ParentId);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -122,7 +123,7 @@ internal static class CategoryEndpoints
             });
         })
         .WithName("UpdateCategory")
-        .RequirePermission(PermissionConstants.Categories.Update);
+        .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
 
         // DELETE /api/v1/categories/{id}
         group.MapDelete("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, ISender sender) =>
@@ -144,9 +145,28 @@ internal static class CategoryEndpoints
             });
         })
         .WithName("DeleteCategory")
-        .RequirePermission(PermissionConstants.Categories.Delete);
+        .RequirePermission(PermissionConstants.Catalog.Categories.Delete);
+
+        group.MapPost("{id:guid}/restore", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new RestoreCategoryCommand(id));
+            if (result.IsSuccess)
+            {
+                return TypedResults.NoContent();
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("RestoreCategory")
+        .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
     }
 }
 
-internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug);
-internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive);
+internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug, Guid? ParentId);
+internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId);

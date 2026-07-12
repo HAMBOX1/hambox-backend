@@ -3,5 +3,5 @@ using MediatR;
 
 namespace HAMBOX.Modules.Commerce.Application.Features.Cart.UpdateCartItem;
 
-public sealed record UpdateCartItemCommand(Guid ProductId, int Quantity, string? GuestSessionId)
+public sealed record UpdateCartItemCommand(Guid ProductId, int Quantity, string? GuestSessionId, Guid? ProductVariantId = null)
     : IRequest<Result<Contracts.CartDto>>;

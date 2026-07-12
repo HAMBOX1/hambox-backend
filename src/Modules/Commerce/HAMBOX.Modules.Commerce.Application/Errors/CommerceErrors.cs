@@ -97,4 +97,75 @@ public static class CommerceErrors
     public static readonly Error NotificationNotFound = new(
         "Notifications.NotFound",
         "The notification with the specified identifier was not found.");
+
+    public static Error InvalidCoupon(string message) => new("Promotions.InvalidCoupon", message);
+
+    public static readonly Error PromotionNotFound = new(
+        "Promotions.NotFound",
+        "The promotion was not found.");
+
+    public static readonly Error CouponNotFound = new(
+        "Coupons.NotFound",
+        "The coupon code was not found.");
+
+    public static readonly Error MembershipPlanNotFound = new("Memberships.PlanNotFound", "Membership plan was not found.");
+    public static readonly Error MembershipSubscriptionNotFound = new("Memberships.SubscriptionNotFound", "Membership subscription was not found.");
+    public static readonly Error MembershipSubscriptionAlreadyActive = new("Memberships.SubscriptionAlreadyActive", "You already have an active membership. Use upgrade or downgrade instead.");
+    public static readonly Error MembershipPlanSlugExists = new("Memberships.SlugExists", "A plan with this slug already exists.");
+    public static readonly Error MembershipCheckoutRequired = new("Memberships.CheckoutRequired", "Complete membership purchase through checkout.");
+    public static readonly Error MembershipCheckoutActionInvalid = new("Memberships.CheckoutActionInvalid", "The membership checkout action is not supported.");
+    public static readonly Error MembershipCheckoutPending = new("Memberships.CheckoutPending", "A membership checkout is already pending. Complete or retry payment.");
+    public static readonly Error MembershipPlanUnchanged = new("Memberships.PlanUnchanged", "You are already on this membership plan.");
+
+    public static readonly Error PaymentMethodNotSupported = new(
+        "Checkout.PaymentMethodNotSupported",
+        "The selected payment method is not supported.");
+
+    public static readonly Error PaymentFailed = new(
+        "Checkout.PaymentFailed",
+        "Payment could not be processed.");
+
+    public static Error InvalidOrderStatus(string status) => new(
+        "Orders.InvalidStatus",
+        $"The order status '{status}' is not supported.");
+
+    public static Error OrderStatusTransitionFailed(string message) => new(
+        "Orders.StatusTransitionFailed",
+        message);
+
+    public static readonly Error OrderNoteNotFound = new(
+        "Orders.NoteNotFound",
+        "The admin note was not found.");
+
+    public static readonly Error OrderLicenseKeyNotFound = new(
+        "Orders.LicenseKeyNotFound",
+        "The license key was not found.");
+
+    public static readonly Error OrderRefundNotSupported = new(
+        "Orders.RefundNotSupported",
+        "This order cannot be refunded.");
+
+    public static readonly Error OrderItemNotFound = new(
+        "Orders.ItemNotFound",
+        "The order line item was not found.");
+
+    public static readonly Error OrderFulfillmentFailed = new(
+        "Orders.FulfillmentFailed",
+        "Fulfillment could not be completed.");
+
+    public static readonly Error OrderFulfillmentNothingToRetry = new(
+        "Orders.FulfillmentNothingToRetry",
+        "All line items already have the required digital codes.");
+
+    public static readonly Error OrderBulkEmpty = new(
+        "Orders.BulkEmpty",
+        "Select at least one order for bulk actions.");
+
+    public static Error OrderBulkActionNotSupported(string action) => new(
+        "Orders.BulkActionNotSupported",
+        $"Bulk action '{action}' is not supported.");
+
+    public static Error OrderManualCodeInvalid(string message) => new(
+        "Orders.ManualCodeInvalid",
+        message);
 }

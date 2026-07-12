@@ -25,9 +25,12 @@ internal sealed class OrderLicenseKeyConfiguration : IEntityTypeConfiguration<Or
         builder.Property(k => k.ProductId)
             .IsRequired();
 
+        builder.Property(k => k.ProductVariantId);
+        builder.Property(k => k.DigitalInventoryCodeId);
+
         builder.Property(k => k.LicenseKey)
             .IsRequired()
-            .HasMaxLength(50);
+            .HasMaxLength(500);
 
         builder.Property(k => k.CreatedOnUtc)
             .IsRequired();
@@ -38,7 +41,6 @@ internal sealed class OrderLicenseKeyConfiguration : IEntityTypeConfiguration<Or
             .HasDatabaseName("IX_OrderLicenseKeys_OrderId");
 
         builder.HasIndex(k => k.OrderItemId)
-            .IsUnique()
             .HasDatabaseName("IX_OrderLicenseKeys_OrderItemId");
     }
 }

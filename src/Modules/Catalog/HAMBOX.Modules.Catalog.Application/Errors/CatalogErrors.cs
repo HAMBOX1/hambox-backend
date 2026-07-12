@@ -69,4 +69,79 @@ public static class CatalogErrors
     public static readonly Error ProductImageLimitReached = new(
         "Products.ImageLimitReached",
         "The product has reached the maximum number of images.");
+
+    public static readonly Error VariantNotFound = new(
+        "Inventory.VariantNotFound",
+        "The product variant was not found.");
+
+    public static readonly Error VariantRequired = new(
+        "Inventory.VariantRequired",
+        "A product variant must be selected for this product.");
+
+    public static readonly Error SupplierNotFound = new(
+        "Inventory.SupplierNotFound",
+        "The inventory supplier was not found.");
+
+    public static readonly Error BatchNotFound = new(
+        "Inventory.BatchNotFound",
+        "The inventory batch was not found.");
+
+    public static readonly Error CodeNotFound = new(
+        "Inventory.CodeNotFound",
+        "The inventory code was not found.");
+
+    public static readonly Error DuplicateCode = new(
+        "Inventory.DuplicateCode",
+        "The digital code already exists in inventory.");
+
+    public static readonly Error InsufficientInventory = new(
+        "Inventory.InsufficientInventory",
+        "Insufficient digital codes available for this variant.");
+
+    public static Error InsufficientInventoryQuantity(int available, int requested, int alreadyInCart) =>
+        new(
+            "Inventory.InsufficientInventory",
+            alreadyInCart > 0
+                ? $"Only {available} code(s) in stock. Your cart already has {alreadyInCart}; cannot reach quantity {requested}."
+                : $"Only {available} code(s) in stock; requested quantity is {requested}.");
+
+    public static readonly Error DuplicateVariantCombination = new(
+        "Inventory.DuplicateVariantCombination",
+        "A variant with this option combination already exists.");
+
+    public static readonly Error OptionGroupNotFound = new(
+        "Inventory.OptionGroupNotFound",
+        "The option group was not found.");
+
+    public static readonly Error OptionNotFound = new(
+        "Inventory.OptionNotFound",
+        "The product option was not found.");
+
+    public static readonly Error OptionInUse = new(
+        "Inventory.OptionInUse",
+        "The option is used by one or more variants and cannot be removed.");
+
+    public static readonly Error OptionGroupInUse = new(
+        "Inventory.OptionGroupInUse",
+        "The option group is used by one or more variants and cannot be removed.");
+
+    public static readonly Error NoOptionGroups = new(
+        "Inventory.NoOptionGroups",
+        "Create at least one option group with values before generating variants.");
+
+    public static readonly Error EmptyOptionGroup = new(
+        "Inventory.EmptyOptionGroup",
+        "Every option group must contain at least one option value.");
+
+    public static readonly Error InvalidCodeStatus = new(
+        "Inventory.InvalidCodeStatus",
+        "The inventory code status does not allow this operation.");
+
+    public static readonly Error CategoryHasChildren = new(
+        "Categories.HasChildren",
+        "The category has child categories and cannot be deleted.");
+
+    public static readonly Error CategoryCycle = new(
+        "Categories.Cycle",
+        "The parent assignment would create a category cycle.");
 }

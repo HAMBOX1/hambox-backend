@@ -103,7 +103,7 @@ internal static class ProductImageEndpoints
             });
         })
         .WithName("UploadProductImage")
-        .RequirePermission(PermissionConstants.Products.Update)
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit)
         .DisableAntiforgery();
 
         group.MapDelete("{imageId:guid}", async Task<Results<NoContent, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
@@ -139,7 +139,7 @@ internal static class ProductImageEndpoints
             });
         })
         .WithName("DeleteProductImage")
-        .RequirePermission(PermissionConstants.Products.Update);
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
         group.MapPut("{imageId:guid}/primary", async Task<Results<Ok<ProductImageDto>, NotFound<ProblemDetails>>> (
             Guid productId,
@@ -162,7 +162,7 @@ internal static class ProductImageEndpoints
             });
         })
         .WithName("SetPrimaryProductImage")
-        .RequirePermission(PermissionConstants.Products.Update);
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
         group.MapPut("reorder", async Task<Results<Ok<IReadOnlyList<ProductImageDto>>, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
             Guid productId,
@@ -196,7 +196,7 @@ internal static class ProductImageEndpoints
             });
         })
         .WithName("ReorderProductImages")
-        .RequirePermission(PermissionConstants.Products.Update);
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
     }
 }
 

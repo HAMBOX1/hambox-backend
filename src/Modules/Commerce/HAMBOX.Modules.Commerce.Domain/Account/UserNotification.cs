@@ -16,13 +16,15 @@ public sealed class UserNotification : Entity
         string userId,
         string title,
         string body,
-        string category)
+        string category,
+        string? actionUrl)
         : base(id)
     {
         UserId = userId;
         Title = title;
         Body = body;
         Category = category;
+        ActionUrl = actionUrl;
         IsRead = false;
     }
 
@@ -47,6 +49,11 @@ public sealed class UserNotification : Entity
     public string Category { get; private set; } = string.Empty;
 
     /// <summary>
+    /// Gets an optional deep-link for the notification (e.g. library item).
+    /// </summary>
+    public string? ActionUrl { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether the notification has been read.
     /// </summary>
     public bool IsRead { get; private set; }
@@ -54,14 +61,25 @@ public sealed class UserNotification : Entity
     /// <summary>
     /// Creates a new user notification.
     /// </summary>
-    public static UserNotification Create(string userId, string title, string body, string category)
+    public static UserNotification Create(
+        string userId,
+        string title,
+        string body,
+        string category,
+        string? actionUrl = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(body);
         ArgumentException.ThrowIfNullOrWhiteSpace(category);
 
-        return new UserNotification(Guid.NewGuid(), userId, title, body, category);
+        return new UserNotification(
+            Guid.NewGuid(),
+            userId,
+            title,
+            body,
+            category,
+            string.IsNullOrWhiteSpace(actionUrl) ? null : actionUrl.Trim());
     }
 
     /// <summary>

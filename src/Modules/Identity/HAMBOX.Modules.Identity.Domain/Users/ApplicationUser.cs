@@ -328,4 +328,12 @@ public sealed class ApplicationUser : AggregateRoot, IAuditable, ISoftDeletable
         AccessFailedCount = 0;
         LockoutEnd = null;
     }
+
+    /// <summary>
+    /// Rotates the security stamp to invalidate existing access tokens.
+    /// </summary>
+    public void RotateSecurityStamp()
+    {
+        SecurityStamp = Guid.NewGuid().ToString("N");
+    }
 }

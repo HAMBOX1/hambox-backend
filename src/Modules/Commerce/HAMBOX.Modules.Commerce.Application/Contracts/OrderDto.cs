@@ -4,7 +4,9 @@ namespace HAMBOX.Modules.Commerce.Application.Contracts;
 /// Represents an order line item.
 /// </summary>
 public sealed record OrderItemDto(
-    Guid ProductId,
+    Guid? ProductId,
+    Guid? MembershipPlanId,
+    string LineItemType,
     string ProductNameEn,
     int Quantity,
     decimal UnitPrice,
@@ -17,9 +19,14 @@ public sealed record OrderDto(
     Guid Id,
     string OrderNumber,
     string Status,
+    string OrderKind,
+    string? MembershipAction,
     string Email,
     string Country,
     string PaymentMethod,
+    string? PaymentProvider,
+    string? PaymentTransactionId,
+    string PaymentStatus,
     decimal Subtotal,
     decimal DiscountAmount,
     decimal TaxAmount,

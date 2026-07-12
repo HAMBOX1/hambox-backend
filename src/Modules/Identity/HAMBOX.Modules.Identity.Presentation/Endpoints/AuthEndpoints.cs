@@ -1,4 +1,5 @@
 using HAMBOX.Infrastructure.Localization;
+using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
 using HAMBOX.Modules.Identity.Application.Features.GetMe;
@@ -8,6 +9,7 @@ using HAMBOX.Modules.Identity.Application.Features.RefreshToken;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Application.Features.ResendVerification;
 using HAMBOX.Modules.Identity.Application.Features.ResetPassword;
+using HAMBOX.Modules.Identity.Application.Features.Sessions;
 using HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 using HAMBOX.Modules.Identity.Application.Features.VerifyEmail;
 using MediatR;
@@ -64,6 +66,56 @@ public static class AuthEndpoints
                 ipAddress,
                 userAgent);
 
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
+
+        group.MapPost("admin/login", async (
+            [FromBody] LoginRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+
+            var command = new AdminLoginCommand(
+                request.Email,
+                request.Password,
+                ipAddress,
+                userAgent);
+
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
+
+        group.MapPost("admin/verify-otp", async (
+            [FromBody] VerifyAdminOtpRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+
+            var command = new VerifyAdminOtpCommand(
+                request.ChallengeId,
+                request.Code,
+                ipAddress,
+                userAgent);
+
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
+
+        group.MapPost("admin/resend-otp", async (
+            [FromBody] ResendAdminOtpRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var command = new ResendAdminOtpCommand(request.ChallengeId, ipAddress);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         });
@@ -174,6 +226,24 @@ public static class AuthEndpoints
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireAuthorization();
 
+        group.MapGet("sessions", async (
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GetSessionsQuery(), ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        }).RequireAuthorization();
+
+        group.MapPost("sessions/revoke-all", async (
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new RevokeAllSessionsCommand(), ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        }).RequireAuthorization();
+
         return group;
     }
 }
@@ -227,3 +297,13 @@ public sealed record UpdateProfileRequest(
 /// Represents a change password request.
 /// </summary>
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+/// <summary>
+/// Represents an admin OTP verification request.
+/// </summary>
+public sealed record VerifyAdminOtpRequest(Guid ChallengeId, string Code);
+
+/// <summary>
+/// Represents an admin OTP resend request.
+/// </summary>
+public sealed record ResendAdminOtpRequest(Guid ChallengeId);

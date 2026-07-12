@@ -1,6 +1,8 @@
+using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
+using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +32,19 @@ public interface ICatalogDbContext
     /// Gets the product drafts database set.
     /// </summary>
     DbSet<ProductDraft> ProductDrafts { get; }
+
+    DbSet<ProductPlan> ProductPlans { get; }
+    DbSet<ProductOptionGroup> ProductOptionGroups { get; }
+    DbSet<ProductOption> ProductOptions { get; }
+    DbSet<ProductVariant> ProductVariants { get; }
+    DbSet<ProductVariantOption> ProductVariantOptions { get; }
+    DbSet<InventorySupplier> InventorySuppliers { get; }
+    DbSet<InventoryBatch> InventoryBatches { get; }
+    DbSet<DigitalInventoryCode> DigitalInventoryCodes { get; }
+    DbSet<InventoryReservation> InventoryReservations { get; }
+    DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
+    DbSet<SearchQueryLog> SearchQueryLogs { get; }
+    DbSet<ProductViewEvent> ProductViewEvents { get; }
 
     /// <summary>
     /// Saves all changes made in this context to the database.

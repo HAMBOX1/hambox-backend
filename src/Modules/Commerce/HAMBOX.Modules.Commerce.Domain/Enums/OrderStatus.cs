@@ -18,5 +18,20 @@ public enum OrderStatus
     /// <summary>
     /// The order has been cancelled.
     /// </summary>
-    Cancelled = 2
+    Cancelled = 2,
+
+    /// <summary>
+    /// The order is being processed after payment.
+    /// </summary>
+    Processing = 3,
+
+    /// <summary>
+    /// The order has been refunded.
+    /// </summary>
+    Refunded = 4,
+
+    /// <summary>
+    /// The order failed before completion.
+    /// </summary>
+    Failed = 5,
 }

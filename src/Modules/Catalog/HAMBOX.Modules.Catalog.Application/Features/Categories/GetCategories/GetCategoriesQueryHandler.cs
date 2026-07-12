@@ -34,7 +34,7 @@ internal sealed class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQ
         var categories = await query
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive))
+            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new PagedResult<CategoryDto>(categories, request.PageNumber, request.PageSize, totalCount));

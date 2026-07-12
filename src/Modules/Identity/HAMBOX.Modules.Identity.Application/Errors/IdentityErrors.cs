@@ -54,4 +54,68 @@ public static class IdentityErrors
     public static readonly Error ProfileUpdateFailed = new(
         "Identity.ProfileUpdateFailed",
         "The profile could not be updated.");
+
+    public static readonly Error RoleNotFound = new(
+        "Identity.RoleNotFound",
+        "The role was not found.");
+
+    public static readonly Error RoleNameExists = new(
+        "Identity.RoleNameExists",
+        "A role with this name already exists.");
+
+    public static readonly Error CannotDeleteSystemRole = new(
+        "Identity.CannotDeleteSystemRole",
+        "System roles cannot be deleted.");
+
+    public static readonly Error CannotModifyOwnerRole = new(
+        "Identity.CannotModifyOwnerRole",
+        "The Owner role cannot be modified.");
+
+    public static readonly Error InsufficientPrivileges = new(
+        "Identity.InsufficientPrivileges",
+        "You do not have sufficient privileges to manage this role.");
+
+    public static readonly Error PermissionDenied = new(
+        "Identity.PermissionDenied",
+        "You do not have permission to perform this action.");
+
+    public static readonly Error AdminMustUseAdminPortal = new(
+        "Identity.AdminMustUseAdminPortal",
+        "Administrative accounts must sign in through the admin portal.");
+
+    public static readonly Error CustomerMustUseStorefrontLogin = new(
+        "Identity.CustomerMustUseStorefrontLogin",
+        "Customer accounts must sign in through the storefront login.");
+
+    public static readonly Error AdminPortalAccessDenied = new(
+        "Identity.AdminPortalAccessDenied",
+        "You do not have permission to access the admin portal.");
+
+    public static readonly Error AdminOtpInvalid = new(
+        "Identity.AdminOtpInvalid",
+        "The verification code is incorrect.");
+
+    public static readonly Error AdminOtpExpired = new(
+        "Identity.AdminOtpExpired",
+        "The verification code has expired.");
+
+    public static readonly Error AdminOtpLocked = new(
+        "Identity.AdminOtpLocked",
+        "Too many failed verification attempts. Try again later.");
+
+    public static readonly Error AdminOtpResendCooldown = new(
+        "Identity.AdminOtpResendCooldown",
+        "Please wait before requesting another verification code.");
+
+    public static readonly Error AdminLoginChallengeNotFound = new(
+        "Identity.AdminLoginChallengeNotFound",
+        "The login challenge is invalid or has expired.");
+
+    public static readonly Error CustomerContextRequired = new(
+        "Identity.CustomerContextRequired",
+        "This action requires a customer session.");
+
+    public static readonly Error AdminContextRequired = new(
+        "Identity.AdminContextRequired",
+        "This action requires an authenticated admin session with OTP verification.");
 }

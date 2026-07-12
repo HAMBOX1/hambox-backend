@@ -1,10 +1,12 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
+using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Application.Features.Register;
 
@@ -15,7 +17,8 @@ internal sealed class RegisterCommandHandler(
     IIdentityDbContext dbContext,
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
-    IEmailService emailService) : IRequestHandler<RegisterCommand, Result>
+    IEmailService emailService,
+    IOptions<EmailSettings> emailSettings) : IRequestHandler<RegisterCommand, Result>
 {
     /// <inheritdoc />
     public async Task<Result> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -45,14 +48,32 @@ internal sealed class RegisterCommandHandler(
         dbContext.Users.Add(user);
         dbContext.EmailVerificationTokens.Add(verificationToken);
 
+        if (!emailSettings.Value.Enabled)
+        {
+            user.ConfirmEmail();
+            user.Activate();
+
+            var customerRole = await dbContext.Roles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.IsDefault, cancellationToken);
+
+            if (customerRole is not null)
+            {
+                dbContext.UserRoles.Add(UserRole.Create(user.Id, customerRole.Id));
+            }
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await emailService.SendEmailVerificationAsync(
-            user.Id,
-            user.Email,
-            verificationToken.ExpiresOnUtc,
-            verificationTokenValue,
-            cancellationToken);
+        if (emailSettings.Value.Enabled)
+        {
+            await emailService.SendEmailVerificationAsync(
+                user.Id,
+                user.Email,
+                verificationToken.ExpiresOnUtc,
+                verificationTokenValue,
+                cancellationToken);
+        }
 
         return Result.Success();
     }

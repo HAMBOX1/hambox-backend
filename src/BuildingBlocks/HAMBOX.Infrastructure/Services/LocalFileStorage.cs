@@ -1,5 +1,6 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Infrastructure.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -12,21 +13,26 @@ public sealed class LocalFileStorage : IFileStorage
 {
     private readonly FileStorageSettings _settings;
     private readonly string _rootPath;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public LocalFileStorage(IOptions<FileStorageSettings> options, IHostEnvironment environment)
+    public LocalFileStorage(
+        IOptions<FileStorageSettings> options,
+        IHostEnvironment environment,
+        IServiceScopeFactory scopeFactory)
     {
         _settings = options.Value;
+        _scopeFactory = scopeFactory;
         _rootPath = Path.IsPathRooted(_settings.LocalRootPath)
             ? _settings.LocalRootPath
             : Path.Combine(environment.ContentRootPath, _settings.LocalRootPath);
     }
 
     /// <inheritdoc />
-    public long MaxFileSizeBytes => _settings.MaxFileSizeBytes;
+    public long MaxFileSizeBytes => ResolveMediaSettings().MaxUploadSizeBytes;
 
     /// <inheritdoc />
     public bool IsAllowedContentType(string contentType) =>
-        _settings.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase);
+        ResolveMediaSettings().AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public async Task<StoredFileResult> SaveAsync(
@@ -106,5 +112,23 @@ public sealed class LocalFileStorage : IFileStorage
         }
 
         return Task.CompletedTask;
+    }
+
+    private HAMBOX.Application.PlatformSettings.MediaSettingsPayload ResolveMediaSettings()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var platformSettings = scope.ServiceProvider.GetService<IPlatformSettingsProvider>();
+        if (platformSettings is null)
+        {
+            return new HAMBOX.Application.PlatformSettings.MediaSettingsPayload(
+                _settings.MaxFileSizeBytes,
+                _settings.AllowedContentTypes,
+                true,
+                128,
+                256,
+                512);
+        }
+
+        return platformSettings.GetMediaAsync().GetAwaiter().GetResult();
     }
 }

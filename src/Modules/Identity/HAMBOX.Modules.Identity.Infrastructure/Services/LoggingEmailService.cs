@@ -1,6 +1,7 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Options;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +13,7 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Services;
 internal sealed class LoggingEmailService(
     IOptions<EmailSettings> emailSettings,
     IHttpContextAccessor httpContextAccessor,
+    IHostEnvironment environment,
     ILogger<LoggingEmailService> logger) : IEmailService
 {
     private readonly EmailSettings _settings = emailSettings.Value;
@@ -38,6 +40,56 @@ internal sealed class LoggingEmailService(
     {
         LogEmail("PasswordReset", userId, email, expiresAt, token, _settings.ResetPasswordPath);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task SendAdminLoginOtpAsync(
+        Guid userId,
+        string email,
+        string code,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        LogOtp("AdminLoginOtp", userId, email, expiresAt, code);
+        return Task.CompletedTask;
+    }
+
+    private void LogOtp(
+        string emailType,
+        Guid userId,
+        string email,
+        DateTimeOffset expiresAt,
+        string secret)
+    {
+        var correlationId = httpContextAccessor.HttpContext?.Items.TryGetValue("CorrelationId", out var value) == true
+            ? value?.ToString()
+            : null;
+
+        logger.LogInformation(
+            "Email delivery disabled. {EmailType} queued for user {UserId} at {MaskedEmail}. ExpiresAtUtc={ExpiresAtUtc}. CorrelationId={CorrelationId}",
+            emailType,
+            userId,
+            EmailLogHelper.MaskEmail(email),
+            expiresAt,
+            correlationId);
+
+        if (environment.IsDevelopment())
+        {
+            logger.LogWarning(
+                "Development OTP for {EmailType}, user {UserId}: {Secret}. Use the code from the most recent sign-in or resend. CorrelationId={CorrelationId}",
+                emailType,
+                userId,
+                secret,
+                correlationId);
+            return;
+        }
+
+        logger.LogDebug(
+            "Email fallback secret for {EmailType}, user {UserId}: {Secret}. CorrelationId={CorrelationId}",
+            emailType,
+            userId,
+            secret,
+            correlationId);
     }
 
     private void LogEmail(

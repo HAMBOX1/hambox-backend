@@ -2,13 +2,17 @@ using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
+using HAMBOX.Modules.Commerce.Application.Features.Cart.ApplyCartCoupon;
+using HAMBOX.Modules.Commerce.Application.Features.Cart.RemoveCartCoupon;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.ClearCart;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.GetCart;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.MergeCart;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.RemoveCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.UpdateCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout;
+using HAMBOX.Modules.Commerce.Application.Features.Checkout.Membership;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.GetOrderById;
+using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -60,7 +64,8 @@ internal static class CartEndpoints
             [FromHeader(Name = GuestCartHeader)] string? guestCartId,
             ISender sender) =>
         {
-            var result = await sender.Send(new AddCartItemCommand(request.ProductId, request.Quantity, guestCartId));
+            var result = await sender.Send(new AddCartItemCommand(
+                request.ProductId, request.Quantity, guestCartId, request.ProductVariantId));
 
             if (result.IsSuccess)
             {
@@ -82,9 +87,10 @@ internal static class CartEndpoints
             Guid productId,
             [FromBody] UpdateCartItemRequest request,
             [FromHeader(Name = GuestCartHeader)] string? guestCartId,
+            [FromQuery] Guid? variantId,
             ISender sender) =>
         {
-            var result = await sender.Send(new UpdateCartItemCommand(productId, request.Quantity, guestCartId));
+            var result = await sender.Send(new UpdateCartItemCommand(productId, request.Quantity, guestCartId, variantId));
 
             if (result.IsSuccess)
             {
@@ -105,9 +111,10 @@ internal static class CartEndpoints
         group.MapDelete("cart/items/{productId:guid}", async Task<Results<Ok<CartDto>, BadRequest<ProblemDetails>>> (
             Guid productId,
             [FromHeader(Name = GuestCartHeader)] string? guestCartId,
+            [FromQuery] Guid? variantId,
             ISender sender) =>
         {
-            var result = await sender.Send(new RemoveCartItemCommand(productId, guestCartId));
+            var result = await sender.Send(new RemoveCartItemCommand(productId, guestCartId, variantId));
 
             if (result.IsSuccess)
             {
@@ -167,7 +174,75 @@ internal static class CartEndpoints
             });
         })
         .WithName("MergeCart")
-        .RequireAuthorization();
+        .RequireAuthorization()
+        .RequireCustomerContext();
+
+        group.MapPost("cart/promotions/apply", async Task<Results<Ok<CartDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] ApplyCartCouponRequest request,
+            [FromHeader(Name = GuestCartHeader)] string? guestCartId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ApplyCartCouponCommand(request.CouponCode, guestCartId, request.Country));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("ApplyCartCoupon")
+        .AllowAnonymous();
+
+        group.MapDelete("cart/promotions", async Task<Results<Ok<CartDto>, BadRequest<ProblemDetails>>> (
+            [FromHeader(Name = GuestCartHeader)] string? guestCartId,
+            [FromQuery] string? country,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new RemoveCartCouponCommand(guestCartId, country));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("RemoveCartCoupon")
+        .AllowAnonymous();
+
+        group.MapGet("checkout/configuration", async Task<Results<Ok<CheckoutConfigurationDto>, BadRequest<ProblemDetails>>> (
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetCheckoutConfigurationQuery());
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetCheckoutConfiguration")
+        .AllowAnonymous();
 
         group.MapPost("checkout", async Task<Results<Ok<OrderDto>, BadRequest<ProblemDetails>>> (
             [FromBody] CheckoutRequest request,
@@ -189,7 +264,62 @@ internal static class CartEndpoints
             });
         })
         .WithName("Checkout")
-        .RequireAuthorization();
+        .RequireAuthorization()
+        .RequireCustomerContext();
+
+        group.MapGet("checkout/membership/preview", async Task<Results<Ok<MembershipCheckoutPreviewDto>, BadRequest<ProblemDetails>>> (
+            [FromQuery] Guid planId,
+            [FromQuery] string action,
+            [FromQuery] string? couponCode,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetMembershipCheckoutPreviewQuery(planId, action, couponCode));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetMembershipCheckoutPreview")
+        .RequireAuthorization()
+        .RequireCustomerContext();
+
+        group.MapPost("checkout/membership", async Task<Results<Ok<OrderDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] MembershipCheckoutRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new MembershipCheckoutCommand(
+                request.PlanId,
+                request.Action,
+                request.Email,
+                request.Country,
+                request.PaymentMethod,
+                request.CouponCode));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("MembershipCheckout")
+        .RequireAuthorization()
+        .RequireCustomerContext();
 
         group.MapGet("orders/{id:guid}", async Task<Results<Ok<OrderDetailDto>, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
             Guid id,
@@ -222,11 +352,13 @@ internal static class CartEndpoints
             });
         })
         .WithName("GetOrderById")
-        .RequireAuthorization();
+        .RequireAuthorization()
+        .RequireCustomerContext();
     }
 }
 
-internal sealed record CartItemRequest(Guid ProductId, int Quantity);
+internal sealed record CartItemRequest(Guid ProductId, int Quantity, Guid? ProductVariantId = null);
 internal sealed record UpdateCartItemRequest(int Quantity);
 internal sealed record MergeCartRequest(string GuestSessionId);
+internal sealed record ApplyCartCouponRequest(string CouponCode, string? Country);
 internal sealed record CheckoutRequest(string Email, string Country, string PaymentMethod);

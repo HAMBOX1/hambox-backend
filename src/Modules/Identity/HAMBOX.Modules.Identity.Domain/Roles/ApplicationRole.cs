@@ -7,69 +7,77 @@ namespace HAMBOX.Modules.Identity.Domain.Roles;
 /// </summary>
 public sealed class ApplicationRole : AggregateRoot
 {
-    private readonly List<Guid> _permissionIds = [];
+    private readonly List<RolePermission> _rolePermissions = [];
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ApplicationRole"/> class.
-    /// </summary>
-    /// <remarks>Required by EF Core.</remarks>
     private ApplicationRole()
     {
     }
 
-    private ApplicationRole(Guid id, string name, string? description)
+    private ApplicationRole(
+        Guid id,
+        string name,
+        string? description,
+        bool isDefault,
+        bool isSystem,
+        int priorityLevel)
         : base(id)
     {
         Name = name;
         NormalizedName = name.ToUpperInvariant();
         Description = description;
+        IsDefault = isDefault;
+        IsSystem = isSystem;
+        PriorityLevel = priorityLevel;
     }
 
-    /// <summary>
-    /// Gets the role name.
-    /// </summary>
     public string Name { get; private set; } = string.Empty;
 
-    /// <summary>
-    /// Gets the normalized role name used for lookups and uniqueness checks.
-    /// </summary>
     public string NormalizedName { get; private set; } = string.Empty;
 
-    /// <summary>
-    /// Gets the role description.
-    /// </summary>
     public string? Description { get; private set; }
 
-    /// <summary>
-    /// Gets a value indicating whether this role is assigned to new users by default.
-    /// </summary>
     public bool IsDefault { get; private set; }
 
     /// <summary>
-    /// Gets the identifiers of the permissions assigned to this role.
+    /// System roles (Owner, Administrator, Customer) cannot be deleted.
     /// </summary>
-    public IReadOnlyCollection<Guid> PermissionIds => _permissionIds.AsReadOnly();
+    public bool IsSystem { get; private set; }
 
     /// <summary>
-    /// Creates a new role.
+    /// Lower value = higher privilege. Owner = 0, Administrator = 10, Customer = 1000.
     /// </summary>
-    /// <param name="name">The role name.</param>
-    /// <param name="description">An optional description of the role.</param>
-    /// <returns>A new <see cref="ApplicationRole"/> instance.</returns>
-    /// <exception cref="ArgumentException">Thrown when the name is null or whitespace.</exception>
-    public static ApplicationRole Create(string name, string? description = null)
+    public int PriorityLevel { get; private set; }
+
+    public IReadOnlyCollection<RolePermission> RolePermissions => _rolePermissions.AsReadOnly();
+
+    public IReadOnlyCollection<Guid> PermissionIds =>
+        _rolePermissions.Select(rp => rp.PermissionId).ToList().AsReadOnly();
+
+    public static ApplicationRole Create(
+        string name,
+        string? description = null,
+        bool isDefault = false,
+        bool isSystem = false,
+        int priorityLevel = 500)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        return new ApplicationRole(Guid.NewGuid(), name, description);
+        return new ApplicationRole(Guid.NewGuid(), name, description, isDefault, isSystem, priorityLevel);
     }
 
-    /// <summary>
-    /// Assigns a permission to this role.
-    /// </summary>
-    /// <param name="permissionId">The identifier of the permission to assign.</param>
-    /// <exception cref="ArgumentException">Thrown when the permission identifier is empty.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the permission is already assigned.</exception>
+    public void UpdateDetails(string name, string? description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Name = name;
+        NormalizedName = name.ToUpperInvariant();
+        Description = description;
+    }
+
+    public void SetPriorityLevel(int priorityLevel)
+    {
+        PriorityLevel = priorityLevel;
+    }
+
     public void AddPermission(Guid permissionId)
     {
         if (permissionId == Guid.Empty)
@@ -77,38 +85,39 @@ public sealed class ApplicationRole : AggregateRoot
             throw new ArgumentException("Permission identifier is required.", nameof(permissionId));
         }
 
-        if (_permissionIds.Contains(permissionId))
+        if (_rolePermissions.Any(rp => rp.PermissionId == permissionId))
         {
             throw new InvalidOperationException("Permission is already assigned to this role.");
         }
 
-        _permissionIds.Add(permissionId);
+        _rolePermissions.Add(RolePermission.Create(Id, permissionId));
     }
 
-    /// <summary>
-    /// Removes a permission from this role.
-    /// </summary>
-    /// <param name="permissionId">The identifier of the permission to remove.</param>
-    /// <exception cref="InvalidOperationException">Thrown when the permission is not assigned.</exception>
     public void RemovePermission(Guid permissionId)
     {
-        if (!_permissionIds.Remove(permissionId))
+        var existing = _rolePermissions.FirstOrDefault(rp => rp.PermissionId == permissionId);
+        if (existing is null)
         {
             throw new InvalidOperationException("Permission is not assigned to this role.");
         }
+
+        _rolePermissions.Remove(existing);
     }
 
-    /// <summary>
-    /// Marks this role as the default role assigned to new users.
-    /// </summary>
+    public void SetPermissions(IEnumerable<Guid> permissionIds)
+    {
+        _rolePermissions.Clear();
+        foreach (var permissionId in permissionIds.Distinct())
+        {
+            AddPermission(permissionId);
+        }
+    }
+
     public void MarkAsDefault()
     {
         IsDefault = true;
     }
 
-    /// <summary>
-    /// Removes the default designation from this role.
-    /// </summary>
     public void UnmarkAsDefault()
     {
         IsDefault = false;

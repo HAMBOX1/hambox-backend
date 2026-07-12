@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>hambox-api-development</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +26,8 @@
     <ProjectReference Include="..\..\Modules\Catalog\HAMBOX.Modules.Catalog.Presentation\HAMBOX.Modules.Catalog.Presentation.csproj" />
     <ProjectReference Include="..\..\Modules\Commerce\HAMBOX.Modules.Commerce.Infrastructure\HAMBOX.Modules.Commerce.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Commerce\HAMBOX.Modules.Commerce.Presentation\HAMBOX.Modules.Commerce.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Themes\HAMBOX.Modules.Themes.Infrastructure\HAMBOX.Modules.Themes.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Themes\HAMBOX.Modules.Themes.Presentation\HAMBOX.Modules.Themes.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,12 @@
+using System.Security.Claims;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Errors;
-using HAMBOX.Modules.Identity.Domain.Enums;
-using DomainRefreshToken = HAMBOX.Modules.Identity.Domain.Tokens.RefreshToken;
 using HAMBOX.Modules.Identity.Application.Options;
+using HAMBOX.Modules.Identity.Domain.Enums;
+using HAMBOX.Modules.Identity.Domain.Sessions;
+using DomainRefreshToken = HAMBOX.Modules.Identity.Domain.Tokens.RefreshToken;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +31,18 @@ internal sealed class RefreshTokenCommandHandler(
         var existingToken = await dbContext.RefreshTokens
             .FirstOrDefaultAsync(t => t.Token == tokenHash, cancellationToken);
 
-        if (existingToken is null || !existingToken.IsActive)
+        if (existingToken is null)
+        {
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+        }
+
+        if (existingToken.WasReused())
+        {
+            await RevokeAllUserTokensAsync(existingToken.UserId, cancellationToken);
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+        }
+
+        if (!existingToken.IsActive)
         {
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
         }
@@ -46,19 +60,70 @@ internal sealed class RefreshTokenCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountNotActive);
         }
 
-        existingToken.Revoke();
+        var session = await dbContext.UserSessions
+            .FirstOrDefaultAsync(s => s.Id == existingToken.SessionId, cancellationToken);
+
+        if (session is null || !session.IsActive)
+        {
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+        }
 
         var newRefreshTokenValue = tokenGenerator.GenerateSecureToken();
         var refreshExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
-        var (newRefreshToken, _) = DomainRefreshToken.Issue(user.Id, newRefreshTokenValue, refreshExpiresAt);
+        var (newRefreshToken, _) = DomainRefreshToken.Issue(
+            user.Id,
+            newRefreshTokenValue,
+            refreshExpiresAt,
+            existingToken.AuthContext,
+            existingToken.SessionId);
 
-        var claims = await userClaimsService.GetClaimsAsync(user.Id, cancellationToken);
+        existingToken.MarkReplacedBy(newRefreshTokenValue);
+        existingToken.Revoke();
+
+        var roleAndPermissionClaims = await userClaimsService.GetClaimsAsync(user.Id, cancellationToken);
+        var otpVerified = existingToken.AuthContext == AuthContextTypes.Admin;
+        var claims = new List<Claim>(roleAndPermissionClaims)
+        {
+            new(IdentityClaimTypes.AuthContext, existingToken.AuthContext),
+            new(IdentityClaimTypes.OtpVerified, otpVerified ? "true" : "false"),
+            new(IdentityClaimTypes.SessionId, existingToken.SessionId.ToString()),
+        };
+
         var (accessToken, expiresAt) = jwtTokenService.GenerateAccessToken(user, claims);
+
+        session.LinkRefreshToken(newRefreshToken.Id);
+        session.RecordActivity();
 
         dbContext.RefreshTokens.Add(newRefreshToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt));
+    }
+
+    private async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var tokens = await dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedOnUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+        {
+            if (!token.IsRevoked)
+            {
+                token.Revoke();
+            }
+        }
+
+        var sessions = await dbContext.UserSessions
+            .Where(s => s.UserId == userId && s.EndedOnUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.End();
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

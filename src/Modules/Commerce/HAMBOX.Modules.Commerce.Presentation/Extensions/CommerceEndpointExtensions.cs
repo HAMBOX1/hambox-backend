@@ -24,6 +24,13 @@ public static class CommerceEndpointExtensions
 
         app.MapCartEndpoints(apiVersionSet);
         app.MapAccountEndpoints(apiVersionSet);
+        app.MapPromotionEndpoints(apiVersionSet);
+        app.MapMembershipEndpoints(apiVersionSet);
+        app.MapOrderManagementEndpoints(apiVersionSet);
+        app.MapDashboardEndpoints(apiVersionSet);
+        app.MapOperationsEndpoints(apiVersionSet);
+        app.MapAnalyticsEndpoints(apiVersionSet);
+        app.MapReportEndpoints(apiVersionSet);
 
         return app;
     }

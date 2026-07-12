@@ -26,6 +26,12 @@ internal sealed class LogoutCommandHandler(IIdentityDbContext dbContext) : IRequ
         if (!token.IsRevoked)
         {
             token.Revoke();
+
+            var session = await dbContext.UserSessions
+                .FirstOrDefaultAsync(s => s.Id == token.SessionId, cancellationToken);
+
+            session?.End();
+
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 

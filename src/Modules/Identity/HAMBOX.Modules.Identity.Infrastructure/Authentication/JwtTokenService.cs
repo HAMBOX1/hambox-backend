@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Options;
@@ -13,7 +14,9 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Authentication;
 /// <summary>
 /// Service to generate JWT access tokens.
 /// </summary>
-internal sealed class JwtTokenService(IOptions<JwtSettings> jwtSettings) : IJwtTokenService
+internal sealed class JwtTokenService(
+    IOptions<JwtSettings> jwtSettings,
+    IPlatformSettingsProvider platformSettings) : IJwtTokenService
 {
     private readonly JwtSettings _settings = jwtSettings.Value;
 
@@ -22,7 +25,11 @@ internal sealed class JwtTokenService(IOptions<JwtSettings> jwtSettings) : IJwtT
         ApplicationUser user,
         IEnumerable<Claim> claims)
     {
-        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_settings.AccessTokenExpirationMinutes);
+        var auth = platformSettings.GetAuthenticationAsync().GetAwaiter().GetResult();
+        var expirationMinutes = auth.SessionTimeoutMinutes > 0
+            ? auth.SessionTimeoutMinutes
+            : _settings.AccessTokenExpirationMinutes;
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(expirationMinutes);
 
         var tokenClaims = new List<Claim>
         {

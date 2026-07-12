@@ -1,8 +1,8 @@
 using FluentValidation;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Infrastructure.Services;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
-using HAMBOX.Modules.Catalog.Application.Options;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
@@ -37,8 +37,8 @@ public static class CatalogInfrastructureExtensions
                 sp.GetRequiredService<AuditInterceptor>()));
 
         services.AddScoped<ICatalogDbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
-
-        services.Configure<StorefrontSettings>(configuration.GetSection(StorefrontSettings.SectionName));
+        services.AddScoped<IInventoryEngine, InventoryEngine>();
+        services.AddScoped<ProductionDemoDataSeeder>();
 
         // 2. Register FluentValidation Validators
         services.AddValidatorsFromAssembly(typeof(CreateCategoryCommandValidator).Assembly);

@@ -17,12 +17,20 @@ public sealed class RefreshToken : Entity
     {
     }
 
-    private RefreshToken(Guid id, Guid userId, string tokenHash, DateTimeOffset expiresOnUtc)
+    private RefreshToken(
+        Guid id,
+        Guid userId,
+        string tokenHash,
+        DateTimeOffset expiresOnUtc,
+        string authContext,
+        Guid sessionId)
         : base(id)
     {
         UserId = userId;
         Token = tokenHash;
         ExpiresOnUtc = expiresOnUtc;
+        AuthContext = authContext;
+        SessionId = sessionId;
     }
 
     /// <summary>
@@ -45,6 +53,21 @@ public sealed class RefreshToken : Entity
     /// A value of <see langword="null"/> indicates the token has not been revoked.
     /// </summary>
     public DateTimeOffset? RevokedOnUtc { get; private set; }
+
+    /// <summary>
+    /// Gets the auth context this refresh token belongs to (customer or admin).
+    /// </summary>
+    public string AuthContext { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets the linked user session identifier.
+    /// </summary>
+    public Guid SessionId { get; private set; }
+
+    /// <summary>
+    /// Gets the hash of the replacement token when this token was rotated.
+    /// </summary>
+    public string? ReplacedByTokenHash { get; private set; }
 
     /// <summary>
     /// Gets a value indicating whether the token has expired.
@@ -75,7 +98,9 @@ public sealed class RefreshToken : Entity
     public static (RefreshToken Token, string Plaintext) Issue(
         Guid userId,
         string plaintextToken,
-        DateTimeOffset expiresOnUtc)
+        DateTimeOffset expiresOnUtc,
+        string authContext,
+        Guid sessionId)
     {
         if (userId == Guid.Empty)
         {
@@ -83,6 +108,12 @@ public sealed class RefreshToken : Entity
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(plaintextToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(authContext);
+
+        if (sessionId == Guid.Empty)
+        {
+            throw new ArgumentException("Session identifier is required.", nameof(sessionId));
+        }
 
         if (expiresOnUtc <= DateTimeOffset.UtcNow)
         {
@@ -93,7 +124,9 @@ public sealed class RefreshToken : Entity
             Guid.NewGuid(),
             userId,
             ComputeHash(plaintextToken),
-            expiresOnUtc);
+            expiresOnUtc,
+            authContext,
+            sessionId);
 
         return (token, plaintextToken);
     }
@@ -129,6 +162,20 @@ public sealed class RefreshToken : Entity
 
         RevokedOnUtc = DateTimeOffset.UtcNow;
     }
+
+    /// <summary>
+    /// Marks this token as replaced during rotation to detect reuse.
+    /// </summary>
+    public void MarkReplacedBy(string newPlaintextToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPlaintextToken);
+        ReplacedByTokenHash = ComputeHash(newPlaintextToken);
+    }
+
+    /// <summary>
+    /// Determines whether this token was already rotated and reused.
+    /// </summary>
+    public bool WasReused() => !string.IsNullOrEmpty(ReplacedByTokenHash);
 
     private static string ComputeHash(string plaintextToken)
     {

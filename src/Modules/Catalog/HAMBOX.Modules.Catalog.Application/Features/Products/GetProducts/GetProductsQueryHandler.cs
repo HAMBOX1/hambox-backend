@@ -1,22 +1,32 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts;
 
 internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<PagedResult<ProductDto>>>
 {
     private readonly ICatalogDbContext _dbContext;
+    private readonly ICurrentUserService _currentUser;
+    private readonly ILogger<GetProductsQueryHandler> _logger;
 
-    public GetProductsQueryHandler(ICatalogDbContext dbContext)
+    public GetProductsQueryHandler(
+        ICatalogDbContext dbContext,
+        ICurrentUserService currentUser,
+        ILogger<GetProductsQueryHandler> logger)
     {
         _dbContext = dbContext;
+        _currentUser = currentUser;
+        _logger = logger;
     }
 
     public async Task<Result<PagedResult<ProductDto>>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
@@ -64,7 +74,28 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 p.CreatedOnUtc))
             .ToListAsync(cancellationToken);
 
+        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        {
+            await TryLogSearchAsync(request.SearchTerm.Trim(), totalCount, cancellationToken);
+        }
+
         return Result.Success(new PagedResult<ProductDto>(products, request.PageNumber, request.PageSize, totalCount));
+    }
+
+    private async Task TryLogSearchAsync(string searchTerm, int resultCount, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _dbContext.SearchQueryLogs.Add(SearchQueryLog.Create(
+                searchTerm,
+                resultCount,
+                _currentUser.UserId));
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Best-effort search query logging failed.");
+        }
     }
 
     private static IQueryable<Domain.Products.Product> ApplySort(

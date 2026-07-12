@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
@@ -26,20 +27,30 @@ internal sealed class CommerceTransactionService : ICommerceTransactionService
     /// <inheritdoc />
     public async Task ExecuteAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
     {
-        var connection = _commerceDbContext.Database.GetDbConnection();
+        await _commerceDbContext.Database.CloseConnectionAsync();
+        if (_catalogDbContext is CatalogDbContext catalogDbContext)
+        {
+            await catalogDbContext.Database.CloseConnectionAsync();
+        }
 
-        if (connection.State != System.Data.ConnectionState.Open)
+        var connection = _commerceDbContext.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
         {
             await connection.OpenAsync(cancellationToken);
+        }
+
+        if (_catalogDbContext is CatalogDbContext enlistedCatalog
+            && !ReferenceEquals(enlistedCatalog.Database.GetDbConnection(), connection))
+        {
+            enlistedCatalog.Database.SetDbConnection(connection);
         }
 
         await using var dbTransaction = await connection.BeginTransactionAsync(cancellationToken);
 
         await _commerceDbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken);
-
-        if (_catalogDbContext is CatalogDbContext catalogDbContext)
+        if (_catalogDbContext is CatalogDbContext catalogWithSharedConnection)
         {
-            await catalogDbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken);
+            await catalogWithSharedConnection.Database.UseTransactionAsync(dbTransaction, cancellationToken);
         }
 
         try

@@ -4,6 +4,7 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 using HAMBOX.Modules.Commerce.Infrastructure.Services;
+using HAMBOX.Modules.Commerce.Infrastructure.Services.Reports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,8 +35,26 @@ public static class CommerceInfrastructureExtensions
 
         services.AddScoped<ICommerceDbContext>(sp => sp.GetRequiredService<CommerceDbContext>());
         services.AddScoped<ICommerceTransactionService, CommerceTransactionService>();
+        services.AddScoped<DevelopmentPaymentProvider>();
+        services.AddScoped<ImmediatePaymentProvider>();
+        services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<DevelopmentPaymentProvider>());
+        services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<ImmediatePaymentProvider>());
+        services.AddScoped<PaymentProviderResolver>();
+        services.AddScoped<ICheckoutConfigurationProvider, CheckoutConfigurationProvider>();
 
         services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly);
+
+        services.AddSingleton<IWorkerRuntimeState, WorkerRuntimeState>();
+        services.AddScoped<IOperationalJobQueue, OperationalJobQueue>();
+        services.AddScoped<IOperationsMonitorService, OperationsMonitorService>();
+        services.AddScoped<IAnalyticsAggregationService, AnalyticsAggregationService>();
+        services.AddScoped<ISystemHealthService, SystemHealthService>();
+        services.AddScoped<IReportCatalog, ReportCatalog>();
+        services.AddScoped<IReportBuilderService, ReportBuilderService>();
+        services.AddScoped<IReportDocumentGenerator, ReportDocumentGenerator>();
+        services.AddScoped<IScheduledReportService, ScheduledReportService>();
+        services.AddHostedService<OperationalJobWorker>();
+        services.AddHostedService<ScheduledReportWorker>();
 
         return services;
     }

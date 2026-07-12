@@ -1,4 +1,5 @@
 using FluentValidation;
+using HAMBOX.Application.Abstractions;
 
 namespace HAMBOX.Modules.Identity.Application.Features.Register;
 
@@ -7,10 +8,7 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// </summary>
 public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RegisterCommandValidator"/> class.
-    /// </summary>
-    public RegisterCommandValidator()
+    public RegisterCommandValidator(IPlatformSettingsProvider platformSettings)
     {
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
@@ -19,8 +17,33 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(8).WithMessage("Password must be at least 8 characters long.")
-            .MaximumLength(128).WithMessage("Password must not exceed 128 characters.");
+            .MaximumLength(128).WithMessage("Password must not exceed 128 characters.")
+            .MustAsync(async (password, cancellation) =>
+            {
+                var auth = await platformSettings.GetAuthenticationAsync(cancellation);
+                if (password.Length < auth.MinimumPasswordLength)
+                {
+                    return false;
+                }
+
+                if (auth.RequireNumbers && !password.Any(char.IsDigit))
+                {
+                    return false;
+                }
+
+                if (auth.RequireUppercase && !password.Any(char.IsUpper))
+                {
+                    return false;
+                }
+
+                if (auth.RequireSymbols && !password.Any(ch => !char.IsLetterOrDigit(ch)))
+                {
+                    return false;
+                }
+
+                return true;
+            })
+            .WithMessage("Password does not meet the configured password policy.");
 
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("First name is required.")

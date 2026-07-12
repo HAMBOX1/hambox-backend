@@ -14,15 +14,18 @@ internal sealed class MergeCartCommandHandler : IRequestHandler<MergeCartCommand
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly CartResponseBuilder _cartResponseBuilder;
 
     public MergeCartCommandHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        CartResponseBuilder cartResponseBuilder)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
+        _cartResponseBuilder = cartResponseBuilder;
     }
 
     public async Task<Result<Contracts.CartDto>> Handle(MergeCartCommand request, CancellationToken cancellationToken)
@@ -49,19 +52,10 @@ internal sealed class MergeCartCommandHandler : IRequestHandler<MergeCartCommand
             _commerceDbContext.ShoppingCarts.Remove(guestCart);
         }
 
+        await CartPersistenceHelper.PrepareForSaveAsync(_commerceDbContext, userCart, cancellationToken);
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
-        var productIds = userCart.Items.Select(i => i.ProductId).ToList();
-        var products = productIds.Count == 0
-            ? []
-            : await _catalogDbContext.Products
-                .Where(p => productIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        return Result.Success(CommerceMapper.ToCartDto(
-            userCart,
-            guestSessionId: null,
-            products,
-            isAuthenticated: true));
+        var dto = await _cartResponseBuilder.BuildAsync(userCart, guestSessionId: null, countryCode: null, cancellationToken);
+        return Result.Success(dto);
     }
 }

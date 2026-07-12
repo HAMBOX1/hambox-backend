@@ -1,6 +1,10 @@
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Carts;
+using HAMBOX.Modules.Commerce.Domain.Memberships;
+using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Commerce.Domain.Promotions;
+using HAMBOX.Modules.Commerce.Domain.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Application.Abstractions;
@@ -61,7 +65,66 @@ public interface ICommerceDbContext
     DbSet<OrderLicenseKey> OrderLicenseKeys { get; }
 
     /// <summary>
-    /// Saves all changes made in this context to the database.
+    /// Gets the promotions database set.
     /// </summary>
+    DbSet<Promotion> Promotions { get; }
+
+    /// <summary>
+    /// Gets the promotion conditions database set.
+    /// </summary>
+    DbSet<PromotionCondition> PromotionConditions { get; }
+
+    /// <summary>
+    /// Gets the promotion targets database set.
+    /// </summary>
+    DbSet<PromotionTarget> PromotionTargets { get; }
+
+    /// <summary>
+    /// Gets the coupon codes database set.
+    /// </summary>
+    DbSet<CouponCode> CouponCodes { get; }
+
+    /// <summary>
+    /// Gets the promotion redemptions database set.
+    /// </summary>
+    DbSet<PromotionRedemption> PromotionRedemptions { get; }
+
+    /// <summary>
+    /// Gets the promotion audit logs database set.
+    /// </summary>
+    DbSet<PromotionAuditLog> PromotionAuditLogs { get; }
+
+    /// <summary>
+    /// Gets the order applied promotions database set.
+    /// </summary>
+    DbSet<OrderAppliedPromotion> OrderAppliedPromotions { get; }
+
+    DbSet<OrderAdminNote> OrderAdminNotes { get; }
+
+    DbSet<OrderAuditEntry> OrderAuditEntries { get; }
+
+    DbSet<OrderPaymentCallback> OrderPaymentCallbacks { get; }
+
+    DbSet<MembershipPlan> MembershipPlans { get; }
+    DbSet<MembershipBenefit> MembershipBenefits { get; }
+    DbSet<MembershipSubscription> MembershipSubscriptions { get; }
+    DbSet<MembershipHistory> MembershipHistories { get; }
+    DbSet<MembershipTransaction> MembershipTransactions { get; }
+    DbSet<MembershipAuditLog> MembershipAuditLogs { get; }
+
+    DbSet<OperationalJob> OperationalJobs { get; }
+
+    DbSet<ApiRequestLog> ApiRequestLogs { get; }
+
+    DbSet<OperationalAuditLog> OperationalAuditLogs { get; }
+
+    DbSet<OperationalAlert> OperationalAlerts { get; }
+
+    DbSet<ReportDefinition> ReportDefinitions { get; }
+    DbSet<ReportFavorite> ReportFavorites { get; }
+    DbSet<ReportDownload> ReportDownloads { get; }
+    DbSet<ScheduledReport> ScheduledReports { get; }
+    DbSet<ScheduledReportExecution> ScheduledReportExecutions { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

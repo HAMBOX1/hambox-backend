@@ -116,6 +116,20 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public DateTimeOffset? DeletedOnUtc { get; private set; }
 
     /// <summary>
+    /// Restores a soft-deleted product.
+    /// </summary>
+    public void Restore()
+    {
+        if (!IsDeleted)
+        {
+            throw new InvalidOperationException("Product is not deleted.");
+        }
+
+        IsDeleted = false;
+        DeletedOnUtc = null;
+    }
+
+    /// <summary>
     /// Creates a new product in <see cref="ProductStatus.Draft"/> status.
     /// </summary>
     /// <param name="nameAr">The product name in Arabic.</param>

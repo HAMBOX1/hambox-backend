@@ -27,7 +27,18 @@ internal sealed class CreateCategoryCommandHandler : IRequestHandler<CreateCateg
             return Result.Failure<Guid>(CatalogErrors.CategorySlugNotUnique);
         }
 
-        var category = Category.Create(request.NameAr, request.NameEn, request.Slug);
+        var parentError = await CategoryParentValidator.ValidateParentAsync(
+            _dbContext,
+            Guid.Empty,
+            request.ParentId,
+            cancellationToken);
+
+        if (parentError is not null)
+        {
+            return Result.Failure<Guid>(parentError.Error);
+        }
+
+        var category = Category.Create(request.NameAr, request.NameEn, request.Slug, request.ParentId);
         _dbContext.Categories.Add(category);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

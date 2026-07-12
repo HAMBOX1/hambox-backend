@@ -18,15 +18,21 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IInventoryEngine _inventoryEngine;
+    private readonly CartResponseBuilder _cartResponseBuilder;
 
     public MoveWishlistItemToCartCommandHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IInventoryEngine inventoryEngine,
+        CartResponseBuilder cartResponseBuilder)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
+        _inventoryEngine = inventoryEngine;
+        _cartResponseBuilder = cartResponseBuilder;
     }
 
     public async Task<Result<Contracts.CartDto>> Handle(
@@ -61,6 +67,29 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
             return Result.Failure<Contracts.CartDto>(CatalogErrors.ProductNotActive);
         }
 
+        decimal unitPrice = product.Price;
+        Guid? productVariantId = null;
+
+        if (await _inventoryEngine.ProductHasVariantsAsync(request.ProductId, cancellationToken))
+        {
+            var activeVariants = await _catalogDbContext.ProductVariants
+                .Where(v =>
+                    v.ProductId == request.ProductId
+                    && !v.IsDeleted
+                    && v.Status == ProductVariantStatus.Active
+                    && v.IsVisible)
+                .ToListAsync(cancellationToken);
+
+            if (activeVariants.Count != 1)
+            {
+                return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantRequired);
+            }
+
+            var variant = activeVariants[0];
+            productVariantId = variant.Id;
+            unitPrice = variant.PriceOverride ?? product.Price;
+        }
+
         var (cart, guestSessionId) = await CartResolver.GetOrCreateCartAsync(
             _commerceDbContext,
             _currentUserService,
@@ -68,24 +97,34 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
             createGuestSessionIfMissing: false,
             cancellationToken);
 
-        var existingItem = cart.Items.FirstOrDefault(i => i.ProductId == request.ProductId);
+        var existingItem = cart.Items.FirstOrDefault(i =>
+            i.ProductId == request.ProductId && i.ProductVariantId == productVariantId);
         var newQuantity = existingItem is null ? 1 : existingItem.Quantity + 1;
 
-        if (product.AvailableStock < newQuantity)
+        if (productVariantId is Guid stockVariantId)
+        {
+            var stock = await _inventoryEngine.GetVariantStockAsync(stockVariantId, cancellationToken);
+            if (stock.Available < newQuantity)
+            {
+                return Result.Failure<Contracts.CartDto>(
+                    CatalogErrors.InsufficientInventoryQuantity(
+                        stock.Available,
+                        newQuantity,
+                        existingItem?.Quantity ?? 0));
+            }
+        }
+        else if (product.AvailableStock < newQuantity)
         {
             return Result.Failure<Contracts.CartDto>(CatalogErrors.InsufficientStock);
         }
 
-        cart.AddOrUpdateItem(request.ProductId, newQuantity, product.Price);
+        cart.AddOrUpdateItem(request.ProductId, newQuantity, unitPrice, productVariantId);
         _commerceDbContext.WishlistItems.Remove(wishlistItem);
 
+        await CartPersistenceHelper.PrepareForSaveAsync(_commerceDbContext, cart, cancellationToken);
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
-        var productIds = cart.Items.Select(i => i.ProductId).ToList();
-        var products = await _catalogDbContext.Products
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, cancellationToken);
-
-        return Result.Success(CommerceMapper.ToCartDto(cart, guestSessionId, products, isAuthenticated: true));
+        var dto = await _cartResponseBuilder.BuildAsync(cart, guestSessionId, countryCode: null, cancellationToken);
+        return Result.Success(dto);
     }
 }

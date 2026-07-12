@@ -1,10 +1,11 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Errors;
+using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Sessions;
-using DomainRefreshToken = HAMBOX.Modules.Identity.Domain.Tokens.RefreshToken;
-using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -18,11 +19,9 @@ namespace HAMBOX.Modules.Identity.Application.Features.Login;
 internal sealed class LoginCommandHandler(
     IIdentityDbContext dbContext,
     IPasswordHasher passwordHasher,
-    IJwtTokenService jwtTokenService,
-    ITokenGenerator tokenGenerator,
-    IUserClaimsService userClaimsService,
-    IOptions<JwtSettings> jwtSettings,
-    IOptions<LockoutSettings> lockoutSettings) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
+    IAdminAccessResolver adminAccessResolver,
+    IAuthTokenIssuer authTokenIssuer,
+    IPlatformSettingsProvider platformSettings) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
     public async Task<Result<AuthTokenResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -63,10 +62,10 @@ internal sealed class LoginCommandHandler(
         var isPasswordValid = passwordHasher.VerifyPassword(user.PasswordHash, request.Password);
         if (!isPasswordValid)
         {
-            var lockout = lockoutSettings.Value;
+            var security = await platformSettings.GetSecurityAsync(cancellationToken);
             user.RecordAccessFailure(
-                lockout.MaxFailedAccessAttempts,
-                TimeSpan.FromMinutes(lockout.LockoutDurationMinutes));
+                security.MaxFailedAccessAttempts,
+                TimeSpan.FromMinutes(security.LockoutDurationMinutes));
 
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Invalid credentials");
             dbContext.LoginHistory.Add(failure);
@@ -80,23 +79,30 @@ internal sealed class LoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        if (await adminAccessResolver.HasAdminPortalAccessAsync(user.Id, cancellationToken))
+        {
+            var adminFailure = LoginHistory.RecordFailure(
+                user.Id,
+                request.IpAddress,
+                request.UserAgent,
+                "Admin account must use admin portal login");
+            dbContext.LoginHistory.Add(adminFailure);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.AdminMustUseAdminPortal);
+        }
+
         user.ResetAccessFailedCount();
 
-        var claims = await userClaimsService.GetClaimsAsync(user.Id, cancellationToken);
-        var (accessToken, expiresAt) = jwtTokenService.GenerateAccessToken(user, claims);
-        var refreshTokenValue = tokenGenerator.GenerateSecureToken();
-        var refreshExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
-        var (refreshToken, _) = DomainRefreshToken.Issue(user.Id, refreshTokenValue, refreshExpiresAt);
-
-        var session = UserSession.Create(user.Id, request.IpAddress, request.UserAgent);
         var successHistory = LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent);
-
-        dbContext.RefreshTokens.Add(refreshToken);
-        dbContext.UserSessions.Add(session);
         dbContext.LoginHistory.Add(successHistory);
-
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AuthTokenResponse(accessToken, refreshTokenValue, expiresAt));
+        return await authTokenIssuer.IssueAsync(
+            user,
+            AuthContextTypes.Customer,
+            otpVerified: false,
+            request.IpAddress,
+            request.UserAgent,
+            cancellationToken);
     }
 }

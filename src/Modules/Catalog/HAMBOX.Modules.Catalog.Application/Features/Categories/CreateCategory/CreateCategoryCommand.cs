@@ -4,4 +4,4 @@ using System;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
 
-public record CreateCategoryCommand(string NameAr, string NameEn, string Slug) : IRequest<Result<Guid>>;
+public record CreateCategoryCommand(string NameAr, string NameEn, string Slug, Guid? ParentId) : IRequest<Result<Guid>>;

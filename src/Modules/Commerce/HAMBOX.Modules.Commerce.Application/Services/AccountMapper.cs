@@ -133,5 +133,6 @@ internal static class AccountMapper
             notification.Body,
             notification.Category,
             notification.IsRead,
-            notification.CreatedOnUtc);
+            notification.CreatedOnUtc,
+            notification.ActionUrl);
 }

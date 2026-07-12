@@ -34,6 +34,7 @@ internal sealed class ClearCartCommandHandler : IRequestHandler<ClearCartCommand
         }
 
         cart.Clear();
+        await CartPersistenceHelper.PrepareForSaveAsync(_commerceDbContext, cart, cancellationToken);
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

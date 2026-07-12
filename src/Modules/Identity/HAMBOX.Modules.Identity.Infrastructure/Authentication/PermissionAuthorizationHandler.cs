@@ -4,9 +4,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HAMBOX.Modules.Identity.Infrastructure.Authentication;
 
-/// <summary>
-/// Authorization handler that evaluates <see cref="PermissionRequirement"/> against user claims.
-/// </summary>
 internal sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
 {
     private static readonly string[] RoleClaimTypes =
@@ -23,7 +20,6 @@ internal sealed class PermissionAuthorizationHandler : AuthorizationHandler<Perm
         "http://schemas.microsoft.com/ws/2008/06/identity/claims/permission",
     ];
 
-    /// <inheritdoc />
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
         PermissionRequirement requirement)
@@ -38,7 +34,17 @@ internal sealed class PermissionAuthorizationHandler : AuthorizationHandler<Perm
 
     private static bool HasPermission(ClaimsPrincipal user, string permission)
     {
-        if (user.IsInRole(RoleConstants.SuperAdmin))
+        var authContext = user.FindFirst(IdentityClaimTypes.AuthContext)?.Value;
+        var otpVerified = user.FindFirst(IdentityClaimTypes.OtpVerified)?.Value;
+
+        if (authContext != AuthContextTypes.Admin || otpVerified != "true")
+        {
+            return false;
+        }
+
+        if (user.Claims.Any(c =>
+                RoleClaimTypes.Contains(c.Type) &&
+                RoleConstants.IsOwnerRole(c.Value)))
         {
             return true;
         }
@@ -48,15 +54,6 @@ internal sealed class PermissionAuthorizationHandler : AuthorizationHandler<Perm
             .Select(c => c.Value)
             .ToHashSet(StringComparer.Ordinal);
 
-        if (permissions.Contains(permission))
-        {
-            return true;
-        }
-
-        var roles = user.Claims
-            .Where(c => RoleClaimTypes.Contains(c.Type))
-            .Select(c => c.Value);
-
-        return roles.Any(role => RolePermissionMatrix.RoleGrantsPermission(role, permission));
+        return permissions.Contains(permission);
     }
 }

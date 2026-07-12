@@ -1,32 +1,31 @@
 namespace HAMBOX.Modules.Identity.Application.Authorization;
 
 /// <summary>
-/// Contains all well-known role names defined in the system.
+/// Well-known system role names.
 /// </summary>
 public static class RoleConstants
 {
-    /// <summary>
-    /// Role with complete system administration capabilities.
-    /// </summary>
+    /// <summary>Full system access; bypasses permission checks. Cannot be deleted.</summary>
+    public const string Owner = "Owner";
+
+    /// <summary>General administration with configurable permissions.</summary>
+    public const string Administrator = "Administrator";
+
+    /// <summary>Default role for registered customers.</summary>
+    public const string Customer = "Customer";
+
+    /// <summary>Legacy alias — maps to Owner for backward compatibility.</summary>
     public const string SuperAdmin = "SuperAdmin";
 
-    /// <summary>
-    /// Role for general administrative tasks.
-    /// </summary>
+    /// <summary>Legacy alias — maps to Administrator for backward compatibility.</summary>
     public const string Admin = "Admin";
 
-    /// <summary>
-    /// Role for managing catalog items and publishing content.
-    /// </summary>
-    public const string ContentManager = "ContentManager";
+    public static readonly IReadOnlyCollection<string> SystemRoles =
+        [Owner, Administrator, Customer];
 
-    /// <summary>
-    /// Role for handling customer support.
-    /// </summary>
-    public const string SupportAgent = "SupportAgent";
+    public static readonly IReadOnlyCollection<string> OwnerAliases =
+        [Owner, SuperAdmin];
 
-    /// <summary>
-    /// Role representing default customer accounts.
-    /// </summary>
-    public const string Customer = "Customer";
+    public static bool IsOwnerRole(string roleName) =>
+        OwnerAliases.Contains(roleName, StringComparer.OrdinalIgnoreCase);
 }

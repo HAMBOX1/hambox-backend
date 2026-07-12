@@ -31,6 +31,17 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         builder.Property(t => t.RevokedOnUtc);
 
+        builder.Property(t => t.AuthContext)
+            .IsRequired()
+            .HasMaxLength(32)
+            .HasDefaultValue("customer");
+
+        builder.Property(t => t.SessionId)
+            .IsRequired();
+
+        builder.Property(t => t.ReplacedByTokenHash)
+            .HasMaxLength(512);
+
         // Base entity properties
         builder.Property(t => t.CreatedOnUtc)
             .IsRequired();

@@ -11,6 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Asp.Versioning.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Infrastructure\HAMBOX.Infrastructure.csproj" />
     <ProjectReference Include="..\HAMBOX.Modules.Identity.Application\HAMBOX.Modules.Identity.Application.csproj" />
   </ItemGroup>

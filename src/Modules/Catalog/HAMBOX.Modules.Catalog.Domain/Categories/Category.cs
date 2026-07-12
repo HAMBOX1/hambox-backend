@@ -54,6 +54,11 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public string Slug { get; private set; } = string.Empty;
 
     /// <summary>
+    /// Gets the optional parent category identifier.
+    /// </summary>
+    public Guid? ParentId { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether the category is active.
     /// </summary>
     public bool IsActive { get; private set; }
@@ -81,13 +86,30 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public static Category Create(
         string nameAr,
         string nameEn,
-        string slug)
+        string slug,
+        Guid? parentId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
-        return new Category(Guid.NewGuid(), nameAr, nameEn, slug);
+        var category = new Category(Guid.NewGuid(), nameAr, nameEn, slug);
+        category.SetParent(parentId);
+        return category;
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted category.
+    /// </summary>
+    public void Restore()
+    {
+        if (!IsDeleted)
+        {
+            throw new InvalidOperationException("Category is not deleted.");
+        }
+
+        IsDeleted = false;
+        DeletedOnUtc = null;
     }
 
     /// <summary>
@@ -100,7 +122,8 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public void Update(
         string nameAr,
         string nameEn,
-        string slug)
+        string slug,
+        Guid? parentId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
@@ -109,6 +132,20 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
         NameAr = nameAr;
         NameEn = nameEn;
         Slug = slug;
+        SetParent(parentId);
+    }
+
+    /// <summary>
+    /// Sets the parent category.
+    /// </summary>
+    public void SetParent(Guid? parentId)
+    {
+        if (parentId == Id)
+        {
+            throw new InvalidOperationException("A category cannot be its own parent.");
+        }
+
+        ParentId = parentId;
     }
 
     /// <summary>

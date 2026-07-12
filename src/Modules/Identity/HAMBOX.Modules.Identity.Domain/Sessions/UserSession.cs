@@ -20,12 +20,18 @@ public sealed class UserSession : Entity
         Guid userId,
         string ipAddress,
         string userAgent,
+        string authContext,
+        string? browserName,
+        string? deviceName,
         DateTimeOffset startedOnUtc)
         : base(id)
     {
         UserId = userId;
         IpAddress = ipAddress;
         UserAgent = userAgent;
+        AuthContext = authContext;
+        BrowserName = browserName;
+        DeviceName = deviceName;
         StartedOnUtc = startedOnUtc;
         LastActivityOnUtc = startedOnUtc;
     }
@@ -44,6 +50,26 @@ public sealed class UserSession : Entity
     /// Gets the user agent string of the client that initiated the session.
     /// </summary>
     public string UserAgent { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets the auth context for this session (customer or admin).
+    /// </summary>
+    public string AuthContext { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Gets the linked refresh token identifier, when assigned.
+    /// </summary>
+    public Guid? RefreshTokenId { get; private set; }
+
+    /// <summary>
+    /// Gets a parsed browser name from the user agent.
+    /// </summary>
+    public string? BrowserName { get; private set; }
+
+    /// <summary>
+    /// Gets a parsed device description from the user agent.
+    /// </summary>
+    public string? DeviceName { get; private set; }
 
     /// <summary>
     /// Gets the date and time, in UTC, when the session was started.
@@ -74,7 +100,13 @@ public sealed class UserSession : Entity
     /// <param name="userAgent">The client user agent string.</param>
     /// <returns>A new <see cref="UserSession"/> instance.</returns>
     /// <exception cref="ArgumentException">Thrown when any required parameter is invalid.</exception>
-    public static UserSession Create(Guid userId, string ipAddress, string userAgent)
+    public static UserSession Create(
+        Guid userId,
+        string ipAddress,
+        string userAgent,
+        string authContext,
+        string? browserName = null,
+        string? deviceName = null)
     {
         if (userId == Guid.Empty)
         {
@@ -83,8 +115,31 @@ public sealed class UserSession : Entity
 
         ArgumentException.ThrowIfNullOrWhiteSpace(ipAddress);
         ArgumentException.ThrowIfNullOrWhiteSpace(userAgent);
+        ArgumentException.ThrowIfNullOrWhiteSpace(authContext);
 
-        return new UserSession(Guid.NewGuid(), userId, ipAddress, userAgent, DateTimeOffset.UtcNow);
+        return new UserSession(
+            Guid.NewGuid(),
+            userId,
+            ipAddress,
+            userAgent,
+            authContext,
+            browserName,
+            deviceName,
+            DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Links the active refresh token to this session.
+    /// </summary>
+    public void LinkRefreshToken(Guid refreshTokenId)
+    {
+        if (refreshTokenId == Guid.Empty)
+        {
+            throw new ArgumentException("Refresh token identifier is required.", nameof(refreshTokenId));
+        }
+
+        RefreshTokenId = refreshTokenId;
+        LastActivityOnUtc = DateTimeOffset.UtcNow;
     }
 
     /// <summary>

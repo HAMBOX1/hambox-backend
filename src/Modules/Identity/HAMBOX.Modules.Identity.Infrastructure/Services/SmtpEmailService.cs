@@ -4,8 +4,8 @@ using HAMBOX.Modules.Identity.Application.Options;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MimeKit;
 
 namespace HAMBOX.Modules.Identity.Infrastructure.Services;
@@ -14,34 +14,57 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Services;
 /// Sends transactional emails via SMTP using MailKit.
 /// </summary>
 internal sealed class SmtpEmailService(
-    IOptions<EmailSettings> emailSettings,
+    IPlatformSettingsService platformSettings,
     IHttpContextAccessor httpContextAccessor,
+    IHostEnvironment environment,
     ILogger<SmtpEmailService> logger) : IEmailService
 {
-    private readonly EmailSettings _settings = emailSettings.Value;
-
     /// <inheritdoc />
-    public Task SendEmailVerificationAsync(
+    public async Task SendEmailVerificationAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
         string token,
         CancellationToken cancellationToken = default)
     {
-        var message = EmailMessageBuilder.BuildVerificationMessage(_settings, email, token, expiresAt);
-        return SendAsync("EmailVerification", userId, email, message, cancellationToken);
+        var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
+        var message = EmailMessageBuilder.BuildVerificationMessage(settings, email, token, expiresAt);
+        await SendAsync("EmailVerification", userId, email, message, settings, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task SendPasswordResetAsync(
+    public async Task SendPasswordResetAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
         string token,
         CancellationToken cancellationToken = default)
     {
-        var message = EmailMessageBuilder.BuildPasswordResetMessage(_settings, email, token, expiresAt);
-        return SendAsync("PasswordReset", userId, email, message, cancellationToken);
+        var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
+        var message = EmailMessageBuilder.BuildPasswordResetMessage(settings, email, token, expiresAt);
+        await SendAsync("PasswordReset", userId, email, message, settings, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task SendAdminLoginOtpAsync(
+        Guid userId,
+        string email,
+        string code,
+        DateTimeOffset expiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (environment.IsDevelopment())
+        {
+            logger.LogWarning(
+                "Development OTP for AdminLoginOtp, user {UserId} at {MaskedEmail}: {Code}. Use the code from the most recent sign-in or resend.",
+                userId,
+                EmailLogHelper.MaskEmail(email),
+                code);
+        }
+
+        var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
+        var message = EmailMessageBuilder.BuildAdminOtpMessage(settings, email, code, expiresAt);
+        await SendAsync("AdminLoginOtp", userId, email, message, settings, cancellationToken);
     }
 
     private async Task SendAsync(
@@ -49,6 +72,7 @@ internal sealed class SmtpEmailService(
         Guid userId,
         string email,
         MimeMessage message,
+        EmailSettings settings,
         CancellationToken cancellationToken)
     {
         var correlationId = GetCorrelationId();
@@ -60,8 +84,8 @@ internal sealed class SmtpEmailService(
             emailType,
             maskedEmail,
             userId,
-            _settings.SmtpHost,
-            _settings.SmtpPort);
+            settings.SmtpHost,
+            settings.SmtpPort);
 
         try
         {
@@ -70,15 +94,15 @@ internal sealed class SmtpEmailService(
                 Timeout = 30_000
             };
 
-            var socketOptions = _settings.UseSsl
+            var socketOptions = settings.UseSsl
                 ? SecureSocketOptions.StartTls
                 : SecureSocketOptions.None;
 
-            await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, socketOptions, cancellationToken);
+            await client.ConnectAsync(settings.SmtpHost, settings.SmtpPort, socketOptions, cancellationToken);
 
-            if (!string.IsNullOrWhiteSpace(_settings.Username))
+            if (!string.IsNullOrWhiteSpace(settings.Username))
             {
-                await client.AuthenticateAsync(_settings.Username, _settings.Password ?? string.Empty, cancellationToken);
+                await client.AuthenticateAsync(settings.Username, settings.Password ?? string.Empty, cancellationToken);
             }
 
             await client.SendAsync(message, cancellationToken);
@@ -102,8 +126,8 @@ internal sealed class SmtpEmailService(
                 emailType,
                 maskedEmail,
                 userId,
-                _settings.SmtpHost,
-                _settings.SmtpPort,
+                settings.SmtpHost,
+                settings.SmtpPort,
                 stopwatch.ElapsedMilliseconds,
                 correlationId);
         }

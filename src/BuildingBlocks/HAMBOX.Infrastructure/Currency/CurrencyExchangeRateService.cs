@@ -1,5 +1,6 @@
 using HAMBOX.Application.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Infrastructure.Currency;
@@ -11,15 +12,17 @@ public sealed class CurrencyExchangeRateService(
     ICurrencyExchangeRateProvider provider,
     IMemoryCache cache,
     IOptions<CurrencySettings> options,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IServiceScopeFactory scopeFactory)
 {
     private const string CacheKey = "hambox.exchange-rates";
 
     /// <summary>Gets supported currency codes.</summary>
-    public IReadOnlyList<string> SupportedCurrencies => options.Value.SupportedCurrencies;
+    public IReadOnlyList<string> SupportedCurrencies =>
+        ResolveCurrencySettings().SupportedCurrencies;
 
     /// <summary>Gets the base currency used for stored prices.</summary>
-    public string BaseCurrency => options.Value.BaseCurrency;
+    public string BaseCurrency => ResolveCurrencySettings().BaseCurrency;
 
     /// <summary>Returns cached rates or refreshes when stale.</summary>
     public async Task<CurrencyRatesSnapshot> GetRatesAsync(CancellationToken cancellationToken = default)
@@ -35,7 +38,7 @@ public sealed class CurrencyExchangeRateService(
     /// <summary>Forces a refresh from the configured provider.</summary>
     public async Task<CurrencyRatesSnapshot> RefreshRatesAsync(CancellationToken cancellationToken = default)
     {
-        var settings = options.Value;
+        var settings = ResolveCurrencySettings();
         var fetched = await provider.GetRatesAsync(cancellationToken);
         var rates = NormalizeRates(fetched, settings);
 
@@ -47,14 +50,14 @@ public sealed class CurrencyExchangeRateService(
         cache.Set(
             CacheKey,
             snapshot,
-            TimeSpan.FromMinutes(Math.Max(5, settings.RefreshIntervalMinutes)));
+            TimeSpan.FromMinutes(Math.Max(5, settings.ExchangeRateRefreshMinutes)));
 
         return snapshot;
     }
 
     private static IReadOnlyDictionary<string, decimal> NormalizeRates(
         IReadOnlyDictionary<string, decimal> fetched,
-        CurrencySettings settings)
+        HAMBOX.Application.PlatformSettings.CurrencySettingsPayload settings)
     {
         var normalized = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
@@ -78,6 +81,25 @@ public sealed class CurrencyExchangeRateService(
         }
 
         return normalized;
+    }
+
+    private HAMBOX.Application.PlatformSettings.CurrencySettingsPayload ResolveCurrencySettings()
+    {
+        using var scope = scopeFactory.CreateScope();
+        var platformSettings = scope.ServiceProvider.GetService<IPlatformSettingsProvider>();
+        if (platformSettings is not null)
+        {
+            return platformSettings.GetCurrencyAsync().GetAwaiter().GetResult();
+        }
+
+        var fallback = options.Value;
+        return new HAMBOX.Application.PlatformSettings.CurrencySettingsPayload(
+            fallback.BaseCurrency,
+            fallback.SupportedCurrencies,
+            fallback.RefreshIntervalMinutes,
+            fallback.Provider,
+            fallback.ExternalApiUrl,
+            fallback.StaticRates);
     }
 }
 

@@ -1,4 +1,6 @@
+using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Permissions;
+using HAMBOX.Modules.Identity.Domain.PlatformSettings;
 using HAMBOX.Modules.Identity.Domain.Roles;
 using HAMBOX.Modules.Identity.Domain.Sessions;
 using HAMBOX.Modules.Identity.Domain.Tokens;
@@ -28,9 +30,24 @@ public interface IIdentityDbContext
     DbSet<UserRole> UserRoles { get; }
 
     /// <summary>
+    /// Gets the permission groups database set.
+    /// </summary>
+    DbSet<PermissionGroup> PermissionGroups { get; }
+
+    /// <summary>
     /// Gets the permissions database set.
     /// </summary>
     DbSet<Permission> Permissions { get; }
+
+    /// <summary>
+    /// Gets the role permissions database set.
+    /// </summary>
+    DbSet<RolePermission> RolePermissions { get; }
+
+    /// <summary>
+    /// Gets the authorization audit logs database set.
+    /// </summary>
+    DbSet<AuthorizationAuditLog> AuthorizationAuditLogs { get; }
 
     /// <summary>
     /// Gets the refresh tokens database set.
@@ -56,6 +73,26 @@ public interface IIdentityDbContext
     /// Gets the login history database set.
     /// </summary>
     DbSet<LoginHistory> LoginHistory { get; }
+
+    /// <summary>
+    /// Gets the admin login OTP challenges database set.
+    /// </summary>
+    DbSet<AdminLoginChallenge> AdminLoginChallenges { get; }
+
+    /// <summary>
+    /// Gets the admin OTP audit logs database set.
+    /// </summary>
+    DbSet<AdminOtpAuditLog> AdminOtpAuditLogs { get; }
+
+    /// <summary>
+    /// Gets the platform settings categories database set.
+    /// </summary>
+    DbSet<PlatformSettingsCategory> PlatformSettingsCategories { get; }
+
+    /// <summary>
+    /// Gets the platform settings audit logs database set.
+    /// </summary>
+    DbSet<PlatformSettingsAuditLog> PlatformSettingsAuditLogs { get; }
 
     /// <summary>
     /// Saves all changes made in this context to the database.

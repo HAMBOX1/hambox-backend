@@ -31,7 +31,18 @@ internal sealed class UpdateCategoryCommandHandler : IRequestHandler<UpdateCateg
             return Result.Failure(CatalogErrors.CategorySlugNotUnique);
         }
 
-        category.Update(request.NameAr, request.NameEn, request.Slug);
+        var parentError = await CategoryParentValidator.ValidateParentAsync(
+            _dbContext,
+            request.Id,
+            request.ParentId,
+            cancellationToken);
+
+        if (parentError is not null)
+        {
+            return parentError;
+        }
+
+        category.Update(request.NameAr, request.NameEn, request.Slug, request.ParentId);
 
         if (request.IsActive && !category.IsActive)
         {

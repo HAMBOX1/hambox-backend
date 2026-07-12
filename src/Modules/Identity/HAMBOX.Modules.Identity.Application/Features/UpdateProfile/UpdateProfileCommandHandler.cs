@@ -13,7 +13,8 @@ namespace HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 /// </summary>
 internal sealed class UpdateProfileCommandHandler(
     IIdentityDbContext dbContext,
-    ICurrentUserService currentUserService) : IRequestHandler<UpdateProfileCommand, Result<UserProfileDto>>
+    ICurrentUserService currentUserService,
+    IPermissionResolver permissionResolver) : IRequestHandler<UpdateProfileCommand, Result<UserProfileDto>>
 {
     /// <inheritdoc />
     public async Task<Result<UserProfileDto>> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -57,6 +58,15 @@ internal sealed class UpdateProfileCommandHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var roles = await (
+            from ur in dbContext.UserRoles
+            join r in dbContext.Roles on ur.RoleId equals r.Id
+            where ur.UserId == userId
+            select r.Name
+        ).ToListAsync(cancellationToken);
+
+        var permissions = await permissionResolver.GetPermissionsAsync(userId, cancellationToken);
+
         var profile = new UserProfileDto(
             user.Id,
             user.Email,
@@ -68,7 +78,9 @@ internal sealed class UpdateProfileCommandHandler(
             user.Status.ToString(),
             user.PreferredLanguage,
             user.PreferredCurrency,
-            user.CreatedOnUtc);
+            user.CreatedOnUtc,
+            roles,
+            permissions.ToArray());
 
         return Result.Success(profile);
     }

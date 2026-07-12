@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Application.Features.Products;
 using HAMBOX.Modules.Catalog.Application.Features.Products.CreateProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.DeleteProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById;
@@ -103,7 +104,7 @@ internal static class ProductEndpoints
             });
         })
         .WithName("CreateProduct")
-        .RequirePermission(PermissionConstants.Products.Create);
+        .RequirePermission(PermissionConstants.Catalog.Products.Create);
 
         // PUT /api/v1/products/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateProductRequest request, ISender sender) =>
@@ -125,7 +126,7 @@ internal static class ProductEndpoints
             });
         })
         .WithName("UpdateProduct")
-        .RequirePermission(PermissionConstants.Products.Update);
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
         // DELETE /api/v1/products/{id}
         group.MapDelete("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, ISender sender) =>
@@ -147,9 +148,57 @@ internal static class ProductEndpoints
             });
         })
         .WithName("DeleteProduct")
-        .RequirePermission(PermissionConstants.Products.Delete);
+        .RequirePermission(PermissionConstants.Catalog.Products.Delete);
+
+        group.MapPost("{id:guid}/publish", async (Guid id, ISender sender) =>
+            await SendEmptyResult(sender, new PublishProductCommand(id)))
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        group.MapPost("{id:guid}/deactivate", async (Guid id, ISender sender) =>
+            await SendEmptyResult(sender, new DeactivateProductCommand(id)))
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        group.MapPost("{id:guid}/archive", async (Guid id, ISender sender) =>
+            await SendEmptyResult(sender, new ArchiveProductCommand(id)))
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        group.MapPost("{id:guid}/restore", async (Guid id, ISender sender) =>
+            await SendEmptyResult(sender, new RestoreProductCommand(id)))
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        group.MapPost("{id:guid}/duplicate", async Task<Results<Ok<Guid>, BadRequest<ProblemDetails>>> (
+            Guid id,
+            [FromBody] DuplicateProductRequest? request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new DuplicateProductCommand(id, request?.NameSuffix));
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("DuplicateProduct")
+        .RequirePermission(PermissionConstants.Catalog.Products.Create);
     }
+
+    private static async Task<Results<NoContent, BadRequest<ProblemDetails>>> SendEmptyResult(ISender sender, IRequest<Result> request)
+    {
+        var result = await sender.Send(request);
+        return result.IsSuccess ? TypedResults.NoContent() : TypedResults.BadRequest(Problem(result));
+    }
+
+    private static ProblemDetails Problem(Result result) => new()
+    {
+        Title = "Bad Request",
+        Detail = result.Error.Description,
+        Type = result.Error.Code,
+        Status = StatusCodes.Status400BadRequest
+    };
 }
+
+internal sealed record DuplicateProductRequest(string? NameSuffix);
 
 internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId);
 internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status);

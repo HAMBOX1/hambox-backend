@@ -1,4 +1,6 @@
+using Asp.Versioning;
 using HAMBOX.Modules.Identity.Presentation.Endpoints;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
 namespace HAMBOX.Modules.Identity.Presentation.Extensions;
@@ -15,7 +17,14 @@ public static class IdentityEndpointExtensions
     /// <returns>The updated route builder.</returns>
     public static IEndpointRouteBuilder MapIdentityEndpoints(this IEndpointRouteBuilder builder)
     {
+        var apiVersionSet = builder.NewApiVersionSet()
+            .HasApiVersion(new ApiVersion(1))
+            .ReportApiVersions()
+            .Build();
+
         builder.MapAuthEndpoints();
+        builder.MapRoleEndpoints(apiVersionSet);
+        builder.MapSettingsEndpoints(apiVersionSet);
         return builder;
     }
 }

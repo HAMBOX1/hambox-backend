@@ -1,6 +1,7 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Storefront.GetStorefrontContent;
+using HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -41,6 +42,28 @@ internal static class StorefrontEndpoints
             });
         })
         .WithName("GetStorefrontContent")
+        .AllowAnonymous();
+
+        group.MapGet("products/{productId:guid}/configuration", async Task<Results<Ok<StorefrontProductConfigurationDto>, BadRequest<ProblemDetails>>> (
+            Guid productId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetStorefrontProductConfigurationQuery(productId));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetStorefrontProductConfiguration")
         .AllowAnonymous();
     }
 }

@@ -1,6 +1,8 @@
 using HAMBOX.Domain.Entities;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Permissions;
+using HAMBOX.Modules.Identity.Domain.PlatformSettings;
 using HAMBOX.Modules.Identity.Domain.Roles;
 using HAMBOX.Modules.Identity.Domain.Sessions;
 using HAMBOX.Modules.Identity.Domain.Tokens;
@@ -26,9 +28,24 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<ApplicationRole> Roles => Set<ApplicationRole>();
 
     /// <summary>
+    /// Gets or sets the permission groups table.
+    /// </summary>
+    public DbSet<PermissionGroup> PermissionGroups => Set<PermissionGroup>();
+
+    /// <summary>
     /// Gets or sets the permissions table.
     /// </summary>
     public DbSet<Permission> Permissions => Set<Permission>();
+
+    /// <summary>
+    /// Gets or sets the role permissions join table.
+    /// </summary>
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
+    /// <summary>
+    /// Gets or sets the authorization audit logs table.
+    /// </summary>
+    public DbSet<AuthorizationAuditLog> AuthorizationAuditLogs => Set<AuthorizationAuditLog>();
 
     /// <summary>
     /// Gets or sets the refresh tokens table.
@@ -54,6 +71,26 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// Gets or sets the login history table.
     /// </summary>
     public DbSet<LoginHistory> LoginHistory => Set<LoginHistory>();
+
+    /// <summary>
+    /// Gets or sets the admin login OTP challenges table.
+    /// </summary>
+    public DbSet<AdminLoginChallenge> AdminLoginChallenges => Set<AdminLoginChallenge>();
+
+    /// <summary>
+    /// Gets or sets the admin OTP audit logs table.
+    /// </summary>
+    public DbSet<AdminOtpAuditLog> AdminOtpAuditLogs => Set<AdminOtpAuditLog>();
+
+    /// <summary>
+    /// Gets or sets the platform settings categories table.
+    /// </summary>
+    public DbSet<PlatformSettingsCategory> PlatformSettingsCategories => Set<PlatformSettingsCategory>();
+
+    /// <summary>
+    /// Gets or sets the platform settings audit logs table.
+    /// </summary>
+    public DbSet<PlatformSettingsAuditLog> PlatformSettingsAuditLogs => Set<PlatformSettingsAuditLog>();
 
     /// <summary>
     /// Gets or sets the user roles join table.

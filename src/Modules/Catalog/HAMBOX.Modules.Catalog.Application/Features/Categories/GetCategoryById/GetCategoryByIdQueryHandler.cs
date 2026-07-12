@@ -23,7 +23,7 @@ internal sealed class GetCategoryByIdQueryHandler : IRequestHandler<GetCategoryB
         var category = await _dbContext.Categories
             .AsNoTracking()
             .Where(c => c.Id == request.Id)
-            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive))
+            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (category is null)

@@ -22,6 +22,9 @@ internal sealed class ShoppingCartConfiguration : IEntityTypeConfiguration<Shopp
         builder.Property(c => c.GuestSessionId)
             .HasMaxLength(100);
 
+        builder.Property(c => c.AppliedCouponCode)
+            .HasMaxLength(50);
+
         builder.Property(c => c.CreatedOnUtc)
             .IsRequired();
 
@@ -32,8 +35,9 @@ internal sealed class ShoppingCartConfiguration : IEntityTypeConfiguration<Shopp
             .HasForeignKey(i => i.ShoppingCartId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Metadata.FindNavigation(nameof(ShoppingCart.Items))!
-            .SetPropertyAccessMode(PropertyAccessMode.Field);
+        var itemsNavigation = builder.Metadata.FindNavigation(nameof(ShoppingCart.Items))!;
+        itemsNavigation.SetPropertyAccessMode(PropertyAccessMode.Field);
+        itemsNavigation.SetField("_items");
 
         builder.HasIndex(c => c.UserId)
             .IsUnique()
