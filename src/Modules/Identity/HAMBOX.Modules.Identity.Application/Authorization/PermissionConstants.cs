@@ -40,6 +40,7 @@ public static class PermissionConstants
             public const string ViewCosts = "Catalog.Inventory.ViewCosts";
             public const string ManageBatches = "Catalog.Inventory.ManageBatches";
             public const string ManageSuppliers = "Catalog.Inventory.ManageSuppliers";
+            public const string RevealCodes = "Catalog.Inventory.RevealCodes";
         }
     }
 
@@ -126,6 +127,24 @@ public static class PermissionConstants
         public const string Manage = "Themes.Manage";
     }
 
+    public static class Legal
+    {
+        public const string View = "Legal.View";
+        public const string Create = "Legal.Create";
+        public const string Edit = "Legal.Edit";
+        public const string Publish = "Legal.Publish";
+        public const string Delete = "Legal.Delete";
+    }
+
+    public static class Suppliers
+    {
+        public const string View = "Suppliers.View";
+        public const string Create = "Suppliers.Create";
+        public const string Edit = "Suppliers.Edit";
+        public const string Delete = "Suppliers.Delete";
+        public const string ManageMappings = "Suppliers.ManageMappings";
+    }
+
     public static class Reviews
     {
         public const string View = "Reviews.View";
@@ -197,6 +216,25 @@ public static class PermissionConstants
         public const string Manage = "Analytics.Manage";
     }
 
+    public static class Security
+    {
+        public const string View = "Security.View";
+        public const string ManageUsers = "Security.ManageUsers";
+        public const string ManageEmails = "Security.ManageEmails";
+        public const string ManageCountries = "Security.ManageCountries";
+        public const string ManageIPs = "Security.ManageIPs";
+        public const string ViewEvents = "Security.ViewEvents";
+    }
+
+    public static class Communication
+    {
+        public const string View = "Communication.View";
+        public const string Manage = "Communication.Manage";
+        public const string Send = "Communication.Send";
+        public const string ManageTemplates = "Communication.ManageTemplates";
+        public const string ManageProviders = "Communication.ManageProviders";
+    }
+
     /// <summary>All permission names for policy registration.</summary>
     public static readonly IReadOnlyCollection<string> All =
     [
@@ -217,6 +255,8 @@ public static class PermissionConstants
         Promotions.View, Promotions.Create, Promotions.Edit, Promotions.Delete, Promotions.Publish,
         Themes.View, Themes.Create, Themes.Edit, Themes.Delete, Themes.Publish,
         Themes.Schedule, Themes.Assign, Themes.Export, Themes.Import, Themes.Rollback,
+        Legal.View, Legal.Create, Legal.Edit, Legal.Publish, Legal.Delete,
+        Suppliers.View, Suppliers.Create, Suppliers.Edit, Suppliers.Delete, Suppliers.ManageMappings,
         Reviews.View, Reviews.Moderate,
         Notifications.View, Notifications.Send,
         Referral.View, Referral.Manage,
@@ -228,5 +268,7 @@ public static class PermissionConstants
         AuditLogs.View,
         Operations.View, Operations.Manage, Operations.Retry, Operations.Export, Operations.Clear,
         Analytics.View, Analytics.Export, Analytics.Compare, Analytics.Manage,
+        Security.View, Security.ManageUsers, Security.ManageEmails, Security.ManageCountries, Security.ManageIPs, Security.ViewEvents,
+        Communication.View, Communication.Manage, Communication.Send, Communication.ManageTemplates, Communication.ManageProviders,
     ];
 }

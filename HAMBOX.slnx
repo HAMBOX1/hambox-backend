@@ -11,6 +11,12 @@
     <Project Path="src/BuildingBlocks/HAMBOX.SharedKernel/HAMBOX.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Communication/">
+    <Project Path="src/Modules/Communication/HAMBOX.Modules.Communication.Application/HAMBOX.Modules.Communication.Application.csproj" />
+    <Project Path="src/Modules/Communication/HAMBOX.Modules.Communication.Domain/HAMBOX.Modules.Communication.Domain.csproj" />
+    <Project Path="src/Modules/Communication/HAMBOX.Modules.Communication.Infrastructure/HAMBOX.Modules.Communication.Infrastructure.csproj" />
+    <Project Path="src/Modules/Communication/HAMBOX.Modules.Communication.Presentation/HAMBOX.Modules.Communication.Presentation.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Catalog/">
     <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Application/HAMBOX.Modules.Catalog.Application.csproj" />
     <Project Path="src/Modules/Catalog/HAMBOX.Modules.Catalog.Domain/HAMBOX.Modules.Catalog.Domain.csproj" />
@@ -28,6 +34,12 @@
     <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Domain/HAMBOX.Modules.Identity.Domain.csproj" />
     <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Infrastructure/HAMBOX.Modules.Identity.Infrastructure.csproj" />
     <Project Path="src/Modules/Identity/HAMBOX.Modules.Identity.Presentation/HAMBOX.Modules.Identity.Presentation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Suppliers/">
+    <Project Path="src/Modules/Suppliers/HAMBOX.Modules.Suppliers.Application/HAMBOX.Modules.Suppliers.Application.csproj" />
+    <Project Path="src/Modules/Suppliers/HAMBOX.Modules.Suppliers.Domain/HAMBOX.Modules.Suppliers.Domain.csproj" />
+    <Project Path="src/Modules/Suppliers/HAMBOX.Modules.Suppliers.Infrastructure/HAMBOX.Modules.Suppliers.Infrastructure.csproj" />
+    <Project Path="src/Modules/Suppliers/HAMBOX.Modules.Suppliers.Presentation/HAMBOX.Modules.Suppliers.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/HAMBOX.IntegrationTests/HAMBOX.IntegrationTests.csproj" />

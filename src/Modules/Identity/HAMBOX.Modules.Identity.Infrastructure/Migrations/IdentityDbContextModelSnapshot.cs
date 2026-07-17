@@ -981,6 +981,204 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Name = "Reports.Delete",
                             NormalizedName = "REPORTS.DELETE",
                             SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("21000000-0000-0000-0000-000000000001"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000005"),
+                            Name = "Catalog.Inventory.RevealCodes",
+                            NormalizedName = "CATALOG.INVENTORY.REVEALCODES",
+                            SortOrder = 11
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000232"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000027"),
+                            Name = "Legal.View",
+                            NormalizedName = "LEGAL.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000233"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000027"),
+                            Name = "Legal.Create",
+                            NormalizedName = "LEGAL.CREATE",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000234"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000027"),
+                            Name = "Legal.Edit",
+                            NormalizedName = "LEGAL.EDIT",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000235"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000027"),
+                            Name = "Legal.Publish",
+                            NormalizedName = "LEGAL.PUBLISH",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000236"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000028"),
+                            Name = "Suppliers.View",
+                            NormalizedName = "SUPPLIERS.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000237"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000028"),
+                            Name = "Suppliers.Create",
+                            NormalizedName = "SUPPLIERS.CREATE",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000238"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000028"),
+                            Name = "Suppliers.Edit",
+                            NormalizedName = "SUPPLIERS.EDIT",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000239"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000028"),
+                            Name = "Suppliers.Delete",
+                            NormalizedName = "SUPPLIERS.DELETE",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000240"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000028"),
+                            Name = "Suppliers.ManageMappings",
+                            NormalizedName = "SUPPLIERS.MANAGEMAPPINGS",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000241"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.View",
+                            NormalizedName = "SECURITY.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000242"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageUsers",
+                            NormalizedName = "SECURITY.MANAGEUSERS",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000243"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageEmails",
+                            NormalizedName = "SECURITY.MANAGEEMAILS",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000244"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageCountries",
+                            NormalizedName = "SECURITY.MANAGECOUNTRIES",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000245"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageIPs",
+                            NormalizedName = "SECURITY.MANAGEIPS",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000246"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ViewEvents",
+                            NormalizedName = "SECURITY.VIEWEVENTS",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000247"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000030"),
+                            Name = "Communication.View",
+                            NormalizedName = "COMMUNICATION.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000248"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000030"),
+                            Name = "Communication.Manage",
+                            NormalizedName = "COMMUNICATION.MANAGE",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000249"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000030"),
+                            Name = "Communication.Send",
+                            NormalizedName = "COMMUNICATION.SEND",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000250"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000030"),
+                            Name = "Communication.ManageTemplates",
+                            NormalizedName = "COMMUNICATION.MANAGETEMPLATES",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000251"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000030"),
+                            Name = "Communication.ManageProviders",
+                            NormalizedName = "COMMUNICATION.MANAGEPROVIDERS",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000252"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000027"),
+                            Name = "Legal.Delete",
+                            NormalizedName = "LEGAL.DELETE",
+                            SortOrder = 5
                         });
                 });
 
@@ -1261,6 +1459,44 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Module = "Analytics",
                             Name = "Analytics",
                             SortOrder = 185
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000027"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Key = "Legal",
+                            Module = "Platform",
+                            Name = "Legal Center",
+                            SortOrder = 145
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000028"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Key = "Suppliers",
+                            Module = "Operations",
+                            Name = "Suppliers",
+                            SortOrder = 146
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000029"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Blocked users, emails, countries, IPs, and security events",
+                            Key = "Security",
+                            Module = "Security",
+                            Name = "Security Center",
+                            SortOrder = 147
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000030"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Templates, notifications, providers, and delivery history",
+                            Key = "Communication",
+                            Module = "Communication",
+                            Name = "Communication Center",
+                            SortOrder = 148
                         });
                 });
 
@@ -2056,7 +2292,446 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             PermissionId = new Guid("20000000-0000-0000-0000-000000000231"),
                             RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000091"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("21000000-0000-0000-0000-000000000001"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000092"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000232"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000093"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000233"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000094"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000234"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000095"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000235"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000096"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000236"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000097"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000237"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000098"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000238"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000099"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000239"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000100"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000240"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000101"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000241"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000102"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000242"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000103"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000243"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000104"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000244"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000105"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000245"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000106"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000246"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000107"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000247"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000108"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000248"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000109"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000249"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000110"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000250"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000111"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000251"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000112"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000252"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
                         });
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.BlockedDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeviceFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceFingerprint")
+                        .HasDatabaseName("IX_BlockedDevices_DeviceFingerprint");
+
+                    b.ToTable("BlockedDevices", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.BlockedEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Pattern")
+                        .HasDatabaseName("IX_BlockedEmails_Pattern");
+
+                    b.ToTable("BlockedEmails", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.BlockedIp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CidrOrAddress")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CidrOrAddress")
+                        .HasDatabaseName("IX_BlockedIps_CidrOrAddress");
+
+                    b.ToTable("BlockedIps", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.CountryRestriction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CountryCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CountryRestrictions_CountryCode")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("CountryRestrictions", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.SecurityEventLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("TargetUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType")
+                        .HasDatabaseName("IX_SecurityEventLogs_EventType");
+
+                    b.HasIndex("OccurredOnUtc")
+                        .HasDatabaseName("IX_SecurityEventLogs_OccurredOnUtc");
+
+                    b.HasIndex("TargetUserId")
+                        .HasDatabaseName("IX_SecurityEventLogs_TargetUserId");
+
+                    b.ToTable("SecurityEventLogs", "identity");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Sessions.LoginHistory", b =>
@@ -2367,6 +3042,20 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("BlockExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("BlockNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("BlockReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("BlockedByUserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)

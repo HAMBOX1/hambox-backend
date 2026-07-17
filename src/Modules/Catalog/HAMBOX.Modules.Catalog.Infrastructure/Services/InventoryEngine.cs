@@ -104,16 +104,15 @@ internal sealed class InventoryEngine : IInventoryEngine
 
         await ExpireStaleReservationsAsync(cancellationToken);
 
-        var codes = await _db.DigitalInventoryCodes
-            .Where(c => c.VariantId == variantId && c.Status == InventoryCodeStatus.Available)
-            .OrderBy(c => c.CreatedOnUtc)
-            .Take(quantity)
-            .ToListAsync(cancellationToken);
-
-        if (codes.Count < quantity)
+        var lockedIds = await GetLockedAvailableCodeIdsAsync(variantId, quantity, cancellationToken);
+        if (lockedIds.Count < quantity)
         {
             throw new InvalidOperationException("Insufficient inventory codes.");
         }
+
+        var codes = await _db.DigitalInventoryCodes
+            .Where(c => lockedIds.Contains(c.Id))
+            .ToListAsync(cancellationToken);
 
         var inventorySettings = await _platformSettings.GetInventoryAsync(cancellationToken);
 
@@ -370,6 +369,33 @@ internal sealed class InventoryEngine : IInventoryEngine
         }
 
         await PersistIfNotEnlistedAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Selects candidate code ids for reservation, taking a pessimistic row lock (UPDLOCK, ROWLOCK) so two
+    /// concurrent checkouts can never select the same "Available" code. The second transaction's identical
+    /// query blocks until the first commits/rolls back, then naturally excludes whatever was just reserved.
+    /// </summary>
+    private async Task<List<Guid>> GetLockedAvailableCodeIdsAsync(Guid variantId, int quantity, CancellationToken cancellationToken)
+    {
+        if (_db is not CatalogDbContext catalogDbContext)
+        {
+            return await _db.DigitalInventoryCodes
+                .Where(c => c.VariantId == variantId && c.Status == InventoryCodeStatus.Available)
+                .OrderBy(c => c.CreatedOnUtc)
+                .Take(quantity)
+                .Select(c => c.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        var statusName = InventoryCodeStatus.Available.ToString();
+        return await catalogDbContext.Database
+            .SqlQuery<Guid>($@"
+                SELECT TOP ({quantity}) Id
+                FROM catalog.DigitalInventoryCodes WITH (UPDLOCK, ROWLOCK)
+                WHERE VariantId = {variantId} AND Status = {statusName}
+                ORDER BY CreatedOnUtc")
+            .ToListAsync(cancellationToken);
     }
 
     private async Task<DigitalInventoryCode> FindTrackedCodeAsync(Guid codeId, CancellationToken cancellationToken)

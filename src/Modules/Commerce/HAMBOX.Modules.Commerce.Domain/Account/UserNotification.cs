@@ -5,7 +5,7 @@ namespace HAMBOX.Modules.Commerce.Domain.Account;
 /// <summary>
 /// Represents an in-app notification for a user.
 /// </summary>
-public sealed class UserNotification : Entity
+public sealed class UserNotification : Entity, ISoftDeletable
 {
     private UserNotification()
     {
@@ -59,6 +59,17 @@ public sealed class UserNotification : Entity
     public bool IsRead { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether the notification has been archived by the user.
+    /// </summary>
+    public bool IsArchived { get; private set; }
+
+    /// <inheritdoc />
+    public bool IsDeleted { get; private set; }
+
+    /// <inheritdoc />
+    public DateTimeOffset? DeletedOnUtc { get; private set; }
+
+    /// <summary>
     /// Creates a new user notification.
     /// </summary>
     public static UserNotification Create(
@@ -88,5 +99,21 @@ public sealed class UserNotification : Entity
     public void MarkAsRead()
     {
         IsRead = true;
+    }
+
+    /// <summary>
+    /// Archives the notification, hiding it from the default notification list without deleting it.
+    /// </summary>
+    public void Archive()
+    {
+        IsArchived = true;
+    }
+
+    /// <summary>
+    /// Restores an archived notification to the default notification list.
+    /// </summary>
+    public void Unarchive()
+    {
+        IsArchived = false;
     }
 }

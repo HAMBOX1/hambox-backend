@@ -4,6 +4,7 @@ using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Permissions;
 using HAMBOX.Modules.Identity.Domain.PlatformSettings;
 using HAMBOX.Modules.Identity.Domain.Roles;
+using HAMBOX.Modules.Identity.Domain.Security;
 using HAMBOX.Modules.Identity.Domain.Sessions;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
@@ -96,6 +97,31 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// Gets or sets the user roles join table.
     /// </summary>
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+
+    /// <summary>
+    /// Gets or sets the Security Center blocked emails/domains table.
+    /// </summary>
+    public DbSet<BlockedEmail> BlockedEmails => Set<BlockedEmail>();
+
+    /// <summary>
+    /// Gets or sets the Security Center blocked IP addresses/ranges table.
+    /// </summary>
+    public DbSet<BlockedIp> BlockedIps => Set<BlockedIp>();
+
+    /// <summary>
+    /// Gets or sets the Security Center country restrictions table.
+    /// </summary>
+    public DbSet<CountryRestriction> CountryRestrictions => Set<CountryRestriction>();
+
+    /// <summary>
+    /// Gets or sets the Security Center blocked devices table (architecture-only, no live usage).
+    /// </summary>
+    public DbSet<BlockedDevice> BlockedDevices => Set<BlockedDevice>();
+
+    /// <summary>
+    /// Gets or sets the Security Center security event log table.
+    /// </summary>
+    public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

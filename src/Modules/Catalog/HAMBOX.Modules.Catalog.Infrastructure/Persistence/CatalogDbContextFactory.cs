@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Infrastructure.Services;
 
@@ -58,6 +59,14 @@ public sealed class CatalogDbContextFactory : IDesignTimeDbContextFactory<Catalo
             new Interceptors.ProductAggregateChangeInterceptor(),
             auditInterceptor);
 
-        return new CatalogDbContext(optionsBuilder.Options);
+        return new CatalogDbContext(optionsBuilder.Options, new DesignTimeCodeProtector());
+    }
+
+    // Migration authoring only inspects the model shape; it never calls Protect/Unprotect.
+    private sealed class DesignTimeCodeProtector : ICodeProtector
+    {
+        public string Protect(string plainText) => plainText;
+
+        public string Unprotect(string cipherText) => cipherText;
     }
 }

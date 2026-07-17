@@ -1,0 +1,188 @@
+namespace HAMBOX.Application.BackgroundJobs;
+
+/// <summary>
+/// The one contract every background-processing engine implements. Business modules (Orders,
+/// Notifications, Suppliers, Reports, ...) enqueue work through this interface only — they never
+/// reference Hangfire, Quartz, RabbitMQ, or any other scheduler. Today it's backed by an in-process
+/// DB-polling worker (Commerce.Infrastructure); swapping the engine later means re-registering this
+/// interface in DI, nothing else.
+/// </summary>
+public interface IBackgroundJobScheduler
+{
+    Task<Guid> EnqueueAsync<TPayload>(
+        string jobType,
+        TPayload payload,
+        BackgroundJobOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid> EnqueueAsync(
+        string jobType,
+        BackgroundJobOptions? options = null,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Lets a module declare a recurring job at startup (e.g. "run InventorySync every 15 minutes")
+/// without hardcoding the schedule into whatever worker happens to execute it.
+/// </summary>
+public interface IRecurringJobScheduler
+{
+    void Register(RecurringJobDefinition definition);
+}
+
+/// <summary>
+/// Read side of the recurring-job store <see cref="IRecurringJobScheduler.Register"/> writes into —
+/// used by the default worker to know what to enqueue and by the admin "Recurring Jobs" screen to
+/// show what's registered. Implemented by the same singleton that implements <see cref="IRecurringJobScheduler"/>.
+/// </summary>
+public interface IRecurringJobRegistry
+{
+    IReadOnlyCollection<RecurringJobDefinition> GetAll();
+}
+
+/// <summary>
+/// Non-generic marker so <see cref="IBackgroundJobHandlerRegistry"/> can hold a heterogeneous
+/// collection of DI-registered handlers and resolve one by <see cref="JobType"/>.
+/// </summary>
+public interface IBackgroundJobHandler
+{
+    string JobType { get; }
+
+    /// <summary>
+    /// Invoked by the engine, which only has the raw stored payload — deserialization into
+    /// <c>TPayload</c> happens inside the handler (see <see cref="BackgroundJobHandlerBase{TPayload}"/>).
+    /// </summary>
+    Task ExecuteRawAsync(string? payloadJson, IBackgroundJobContext context, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// The contract every background-job handler implements — one per <see cref="JobType"/>. Register
+/// one DI line per handler (e.g. <c>services.AddScoped&lt;IBackgroundJobHandler, SyncInventoryJobHandler&gt;()</c>);
+/// nothing else in the framework needs to change to add a new job type. Inherit
+/// <see cref="BackgroundJobHandlerBase{TPayload}"/> rather than implementing this directly — it wires
+/// up <see cref="IBackgroundJobHandler.ExecuteRawAsync"/> for you.
+/// </summary>
+public interface IBackgroundJobHandler<TPayload> : IBackgroundJobHandler
+{
+    Task HandleAsync(TPayload payload, IBackgroundJobContext context, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Base class for job handlers — deserializes the stored payload via <see cref="IBackgroundJobSerializer"/>
+/// and dispatches to the strongly-typed <see cref="HandleAsync"/>, so individual handlers never touch
+/// JSON directly. Use <c>TPayload = string?</c> for jobs with no structured payload (e.g. periodic
+/// maintenance jobs) — <see cref="HandleAsync"/> then simply receives the raw stored JSON, if any.
+/// </summary>
+public abstract class BackgroundJobHandlerBase<TPayload>(IBackgroundJobSerializer serializer) : IBackgroundJobHandler<TPayload>
+{
+    public abstract string JobType { get; }
+
+    public abstract Task HandleAsync(TPayload payload, IBackgroundJobContext context, CancellationToken cancellationToken);
+
+    public Task ExecuteRawAsync(string? payloadJson, IBackgroundJobContext context, CancellationToken cancellationToken)
+    {
+        var payload = typeof(TPayload) == typeof(string)
+            ? (TPayload)(object?)payloadJson!
+            : (payloadJson is null ? default! : serializer.Deserialize<TPayload>(payloadJson)!);
+
+        return HandleAsync(payload, context, cancellationToken);
+    }
+}
+
+/// <summary>
+/// Resolves the <see cref="IBackgroundJobHandler"/> registered for a given job type. The Infrastructure
+/// implementation is a lookup over DI-registered instances keyed by <see cref="IBackgroundJobHandler.JobType"/> —
+/// the same lookup-by-key shape as Suppliers' <c>ISupplierProviderRegistry</c>.
+/// </summary>
+public interface IBackgroundJobHandlerRegistry
+{
+    IBackgroundJobHandler? Resolve(string jobType);
+
+    IReadOnlyCollection<string> GetRegisteredJobTypes();
+}
+
+/// <summary>
+/// Everything a handler needs about the job it's currently executing. Handlers never receive the
+/// storage entity itself — this is the seam that keeps handler implementations persistence-agnostic.
+/// </summary>
+public interface IBackgroundJobContext
+{
+    Guid JobId { get; }
+
+    int Attempt { get; }
+
+    int MaxAttempts { get; }
+
+    string Queue { get; }
+
+    string? CorrelationId { get; }
+
+    string? RelatedEntityType { get; }
+
+    string? RelatedEntityId { get; }
+
+    Task ReportProgressAsync(int percent, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Thin serialization seam so the scheduler and handlers agree on one payload format without every
+/// caller hand-rolling <c>System.Text.Json</c> calls. Swappable if a future engine needs a different
+/// wire format (e.g. a message-broker envelope).
+/// </summary>
+public interface IBackgroundJobSerializer
+{
+    string Serialize<TPayload>(TPayload payload);
+
+    TPayload? Deserialize<TPayload>(string json);
+}
+
+public enum BackgroundJobPriority
+{
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+public enum BackgroundJobStatus
+{
+    Queued = 0,
+    Processing = 1,
+    Succeeded = 2,
+    Failed = 3,
+    Retrying = 4,
+    Cancelled = 5,
+    DeadLetter = 6,
+}
+
+/// <summary>
+/// Named queues jobs can be routed to. Purely a routing label today (the default engine processes
+/// all queues from one worker) — a future engine can dedicate workers per queue without any change
+/// to how business modules enqueue work.
+/// </summary>
+public static class BackgroundJobQueues
+{
+    public const string Default = "default";
+    public const string Emails = "emails";
+    public const string Notifications = "notifications";
+    public const string Suppliers = "suppliers";
+    public const string Reports = "reports";
+    public const string Maintenance = "maintenance";
+    public const string HighPriority = "high-priority";
+    public const string FuturePayment = "future-payment";
+}
+
+public sealed record BackgroundJobOptions(
+    string Queue = BackgroundJobQueues.Default,
+    BackgroundJobPriority Priority = BackgroundJobPriority.Normal,
+    int? MaxAttempts = null,
+    string? CorrelationId = null,
+    string? RelatedEntityType = null,
+    string? RelatedEntityId = null);
+
+public sealed record RecurringJobDefinition(
+    string Key,
+    string JobType,
+    TimeSpan Interval,
+    string Queue = BackgroundJobQueues.Default,
+    BackgroundJobPriority Priority = BackgroundJobPriority.Normal);

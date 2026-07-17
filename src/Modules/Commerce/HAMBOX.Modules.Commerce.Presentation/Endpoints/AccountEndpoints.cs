@@ -2,6 +2,8 @@ using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Dashboard.GetAccountDashboard;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Library;
+using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.ArchiveNotification;
+using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.DeleteNotification;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.GetNotifications;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.GetUnreadNotificationCount;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.MarkAllNotificationsRead;
@@ -153,11 +155,19 @@ internal static class AccountEndpoints
         group.MapGet("notifications", async (
             [FromQuery] int pageNumber,
             [FromQuery] int pageSize,
+            [FromQuery] bool includeArchived,
+            [FromQuery] bool? isRead,
+            [FromQuery] string? category,
+            [FromQuery] string? search,
             ISender sender) =>
         {
             var result = await sender.Send(new GetNotificationsQuery(
                 pageNumber <= 0 ? 1 : pageNumber,
-                pageSize <= 0 ? 20 : pageSize));
+                pageSize <= 0 ? 20 : pageSize,
+                includeArchived,
+                isRead,
+                category,
+                search));
             return ToResult(result);
         }).WithName("GetNotifications");
 
@@ -178,6 +188,18 @@ internal static class AccountEndpoints
             var result = await sender.Send(new MarkAllNotificationsReadCommand());
             return ToResult(result);
         }).WithName("MarkAllNotificationsRead");
+
+        group.MapPost("notifications/{id:guid}/archive", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new ArchiveNotificationCommand(id));
+            return ToResult(result);
+        }).WithName("ArchiveNotification");
+
+        group.MapDelete("notifications/{id:guid}", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new DeleteNotificationCommand(id));
+            return ToResult(result);
+        }).WithName("DeleteNotification");
 
         group.MapGet("referral", async (ISender sender) =>
         {

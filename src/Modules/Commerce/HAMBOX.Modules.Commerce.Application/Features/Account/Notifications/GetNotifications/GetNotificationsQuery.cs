@@ -9,8 +9,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.GetNotifications;
 
-public sealed record GetNotificationsQuery(int PageNumber, int PageSize)
-    : IRequest<Result<PagedResult<UserNotificationDto>>>;
+public sealed record GetNotificationsQuery(
+    int PageNumber,
+    int PageSize,
+    bool IncludeArchived = false,
+    bool? IsRead = null,
+    string? Category = null,
+    string? SearchTerm = null) : IRequest<Result<PagedResult<UserNotificationDto>>>;
 
 internal sealed class GetNotificationsQueryHandler
     : IRequestHandler<GetNotificationsQuery, Result<PagedResult<UserNotificationDto>>>
@@ -39,8 +44,30 @@ internal sealed class GetNotificationsQueryHandler
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
 
         var query = _commerceDbContext.UserNotifications
-            .Where(n => n.UserId == _currentUserService.UserId)
-            .OrderByDescending(n => n.CreatedOnUtc);
+            .Where(n => n.UserId == _currentUserService.UserId);
+
+        if (!request.IncludeArchived)
+        {
+            query = query.Where(n => !n.IsArchived);
+        }
+
+        if (request.IsRead.HasValue)
+        {
+            query = query.Where(n => n.IsRead == request.IsRead.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Category))
+        {
+            query = query.Where(n => n.Category == request.Category);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        {
+            var term = request.SearchTerm.Trim();
+            query = query.Where(n => n.Title.Contains(term) || n.Body.Contains(term));
+        }
+
+        query = query.OrderByDescending(n => n.CreatedOnUtc);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

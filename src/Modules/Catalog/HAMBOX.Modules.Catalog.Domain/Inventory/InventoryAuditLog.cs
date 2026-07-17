@@ -18,7 +18,10 @@ public sealed class InventoryAuditLog : Entity
         Guid? codeId,
         Guid? supplierId,
         string? performedByUserId,
-        string? details)
+        string? details,
+        Guid? orderId,
+        string? ipAddress,
+        string? userAgent)
         : base(id)
     {
         Action = action;
@@ -29,6 +32,9 @@ public sealed class InventoryAuditLog : Entity
         SupplierId = supplierId;
         PerformedByUserId = performedByUserId;
         Details = details;
+        OrderId = orderId;
+        IpAddress = ipAddress;
+        UserAgent = userAgent;
         OccurredOnUtc = DateTimeOffset.UtcNow;
     }
 
@@ -42,6 +48,11 @@ public sealed class InventoryAuditLog : Entity
     public string? Details { get; private set; }
     public DateTimeOffset OccurredOnUtc { get; private set; }
 
+    /// <summary>Order the code was sold on, if known at the time of the action (e.g. a reveal on a delivered code).</summary>
+    public Guid? OrderId { get; private set; }
+    public string? IpAddress { get; private set; }
+    public string? UserAgent { get; private set; }
+
     public static InventoryAuditLog Create(
         InventoryAuditAction action,
         Guid? productId = null,
@@ -50,6 +61,9 @@ public sealed class InventoryAuditLog : Entity
         Guid? codeId = null,
         Guid? supplierId = null,
         string? performedByUserId = null,
-        string? details = null) =>
-        new(Guid.NewGuid(), action, productId, variantId, batchId, codeId, supplierId, performedByUserId, details);
+        string? details = null,
+        Guid? orderId = null,
+        string? ipAddress = null,
+        string? userAgent = null) =>
+        new(Guid.NewGuid(), action, productId, variantId, batchId, codeId, supplierId, performedByUserId, details, orderId, ipAddress, userAgent);
 }

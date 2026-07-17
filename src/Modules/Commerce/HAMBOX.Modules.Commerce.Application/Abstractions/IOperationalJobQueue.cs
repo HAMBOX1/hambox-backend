@@ -8,6 +8,7 @@ public interface IOperationalJobQueue
         string jobType,
         string? payloadJson = null,
         OperationalJobPriority priority = OperationalJobPriority.Normal,
+        string queue = OperationalJobQueues.Default,
         string? correlationId = null,
         string? relatedEntityType = null,
         string? relatedEntityId = null,

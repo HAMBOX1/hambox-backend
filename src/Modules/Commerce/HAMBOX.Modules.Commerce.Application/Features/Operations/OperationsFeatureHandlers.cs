@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Operations;
@@ -30,6 +31,7 @@ public sealed record GetOperationalJobsQuery(
     string? Status,
     string? JobType,
     string? Search,
+    string? Queue,
     DateTimeOffset? DateFrom,
     DateTimeOffset? DateTo,
     int Page,
@@ -58,6 +60,12 @@ internal sealed class GetOperationalJobsQueryHandler(ICommerceDbContext db)
         {
             var type = request.JobType.Trim();
             query = query.Where(j => j.JobType == type);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Queue))
+        {
+            var queueName = request.Queue.Trim();
+            query = query.Where(j => j.Queue == queueName);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -110,6 +118,8 @@ internal sealed class GetOperationalJobsQueryHandler(ICommerceDbContext db)
             j.JobType,
             j.Status.ToString(),
             j.Priority.ToString(),
+            j.Queue,
+            j.ProgressPercent,
             j.Attempts,
             j.MaxAttempts,
             j.WorkerId,
@@ -144,6 +154,68 @@ internal sealed class GetOperationalJobByIdQueryHandler(ICommerceDbContext db)
         }
 
         return Result.Success(GetOperationalJobsQueryHandler.MapJob(job));
+    }
+}
+
+public sealed record GetJobExecutionHistoryQuery(Guid JobId) : IRequest<Result<IReadOnlyList<BackgroundJobExecutionHistoryDto>>>;
+
+internal sealed class GetJobExecutionHistoryQueryHandler(ICommerceDbContext db)
+    : IRequestHandler<GetJobExecutionHistoryQuery, Result<IReadOnlyList<BackgroundJobExecutionHistoryDto>>>
+{
+    public async Task<Result<IReadOnlyList<BackgroundJobExecutionHistoryDto>>> Handle(
+        GetJobExecutionHistoryQuery request,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.BackgroundJobExecutionHistory.AsNoTracking()
+            .Where(h => h.JobId == request.JobId)
+            .OrderByDescending(h => h.AttemptNumber)
+            .Select(h => new BackgroundJobExecutionHistoryDto(
+                h.Id,
+                h.AttemptNumber,
+                h.Status.ToString(),
+                h.StartedOnUtc,
+                h.FinishedOnUtc,
+                h.DurationMs,
+                h.Exception,
+                h.WorkerId,
+                h.CorrelationId))
+            .ToListAsync(cancellationToken);
+
+        return Result.Success<IReadOnlyList<BackgroundJobExecutionHistoryDto>>(rows);
+    }
+}
+
+public sealed record GetRecurringJobDefinitionsQuery : IRequest<Result<IReadOnlyList<RecurringJobDefinitionDto>>>;
+
+internal sealed class GetRecurringJobDefinitionsQueryHandler(
+    IRecurringJobRegistry registry,
+    ICommerceDbContext db) : IRequestHandler<GetRecurringJobDefinitionsQuery, Result<IReadOnlyList<RecurringJobDefinitionDto>>>
+{
+    public async Task<Result<IReadOnlyList<RecurringJobDefinitionDto>>> Handle(
+        GetRecurringJobDefinitionsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var definitions = registry.GetAll();
+        var jobTypes = definitions.Select(d => d.JobType).Distinct().ToArray();
+
+        var lastEnqueued = await db.OperationalJobs.AsNoTracking()
+            .Where(j => jobTypes.Contains(j.JobType))
+            .GroupBy(j => j.JobType)
+            .Select(g => new { JobType = g.Key, LastCreatedOnUtc = g.Max(j => j.CreatedOnUtc) })
+            .ToDictionaryAsync(g => g.JobType, g => g.LastCreatedOnUtc, cancellationToken);
+
+        var items = definitions
+            .OrderBy(d => d.Key)
+            .Select(d => new RecurringJobDefinitionDto(
+                d.Key,
+                d.JobType,
+                d.Queue,
+                d.Priority.ToString(),
+                d.Interval.TotalMinutes,
+                lastEnqueued.TryGetValue(d.JobType, out var last) ? last : null))
+            .ToList();
+
+        return Result.Success<IReadOnlyList<RecurringJobDefinitionDto>>(items);
     }
 }
 

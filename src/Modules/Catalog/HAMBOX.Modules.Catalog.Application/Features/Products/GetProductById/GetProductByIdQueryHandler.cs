@@ -29,12 +29,16 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
             return Result.Failure<ProductDto>(CatalogErrors.ProductNotFound);
         }
 
-        var categoryName = await _dbContext.Categories
+        var category = await _dbContext.Categories
             .AsNoTracking()
-            .Where(category => category.Id == product.CategoryId)
-            .Select(category => category.NameEn)
-            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            .Where(c => c.Id == product.CategoryId)
+            .Select(c => new { c.NameEn, c.NameAr })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return Result.Success(CatalogMapper.ToProductDto(product, categoryName, includeImages: true));
+        return Result.Success(CatalogMapper.ToProductDto(
+            product,
+            category?.NameEn ?? string.Empty,
+            category?.NameAr ?? string.Empty,
+            includeImages: true));
     }
 }

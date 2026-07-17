@@ -1,12 +1,9 @@
-using System.Text.Json;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Application.PlatformSettings;
-using HAMBOX.Modules.Catalog.Application.Abstractions;
-using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
-using HAMBOX.Modules.Commerce.Application.Services;
-using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Operations;
+using HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,14 +11,23 @@ using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
+/// <summary>
+/// The default background-job engine: a polling <see cref="BackgroundService"/> that claims queued
+/// <see cref="OperationalJob"/> rows and dispatches each to the <see cref="IBackgroundJobHandler"/>
+/// registered for its job type. This class — plus <see cref="OperationalJobQueue"/> and the recurring-job
+/// registry — is the only place that knows jobs are stored in SQL and polled; every handler and every
+/// caller of <see cref="IBackgroundJobScheduler"/>/<see cref="IRecurringJobScheduler"/> is unaware of it.
+/// </summary>
 internal sealed class OperationalJobWorker(
     IServiceScopeFactory scopeFactory,
     IWorkerRuntimeState workerState,
+    IRecurringJobScheduler recurringJobScheduler,
     ILogger<OperationalJobWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         workerState.MarkStarted();
+        RegisterBuiltInRecurringJobs();
         logger.LogInformation("Operational job worker {WorkerId} started", workerState.WorkerId);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -35,6 +41,8 @@ internal sealed class OperationalJobWorker(
                 using var scope = scopeFactory.CreateScope();
                 var platformSettings = scope.ServiceProvider.GetRequiredService<IPlatformSettingsProvider>();
                 var queue = scope.ServiceProvider.GetRequiredService<IOperationalJobQueue>();
+                var scheduler = scope.ServiceProvider.GetRequiredService<IBackgroundJobScheduler>();
+                var recurringJobs = scope.ServiceProvider.GetRequiredService<IRecurringJobRegistry>();
                 var commerceDb = scope.ServiceProvider.GetRequiredService<ICommerceDbContext>();
 
                 var queueSettings = await platformSettings.GetAsync<QueueSettingsPayload>(
@@ -46,7 +54,7 @@ internal sealed class OperationalJobWorker(
                     PlatformSettingsCategoryKeys.RetryPolicies,
                     stoppingToken);
 
-                await EnsurePeriodicJobsAsync(queue, commerceDb, stoppingToken);
+                await EnsureRecurringJobsAsync(scheduler, recurringJobs, commerceDb, stoppingToken);
 
                 var batch = await queue.ClaimNextBatchAsync(
                     workerState.WorkerId,
@@ -81,43 +89,61 @@ internal sealed class OperationalJobWorker(
         logger.LogInformation("Operational job worker {WorkerId} stopped", workerState.WorkerId);
     }
 
-    private static async Task EnsurePeriodicJobsAsync(
-        IOperationalJobQueue queue,
+    /// <summary>
+    /// Declares Commerce's own periodic jobs through <see cref="IRecurringJobScheduler"/> — the same
+    /// call any other module would make from its own Infrastructure extension. Kept here (rather than
+    /// resolved during DI registration) because the scheduler is a runtime singleton that must be the
+    /// one instance the app actually built, not one built by a throwaway <c>IServiceCollection</c> provider.
+    /// </summary>
+    private void RegisterBuiltInRecurringJobs()
+    {
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.expire-inventory-reservations", OperationalJobTypes.ExpireInventoryReservations, TimeSpan.FromMinutes(5)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.health-probe", OperationalJobTypes.HealthProbe, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.Low));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.generate-operational-alerts", OperationalJobTypes.GenerateOperationalAlerts, TimeSpan.FromMinutes(5)));
+    }
+
+    /// <summary>
+    /// For each definition a module registered via <see cref="IRecurringJobScheduler"/>, enqueue one
+    /// occurrence unless a job of that type was already created within the definition's interval.
+    /// </summary>
+    private static async Task EnsureRecurringJobsAsync(
+        IBackgroundJobScheduler scheduler,
+        IRecurringJobRegistry recurringJobs,
         ICommerceDbContext commerceDb,
         CancellationToken cancellationToken)
     {
-        var since = DateTimeOffset.UtcNow.AddMinutes(-5);
-        var recentTypes = await commerceDb.OperationalJobs.AsNoTracking()
-            .Where(j => j.CreatedOnUtc >= since
-                        && (j.JobType == OperationalJobTypes.ExpireInventoryReservations
-                            || j.JobType == OperationalJobTypes.HealthProbe
-                            || j.JobType == OperationalJobTypes.GenerateOperationalAlerts))
-            .Select(j => j.JobType)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (!recentTypes.Contains(OperationalJobTypes.ExpireInventoryReservations))
+        var definitions = recurringJobs.GetAll();
+        if (definitions.Count == 0)
         {
-            await queue.EnqueueAsync(
-                OperationalJobTypes.ExpireInventoryReservations,
-                priority: OperationalJobPriority.Normal,
-                cancellationToken: cancellationToken);
+            return;
         }
 
-        if (!recentTypes.Contains(OperationalJobTypes.HealthProbe))
-        {
-            await queue.EnqueueAsync(
-                OperationalJobTypes.HealthProbe,
-                priority: OperationalJobPriority.Low,
-                cancellationToken: cancellationToken);
-        }
+        var now = DateTimeOffset.UtcNow;
+        var jobTypes = definitions.Select(d => d.JobType).Distinct().ToArray();
+        var earliestWindow = now - definitions.Max(d => d.Interval);
 
-        if (!recentTypes.Contains(OperationalJobTypes.GenerateOperationalAlerts))
+        var recentTypes = (await commerceDb.OperationalJobs.AsNoTracking()
+            .Where(j => j.CreatedOnUtc >= earliestWindow && jobTypes.Contains(j.JobType))
+            .Select(j => new { j.JobType, j.CreatedOnUtc })
+            .ToListAsync(cancellationToken))
+            .GroupBy(j => j.JobType)
+            .ToDictionary(g => g.Key, g => g.Max(j => j.CreatedOnUtc));
+
+        foreach (var definition in definitions)
         {
-            await queue.EnqueueAsync(
-                OperationalJobTypes.GenerateOperationalAlerts,
-                priority: OperationalJobPriority.Normal,
-                cancellationToken: cancellationToken);
+            if (recentTypes.TryGetValue(definition.JobType, out var lastCreated) &&
+                lastCreated >= now - definition.Interval)
+            {
+                continue;
+            }
+
+            await scheduler.EnqueueAsync(
+                definition.JobType,
+                new BackgroundJobOptions(definition.Queue, definition.Priority),
+                cancellationToken);
         }
     }
 
@@ -136,221 +162,44 @@ internal sealed class OperationalJobWorker(
             return;
         }
 
+        var history = BackgroundJobExecutionHistory.Start(tracked.Id, tracked.Attempts, workerState.WorkerId, tracked.CorrelationId);
+        commerceDb.BackgroundJobExecutionHistory.Add(history);
+
         try
         {
-            await ExecuteJobTypeAsync(sp, tracked, cancellationToken);
+            var registry = sp.GetRequiredService<IBackgroundJobHandlerRegistry>();
+            var handler = registry.Resolve(tracked.JobType)
+                ?? throw new InvalidOperationException($"No background job handler registered for job type '{tracked.JobType}'.");
+
+            var context = new OperationalJobExecutionContext(tracked, commerceDb);
+            await handler.ExecuteRawAsync(tracked.PayloadJson, context, cancellationToken);
+
             tracked.MarkCompleted();
+            history.Complete(OperationalJobStatus.Completed, null);
             workerState.RecordSuccess();
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Operational job {JobId} ({JobType}) failed", tracked.Id, tracked.JobType);
-            var delay = TimeSpan.FromSeconds(Math.Max(1, retrySettings.RetryDelaySeconds));
-            tracked.MarkFailed(ex.Message, ex.ToString(), delay);
+            var delay = ComputeRetryDelay(retrySettings, tracked.Attempts);
+            tracked.MarkFailed(ex.Message, ex.ToString(), delay, retrySettings.DeadLetterThreshold);
+            history.Complete(tracked.Status, ex.ToString());
             workerState.RecordFailure();
         }
 
         await commerceDb.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task ExecuteJobTypeAsync(
-        IServiceProvider sp,
-        OperationalJob job,
-        CancellationToken cancellationToken)
+    private static TimeSpan ComputeRetryDelay(RetryPoliciesSettingsPayload retrySettings, int attempts)
     {
-        switch (job.JobType)
+        var baseDelaySeconds = Math.Max(1, retrySettings.RetryDelaySeconds);
+        if (!retrySettings.UseExponentialBackoff)
         {
-            case OperationalJobTypes.ExpireInventoryReservations:
-            {
-                var engine = sp.GetRequiredService<IInventoryEngine>();
-                await engine.ExpireStaleReservationsAsync(cancellationToken);
-                break;
-            }
-            case OperationalJobTypes.RetryOrderFulfillment:
-            case OperationalJobTypes.RetryDelivery:
-            {
-                await RetryOrderAsync(sp, job, cancellationToken);
-                break;
-            }
-            case OperationalJobTypes.HealthProbe:
-            {
-                var health = sp.GetRequiredService<ISystemHealthService>();
-                var commerceDb = sp.GetRequiredService<ICommerceDbContext>();
-                var result = await health.GetHealthAsync(cancellationToken);
-                foreach (var component in result.Components.Where(c => c.Status is "Unhealthy" or "Degraded"))
-                {
-                    var code = $"HEALTH_{component.Name.Replace(' ', '_').ToUpperInvariant()}";
-                    var exists = await commerceDb.OperationalAlerts.AnyAsync(
-                        a => a.Code == code && !a.IsAcknowledged && a.CreatedOnUtc >= DateTimeOffset.UtcNow.AddHours(-1),
-                        cancellationToken);
-                    if (!exists)
-                    {
-                        commerceDb.OperationalAlerts.Add(OperationalAlert.Create(
-                            code,
-                            $"{component.Name} {component.Status}",
-                            component.Detail ?? $"{component.Name} reported {component.Status}.",
-                            component.Status == "Unhealthy"
-                                ? OperationalAlertSeverity.Critical
-                                : OperationalAlertSeverity.Warning));
-                    }
-                }
-
-                await commerceDb.SaveChangesAsync(cancellationToken);
-                break;
-            }
-            case OperationalJobTypes.GenerateOperationalAlerts:
-            {
-                await GenerateAlertsAsync(sp, cancellationToken);
-                break;
-            }
-            case OperationalJobTypes.SupplierHealthCheck:
-            {
-                await SupplierHealthAsync(sp, cancellationToken);
-                break;
-            }
-            default:
-                throw new InvalidOperationException($"Unknown operational job type '{job.JobType}'.");
-        }
-    }
-
-    private static async Task RetryOrderAsync(
-        IServiceProvider sp,
-        OperationalJob job,
-        CancellationToken cancellationToken)
-    {
-        if (!Guid.TryParse(job.RelatedEntityId, out var orderId))
-        {
-            if (!string.IsNullOrWhiteSpace(job.PayloadJson))
-            {
-                using var doc = JsonDocument.Parse(job.PayloadJson);
-                if (doc.RootElement.TryGetProperty("orderId", out var prop) &&
-                    prop.TryGetGuid(out var payloadId))
-                {
-                    orderId = payloadId;
-                }
-            }
+            return TimeSpan.FromSeconds(baseDelaySeconds);
         }
 
-        if (orderId == Guid.Empty)
-        {
-            throw new InvalidOperationException("Retry job is missing orderId.");
-        }
-
-        var commerceDb = sp.GetRequiredService<ICommerceDbContext>();
-        var fulfillment = sp.GetRequiredService<OrderFulfillmentService>();
-        var order = await commerceDb.Orders
-            .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)
-            ?? throw new InvalidOperationException($"Order {orderId} not found.");
-
-        var result = await fulfillment.FulfillMissingAsync(order, cancellationToken);
-        if (result.CodesDelivered == 0)
-        {
-            throw new InvalidOperationException("No codes were delivered on retry.");
-        }
-
-        await commerceDb.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task GenerateAlertsAsync(IServiceProvider sp, CancellationToken cancellationToken)
-    {
-        var commerceDb = sp.GetRequiredService<ICommerceDbContext>();
-        var catalogDb = sp.GetRequiredService<ICatalogDbContext>();
-        var inventory = sp.GetRequiredService<IInventoryEngine>();
-        var worker = sp.GetRequiredService<IWorkerRuntimeState>();
-
-        var failedJobs = await commerceDb.OperationalJobs.CountAsync(
-            j => j.Status == OperationalJobStatus.Failed,
-            cancellationToken);
-        if (failedJobs >= 5)
-        {
-            await UpsertAlertAsync(
-                commerceDb,
-                "FAILED_JOBS_BACKLOG",
-                "Failed jobs backlog",
-                $"{failedJobs} operational jobs are in Failed status.",
-                OperationalAlertSeverity.Warning,
-                cancellationToken);
-        }
-
-        var stats = await inventory.GetStatisticsAsync(cancellationToken: cancellationToken);
-        if (stats.OutOfStockVariants > 0)
-        {
-            await UpsertAlertAsync(
-                commerceDb,
-                "LOW_STOCK",
-                "Inventory stock alerts",
-                $"{stats.OutOfStockVariants} variant(s) out of stock, {stats.LowStockVariants} low stock.",
-                OperationalAlertSeverity.Warning,
-                cancellationToken);
-        }
-
-        var failedDeliveries = await commerceDb.Orders.CountAsync(
-            o => o.Status == OrderStatus.Failed || o.PaymentStatus == PaymentStatus.Failed,
-            cancellationToken);
-        if (failedDeliveries > 0)
-        {
-            await UpsertAlertAsync(
-                commerceDb,
-                "FAILED_DELIVERIES",
-                "Failed deliveries / payments",
-                $"{failedDeliveries} order(s) marked failed.",
-                OperationalAlertSeverity.Critical,
-                cancellationToken);
-        }
-
-        if (worker.LastHeartbeatUtc is null ||
-            (DateTimeOffset.UtcNow - worker.LastHeartbeatUtc.Value).TotalSeconds > 90)
-        {
-            await UpsertAlertAsync(
-                commerceDb,
-                "WORKER_STALE",
-                "Background worker issue",
-                "Operational worker heartbeat is missing or stale.",
-                OperationalAlertSeverity.Critical,
-                cancellationToken);
-        }
-
-        _ = catalogDb;
-        await commerceDb.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SupplierHealthAsync(IServiceProvider sp, CancellationToken cancellationToken)
-    {
-        var catalogDb = sp.GetRequiredService<ICatalogDbContext>();
-        var commerceDb = sp.GetRequiredService<ICommerceDbContext>();
-
-        var inactive = await catalogDb.InventorySuppliers.AsNoTracking()
-            .CountAsync(s => !s.IsDeleted && s.Status != SupplierStatus.Active, cancellationToken);
-
-        if (inactive > 0)
-        {
-            await UpsertAlertAsync(
-                commerceDb,
-                "SUPPLIER_INACTIVE",
-                "Inactive suppliers",
-                $"{inactive} supplier(s) are not Active.",
-                OperationalAlertSeverity.Info,
-                cancellationToken);
-            await commerceDb.SaveChangesAsync(cancellationToken);
-        }
-    }
-
-    private static async Task UpsertAlertAsync(
-        ICommerceDbContext commerceDb,
-        string code,
-        string title,
-        string message,
-        OperationalAlertSeverity severity,
-        CancellationToken cancellationToken)
-    {
-        var exists = await commerceDb.OperationalAlerts.AnyAsync(
-            a => a.Code == code && !a.IsAcknowledged && a.CreatedOnUtc >= DateTimeOffset.UtcNow.AddHours(-6),
-            cancellationToken);
-
-        if (!exists)
-        {
-            commerceDb.OperationalAlerts.Add(OperationalAlert.Create(code, title, message, severity));
-        }
+        var exponentialSeconds = baseDelaySeconds * Math.Pow(2, Math.Max(0, attempts - 1));
+        var cappedSeconds = Math.Min(exponentialSeconds, Math.Max(baseDelaySeconds, retrySettings.TimeoutSeconds));
+        return TimeSpan.FromSeconds(cappedSeconds);
     }
 }

@@ -40,6 +40,17 @@ internal sealed class PlatformRoutingEmailService(
         await service.SendAdminLoginOtpAsync(userId, email, code, expiresAt, cancellationToken);
     }
 
+    public async Task SendTemplatedEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var service = await ResolveAsync(cancellationToken);
+        await service.SendTemplatedEmailAsync(toEmail, subject, htmlBody, correlationId, cancellationToken);
+    }
+
     private async Task<IEmailService> ResolveAsync(CancellationToken cancellationToken)
     {
         var email = await platformSettings.GetEmailAsync(cancellationToken);

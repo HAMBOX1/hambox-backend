@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using FluentValidation;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
@@ -9,6 +10,7 @@ using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.Modules.Identity.Infrastructure.Authentication;
+using HAMBOX.Modules.Identity.Infrastructure.BackgroundJobs;
 using HAMBOX.Modules.Identity.Infrastructure.Localization;
 using HAMBOX.Modules.Identity.Infrastructure.Middleware;
 using HAMBOX.Modules.Identity.Infrastructure.Persistence;
@@ -59,6 +61,7 @@ public static class IdentityInfrastructureExtensions
         services.Configure<JwtSettings>(jwtSettingsSection);
         services.Configure<LockoutSettings>(configuration.GetSection(LockoutSettings.SectionName));
         services.Configure<AdminOtpSettings>(configuration.GetSection(AdminOtpSettings.SectionName));
+        services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
 
         var emailSettingsSection = configuration.GetSection(EmailSettings.SectionName);
         services.Configure<EmailSettings>(emailSettingsSection);
@@ -184,6 +187,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IAdminAccessResolver, AdminAccessResolver>();
         services.AddSingleton<IOtpCodeGenerator, OtpCodeGenerator>();
         services.AddScoped<IAuthTokenIssuer, AuthTokenIssuer>();
+        services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddSingleton<IClientInfoParser, ClientInfoParser>();
         services.AddScoped<IUserLanguagePreferenceResolver, UserLanguagePreferenceResolver>();
 
@@ -197,6 +201,13 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IRbacAuthorizationService, RbacAuthorizationService>();
         services.AddScoped<IAuthorizationAuditService, AuthorizationAuditService>();
         services.AddScoped<IUserAuthorizationInvalidationService, UserAuthorizationInvalidationService>();
+        services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
+        services.AddScoped<ISecurityBlocklistService, SecurityBlocklistService>();
+        services.AddScoped<ICountryResolver, NullCountryResolver>();
+        services.AddScoped<IBackgroundJobHandler, InvalidateUserSessionsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, CleanupExpiredUserBlocksJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, CleanupExpiredIpBansJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, CleanupExpiredEmailBansJobHandler>();
 
         // 4. Register FluentValidation Validators
         services.AddValidatorsFromAssembly(typeof(RegisterCommandValidator).Assembly);

@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using HAMBOX.API.Extensions;
 using HAMBOX.Application.Behaviors;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Extensions;
 using HAMBOX.Infrastructure.Currency;
 using HAMBOX.Infrastructure.Localization;
@@ -14,11 +15,24 @@ using HAMBOX.Modules.Commerce.Application.Extensions;
 using HAMBOX.Modules.Commerce.Infrastructure.Extensions;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 using HAMBOX.Modules.Commerce.Presentation.Extensions;
+using HAMBOX.Modules.Communication.Application.Features.Dashboard;
+using HAMBOX.Modules.Communication.Infrastructure.Extensions;
+using HAMBOX.Modules.Communication.Infrastructure.Persistence;
+using HAMBOX.Modules.Communication.Presentation.Extensions;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Infrastructure.Extensions;
+using HAMBOX.Modules.Identity.Domain.Security;
 using HAMBOX.Modules.Identity.Infrastructure.Middleware;
 using HAMBOX.Modules.Identity.Infrastructure.Persistence;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
+using HAMBOX.Modules.Legal.Application.Features.Legal;
+using HAMBOX.Modules.Legal.Infrastructure.Extensions;
+using HAMBOX.Modules.Legal.Infrastructure.Persistence;
+using HAMBOX.Modules.Legal.Presentation.Extensions;
+using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
+using HAMBOX.Modules.Suppliers.Infrastructure.Extensions;
+using HAMBOX.Modules.Suppliers.Infrastructure.Persistence;
+using HAMBOX.Modules.Suppliers.Presentation.Extensions;
 using HAMBOX.Modules.Themes.Application.Features.Themes;
 using HAMBOX.Modules.Themes.Infrastructure.Extensions;
 using HAMBOX.Modules.Themes.Infrastructure.Persistence;
@@ -64,8 +78,12 @@ try
         config.RegisterServicesFromAssembly(typeof(CreateCategoryCommand).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetCartQuery).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetThemesQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetLegalSectionsQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetSuppliersQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetCommunicationDashboardStatsQuery).Assembly);
         config.AddOpenBehavior(typeof(LoggingBehavior<,>));
         config.AddOpenBehavior(typeof(ValidationBehavior<,>));
+        config.AddOpenBehavior(typeof(IdempotencyBehavior<,>));
     });
 
     if (builder.Environment.IsDevelopment())
@@ -79,6 +97,9 @@ try
     builder.Services.AddCommerceInfrastructure(builder.Configuration);
     builder.Services.AddCommerceApplication();
     builder.Services.AddThemesInfrastructure(builder.Configuration);
+    builder.Services.AddLegalInfrastructure(builder.Configuration);
+    builder.Services.AddSuppliersInfrastructure(builder.Configuration);
+    builder.Services.AddCommunicationInfrastructure(builder.Configuration);
 
     builder.Services.Configure<FormOptions>(options =>
     {
@@ -92,6 +113,15 @@ try
 
     var app = builder.Build();
 
+    // ──── Security Center recurring jobs (dispatched by Commerce's OperationalJobWorker) ────
+    var recurringJobScheduler = app.Services.GetRequiredService<IRecurringJobScheduler>();
+    recurringJobScheduler.Register(new RecurringJobDefinition(
+        "security.cleanup-expired-user-blocks", SecurityJobTypes.CleanupExpiredUserBlocks, TimeSpan.FromMinutes(15)));
+    recurringJobScheduler.Register(new RecurringJobDefinition(
+        "security.cleanup-expired-ip-bans", SecurityJobTypes.CleanupExpiredIpBans, TimeSpan.FromMinutes(15)));
+    recurringJobScheduler.Register(new RecurringJobDefinition(
+        "security.cleanup-expired-email-bans", SecurityJobTypes.CleanupExpiredEmailBans, TimeSpan.FromMinutes(15)));
+
     app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
@@ -104,20 +134,34 @@ try
         await app.ApplyMigrationsAsync<CatalogDbContext>();
         await app.ApplyMigrationsAsync<CommerceDbContext>();
         await app.ApplyMigrationsAsync<ThemesDbContext>();
+        await app.ApplyMigrationsAsync<LegalDbContext>();
+        await app.ApplyMigrationsAsync<SuppliersDbContext>();
+        await app.ApplyMigrationsAsync<CommunicationDbContext>();
+        await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
+        await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
+        await app.SeedProductionDemoDataAsync();
         await PromotionDataSeeder.SeedAsync(app.Services);
         await MembershipDataSeeder.SeedAsync(app.Services);
         await ThemeDataSeeder.SeedAsync(app.Services);
+        await LegalDataSeeder.SeedAsync(app.Services);
+        await CommunicationDataSeeder.SeedAsync(app.Services);
         await app.SeedIdentityDevelopmentDataAsync();
         app.UseHamboxSwagger();
     }
     else if (app.Environment.IsProduction())
     {
+        // Migrations are applied manually in Production; the schema (including LicenseKeyHash)
+        // must already exist by the time this runs.
+        await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
+        await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
         await app.SeedProductionDemoDataAsync();
     }
 
     // ──── Middleware Pipeline (order matters) ──────────────────
     app.UseSerilogRequestLoggingMiddleware();
     app.UseCorrelationId();
+    app.UseCountryResolution();
+    app.UseSecurityEnforcement();
     app.UseHamboxLocalization();
     app.UseExceptionHandler();
     app.UseResponseCompression();
@@ -160,6 +204,9 @@ try
     app.MapCatalogEndpoints();
     app.MapCommerceEndpoints();
     app.MapThemesEndpoints();
+    app.MapLegalEndpoints();
+    app.MapSuppliersEndpoints();
+    app.MapCommunicationEndpoints();
     app.MapLocalizationEndpoints();
     app.MapHealthChecks("/health");
 

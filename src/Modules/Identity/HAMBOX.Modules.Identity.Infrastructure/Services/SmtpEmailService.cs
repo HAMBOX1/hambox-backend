@@ -67,15 +67,45 @@ internal sealed class SmtpEmailService(
         await SendAsync("AdminLoginOtp", userId, email, message, settings, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task SendTemplatedEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
+        var message = EmailMessageBuilder.BuildTemplatedMessage(settings, toEmail, subject, htmlBody);
+        var sent = await SendCoreAsync("Templated", null, toEmail, message, settings, correlationId, cancellationToken);
+
+        if (!sent)
+        {
+            throw new InvalidOperationException($"Failed to send templated email to {EmailLogHelper.MaskEmail(toEmail)}.");
+        }
+    }
+
     private async Task SendAsync(
         string emailType,
         Guid userId,
         string email,
         MimeMessage message,
         EmailSettings settings,
+        CancellationToken cancellationToken) =>
+        await SendCoreAsync(emailType, userId, email, message, settings, null, cancellationToken);
+
+    /// <summary>Returns <see langword="true"/> on a successful send; never throws — callers that need to
+    /// surface delivery failure (e.g. the Communication Platform's background job retry) check the result.</summary>
+    private async Task<bool> SendCoreAsync(
+        string emailType,
+        Guid? userId,
+        string email,
+        MimeMessage message,
+        EmailSettings settings,
+        string? correlationIdOverride,
         CancellationToken cancellationToken)
     {
-        var correlationId = GetCorrelationId();
+        var correlationId = correlationIdOverride ?? GetCorrelationId();
         var maskedEmail = EmailLogHelper.MaskEmail(email);
         var stopwatch = Stopwatch.StartNew();
 
@@ -116,6 +146,8 @@ internal sealed class SmtpEmailService(
                 userId,
                 stopwatch.ElapsedMilliseconds,
                 correlationId);
+
+            return true;
         }
         catch (Exception ex)
         {
@@ -130,6 +162,8 @@ internal sealed class SmtpEmailService(
                 settings.SmtpPort,
                 stopwatch.ElapsedMilliseconds,
                 correlationId);
+
+            return false;
         }
     }
 

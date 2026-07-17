@@ -21,7 +21,17 @@ public enum UserStatus
     Suspended = 2,
 
     /// <summary>
-    /// The account has been permanently blocked.
+    /// The account has been temporarily blocked (see <c>ApplicationUser.BlockExpiresOnUtc</c>).
     /// </summary>
-    Blocked = 3
+    Blocked = 3,
+
+    /// <summary>
+    /// The account has been permanently banned.
+    /// </summary>
+    Banned = 4,
+
+    /// <summary>
+    /// The account has been deleted.
+    /// </summary>
+    Deleted = 5
 }

@@ -138,7 +138,10 @@ internal sealed class InventoryAuditLogConfiguration : IEntityTypeConfiguration<
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Action).HasConversion<string>().HasMaxLength(50);
         builder.Property(x => x.Details).HasMaxLength(2000);
+        builder.Property(x => x.IpAddress).HasMaxLength(64);
+        builder.Property(x => x.UserAgent).HasMaxLength(500);
         builder.HasIndex(x => x.OccurredOnUtc);
         builder.HasIndex(x => x.VariantId);
+        builder.HasIndex(x => x.OrderId);
     }
 }

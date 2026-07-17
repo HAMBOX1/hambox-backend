@@ -215,6 +215,14 @@ internal static class InventoryEndpoints
             await SendEmpty(sender, new DeleteInventoryCodeCommand(codeId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
+        group.MapPost("/codes/{codeId:guid}/reveal", async (Guid codeId, HttpContext httpContext, ISender sender) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            return await Send(sender, new RevealInventoryCodeCommand(codeId, ipAddress, userAgent));
+        })
+        .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
+
         group.MapPost("/variants/{variantId:guid}/codes/bulk-disable", async (
             Guid variantId,
             [FromBody] BulkCodeIdsRequest body,

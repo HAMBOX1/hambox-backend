@@ -45,6 +45,8 @@ public sealed record ReorderProductOptionsCommand(Guid GroupId, IReadOnlyList<Gu
 public sealed record DisableInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
 public sealed record EnableInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
 public sealed record DeleteInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
+public sealed record RevealInventoryCodeCommand(Guid CodeId, string IpAddress, string UserAgent)
+    : IRequest<Result<RevealInventoryCodeDto>>;
 public sealed record BulkDisableInventoryCodesCommand(Guid VariantId, IReadOnlyList<Guid> CodeIds) : IRequest<Result<int>>;
 public sealed record BulkDeleteInventoryCodesCommand(Guid VariantId, IReadOnlyList<Guid> CodeIds) : IRequest<Result<int>>;
 
@@ -529,6 +531,51 @@ internal sealed class EnableInventoryCodeCommandHandler : IRequestHandler<Enable
     }
 }
 
+internal sealed class RevealInventoryCodeCommandHandler : IRequestHandler<RevealInventoryCodeCommand, Result<RevealInventoryCodeDto>>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public RevealInventoryCodeCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result<RevealInventoryCodeDto>> Handle(RevealInventoryCodeCommand request, CancellationToken cancellationToken)
+    {
+        // Permission is enforced at the endpoint layer (RequirePermission). Audit is written and
+        // persisted before plaintext is ever returned to the caller.
+        var code = await _db.DigitalInventoryCodes
+            .FirstOrDefaultAsync(c => c.Id == request.CodeId, cancellationToken);
+
+        if (code is null)
+        {
+            return Result.Failure<RevealInventoryCodeDto>(CatalogErrors.CodeNotFound);
+        }
+
+        var productId = await _db.ProductVariants
+            .Where(v => v.Id == code.VariantId)
+            .Select(v => (Guid?)v.ProductId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.CodeRevealed,
+            productId: productId,
+            variantId: code.VariantId,
+            codeId: code.Id,
+            performedByUserId: _currentUser.UserId,
+            details: "Administrator revealed a digital inventory code.",
+            orderId: code.OrderId,
+            ipAddress: request.IpAddress,
+            userAgent: request.UserAgent));
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(new RevealInventoryCodeDto(code.DigitalCode));
+    }
+}
+
 internal sealed class DeleteInventoryCodeCommandHandler : IRequestHandler<DeleteInventoryCodeCommand, Result>
 {
     private readonly ICatalogDbContext _db;
@@ -661,13 +708,17 @@ internal sealed class ExportInventoryCodesQueryHandler : IRequestHandler<ExportI
             query = query.Where(c => c.Status == status);
         }
 
-        var codes = await query.OrderBy(c => c.DigitalCode).ToListAsync(cancellationToken);
+        // Codes are encrypted at rest, so ordering by the raw column would sort by ciphertext.
+        var codes = await query.OrderBy(c => c.CreatedOnUtc).ToListAsync(cancellationToken);
         var builder = new StringBuilder();
         builder.AppendLine("Code,Status,SerialNumber,ExpirationDate");
 
         foreach (var code in codes)
         {
-            builder.AppendLine($"{EscapeCsv(code.DigitalCode)},{code.Status},{EscapeCsv(code.SerialNumber ?? string.Empty)},{code.ExpirationDate:O}");
+            // Exports never expose plaintext — only the dedicated reveal endpoint may.
+            var maskedCode = InventoryCodeMasking.Mask(code.DigitalCode);
+            var maskedSerial = code.SerialNumber is null ? string.Empty : InventoryCodeMasking.Mask(code.SerialNumber);
+            builder.AppendLine($"{EscapeCsv(maskedCode)},{code.Status},{EscapeCsv(maskedSerial)},{code.ExpirationDate:O}");
         }
 
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(

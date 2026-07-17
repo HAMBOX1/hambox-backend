@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Currency;
 using HAMBOX.Infrastructure.Localization;
 using HAMBOX.Infrastructure.Middleware;
@@ -33,11 +34,17 @@ public static class InfrastructureExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IIdempotencyKeyAccessor, IdempotencyKeyAccessor>();
         services.AddScoped<AuditInterceptor>();
         services.AddScoped<SoftDeleteInterceptor>();
 
+        services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
+
         services.Configure<FileStorageSettings>(configuration.GetSection(FileStorageSettings.SectionName));
         services.AddSingleton<IFileStorage, LocalFileStorage>();
+
+        services.AddDataProtection();
+        services.AddSingleton<ICodeProtector, DataProtectionCodeProtector>();
 
         // 1. Exception Handling + ProblemDetails
         services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -97,6 +104,14 @@ public static class InfrastructureExtensions
         // 5. Localization + currency
         services.AddHamboxLocalization();
         services.AddHamboxCurrency(configuration);
+
+        // 6. Background jobs — engine-agnostic abstractions consumed by every module.
+        // The concrete queue/worker (the swappable "engine") is registered by Commerce.Infrastructure.
+        services.AddSingleton<IBackgroundJobSerializer, JsonBackgroundJobSerializer>();
+        services.AddScoped<IBackgroundJobHandlerRegistry, BackgroundJobHandlerRegistry>();
+        services.AddSingleton<RecurringJobRegistry>();
+        services.AddSingleton<IRecurringJobScheduler>(sp => sp.GetRequiredService<RecurringJobRegistry>());
+        services.AddSingleton<IRecurringJobRegistry>(sp => sp.GetRequiredService<RecurringJobRegistry>());
 
         return services;
     }

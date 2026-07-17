@@ -6,7 +6,7 @@ public class CreateCategoryCommandValidator : AbstractValidator<CreateCategoryCo
 {
     public CreateCategoryCommandValidator()
     {
-        RuleFor(x => x.NameAr).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.NameAr).MaximumLength(200);
         RuleFor(x => x.NameEn).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Slug).NotEmpty().MaximumLength(200);
     }

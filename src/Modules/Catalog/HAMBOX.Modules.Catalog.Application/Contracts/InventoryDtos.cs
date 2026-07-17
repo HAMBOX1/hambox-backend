@@ -113,3 +113,6 @@ public sealed record InventoryReservationDto(
     Guid? CartId,
     DateTimeOffset ExpiresOnUtc,
     bool IsActive);
+
+/// <summary>The only DTO in the module that carries a plaintext inventory code — returned solely by the reveal endpoint.</summary>
+public sealed record RevealInventoryCodeDto(string DigitalCode);

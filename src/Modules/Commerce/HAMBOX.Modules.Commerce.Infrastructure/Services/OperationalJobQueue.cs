@@ -1,15 +1,24 @@
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
-internal sealed class OperationalJobQueue(ICommerceDbContext db) : IOperationalJobQueue
+/// <summary>
+/// The default background-job engine's storage: implements the Commerce-internal
+/// <see cref="IOperationalJobQueue"/> and the cross-module <see cref="IBackgroundJobScheduler"/> on
+/// the same table — one enqueue path, two surfaces. A future engine (Hangfire, etc.) replaces this
+/// class's <see cref="IBackgroundJobScheduler"/> registration only; no caller of either interface changes.
+/// </summary>
+internal sealed class OperationalJobQueue(ICommerceDbContext db, IBackgroundJobSerializer serializer)
+    : IOperationalJobQueue, IBackgroundJobScheduler
 {
     public async Task<OperationalJob> EnqueueAsync(
         string jobType,
         string? payloadJson = null,
         OperationalJobPriority priority = OperationalJobPriority.Normal,
+        string queue = OperationalJobQueues.Default,
         string? correlationId = null,
         string? relatedEntityType = null,
         string? relatedEntityId = null,
@@ -20,6 +29,7 @@ internal sealed class OperationalJobQueue(ICommerceDbContext db) : IOperationalJ
             jobType,
             payloadJson,
             priority,
+            queue,
             correlationId,
             relatedEntityType,
             relatedEntityId,
@@ -28,6 +38,44 @@ internal sealed class OperationalJobQueue(ICommerceDbContext db) : IOperationalJ
         db.OperationalJobs.Add(job);
         await db.SaveChangesAsync(cancellationToken);
         return job;
+    }
+
+    public async Task<Guid> EnqueueAsync<TPayload>(
+        string jobType,
+        TPayload payload,
+        BackgroundJobOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await EnqueueCoreAsync(jobType, serializer.Serialize(payload), options, cancellationToken);
+        return job.Id;
+    }
+
+    public async Task<Guid> EnqueueAsync(
+        string jobType,
+        BackgroundJobOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var job = await EnqueueCoreAsync(jobType, null, options, cancellationToken);
+        return job.Id;
+    }
+
+    private Task<OperationalJob> EnqueueCoreAsync(
+        string jobType,
+        string? payloadJson,
+        BackgroundJobOptions? options,
+        CancellationToken cancellationToken)
+    {
+        options ??= new BackgroundJobOptions();
+        return EnqueueAsync(
+            jobType,
+            payloadJson,
+            (OperationalJobPriority)options.Priority,
+            options.Queue,
+            options.CorrelationId,
+            options.RelatedEntityType,
+            options.RelatedEntityId,
+            options.MaxAttempts,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<OperationalJob>> ClaimNextBatchAsync(
@@ -77,7 +125,7 @@ internal sealed class OperationalJobQueue(ICommerceDbContext db) : IOperationalJ
     public async Task<int> RetryAllFailedAsync(CancellationToken cancellationToken = default)
     {
         var failed = await db.OperationalJobs
-            .Where(j => j.Status == OperationalJobStatus.Failed)
+            .Where(j => j.Status == OperationalJobStatus.Failed || j.Status == OperationalJobStatus.DeadLetter)
             .ToListAsync(cancellationToken);
 
         foreach (var job in failed)

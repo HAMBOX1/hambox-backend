@@ -44,4 +44,16 @@ public interface IEmailService
         string code,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a pre-rendered transactional email with an arbitrary subject/HTML body. Used by the
+    /// Communication Platform's <c>EmailCommunicationProvider</c> so every channel — not just the three
+    /// hardcoded identity flows above — reuses this same MailKit/Platform-Settings-driven send path.
+    /// </summary>
+    Task SendTemplatedEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default);
 }

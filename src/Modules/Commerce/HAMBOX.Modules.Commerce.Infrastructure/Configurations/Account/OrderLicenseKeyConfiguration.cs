@@ -32,6 +32,11 @@ internal sealed class OrderLicenseKeyConfiguration : IEntityTypeConfiguration<Or
             .IsRequired()
             .HasMaxLength(500);
 
+        builder.Property(k => k.LicenseKeyHash)
+            .IsRequired()
+            .HasMaxLength(64)
+            .HasDefaultValue(string.Empty); // placeholder for existing rows; backfilled by LicenseKeyEncryptionMigrator
+
         builder.Property(k => k.CreatedOnUtc)
             .IsRequired();
 
@@ -42,5 +47,8 @@ internal sealed class OrderLicenseKeyConfiguration : IEntityTypeConfiguration<Or
 
         builder.HasIndex(k => k.OrderItemId)
             .HasDatabaseName("IX_OrderLicenseKeys_OrderItemId");
+
+        builder.HasIndex(k => k.LicenseKeyHash)
+            .HasDatabaseName("IX_OrderLicenseKeys_LicenseKeyHash");
     }
 }

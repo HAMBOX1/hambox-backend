@@ -12,6 +12,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="Status">The product status.</param>
 /// <param name="CategoryId">The category identifier.</param>
 /// <param name="CategoryName">The category name (English).</param>
+/// <param name="CategoryNameAr">The category name (Arabic).</param>
 /// <param name="PrimaryImageUrl">The URL of the primary image, if any.</param>
 /// <param name="Images">The ordered product images. Populated on detail reads.</param>
 /// <param name="CreatedOnUtc">When the product was created.</param>
@@ -25,6 +26,7 @@ public sealed record ProductDto(
     string Status,
     Guid CategoryId,
     string CategoryName,
+    string CategoryNameAr,
     string? PrimaryImageUrl,
     IReadOnlyList<ProductImageDto>? Images,
     DateTimeOffset CreatedOnUtc);

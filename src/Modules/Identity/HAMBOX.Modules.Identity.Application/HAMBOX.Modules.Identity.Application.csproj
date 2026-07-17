@@ -18,6 +18,7 @@
     <ProjectReference Include="..\HAMBOX.Modules.Identity.Domain\HAMBOX.Modules.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Legal\HAMBOX.Modules.Legal.Application\HAMBOX.Modules.Legal.Application.csproj" />
   </ItemGroup>
 
 </Project>

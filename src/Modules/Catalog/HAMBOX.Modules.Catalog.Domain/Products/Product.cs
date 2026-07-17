@@ -139,7 +139,8 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="price">The product price. Must be non-negative.</param>
     /// <param name="categoryId">The identifier of the category.</param>
     /// <returns>A new <see cref="Product"/> instance in Draft status.</returns>
-    /// <exception cref="ArgumentException">Thrown when any string parameter is null or whitespace, or when the category identifier is empty.</exception>
+    /// <remarks><paramref name="nameAr"/> and <paramref name="descriptionAr"/> are optional and fall back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="descriptionEn"/> is null or whitespace, or when the category identifier is empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the price is negative.</exception>
     public static Product Create(
         string nameAr,
@@ -149,9 +150,7 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         decimal price,
         Guid categoryId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
-        ArgumentException.ThrowIfNullOrWhiteSpace(descriptionAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptionEn);
         ArgumentOutOfRangeException.ThrowIfNegative(price);
 
@@ -160,7 +159,14 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
             throw new ArgumentException("Category identifier must not be empty.", nameof(categoryId));
         }
 
-        var product = new Product(Guid.NewGuid(), nameAr, nameEn, descriptionAr, descriptionEn, price, categoryId);
+        var product = new Product(
+            Guid.NewGuid(),
+            string.IsNullOrWhiteSpace(nameAr) ? nameEn : nameAr,
+            nameEn,
+            string.IsNullOrWhiteSpace(descriptionAr) ? descriptionEn : descriptionAr,
+            descriptionEn,
+            price,
+            categoryId);
         product.SetInitialStock(100);
         return product;
     }
@@ -247,21 +253,20 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="nameEn">The new product name in English.</param>
     /// <param name="descriptionAr">The new product description in Arabic.</param>
     /// <param name="descriptionEn">The new product description in English.</param>
-    /// <exception cref="ArgumentException">Thrown when any parameter is null or whitespace.</exception>
+    /// <remarks><paramref name="nameAr"/> and <paramref name="descriptionAr"/> are optional and fall back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="descriptionEn"/> is null or whitespace.</exception>
     public void Update(
         string nameAr,
         string nameEn,
         string descriptionAr,
         string descriptionEn)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
-        ArgumentException.ThrowIfNullOrWhiteSpace(descriptionAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(descriptionEn);
 
-        NameAr = nameAr;
+        NameAr = string.IsNullOrWhiteSpace(nameAr) ? nameEn : nameAr;
         NameEn = nameEn;
-        DescriptionAr = descriptionAr;
+        DescriptionAr = string.IsNullOrWhiteSpace(descriptionAr) ? descriptionEn : descriptionAr;
         DescriptionEn = descriptionEn;
     }
 

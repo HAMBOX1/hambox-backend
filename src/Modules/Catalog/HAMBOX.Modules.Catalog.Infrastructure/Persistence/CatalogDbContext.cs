@@ -1,4 +1,6 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Domain.Entities;
+using HAMBOX.Infrastructure.Persistence.Conversions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Categories;
@@ -13,7 +15,7 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Persistence;
 /// <summary>
 /// Represents the Entity Framework Core database context for the Catalog module.
 /// </summary>
-public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
+public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options, ICodeProtector codeProtector)
     : DbContext(options), ICatalogDbContext
 {
     /// <summary>
@@ -59,6 +61,30 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CatalogDbContext).Assembly);
 
         ApplyGlobalQueryFilters(modelBuilder);
+        ApplyCodeEncryption(modelBuilder);
+    }
+
+    /// <summary>
+    /// Encrypts digital inventory codes/serials/pins at rest. Storage is ciphertext only; the
+    /// application layer keeps reading/writing plaintext, since EF applies the conversion transparently.
+    /// </summary>
+    private void ApplyCodeEncryption(ModelBuilder modelBuilder)
+    {
+        // Cast to the non-generic base so the same converter instance applies to both the
+        // non-nullable DigitalCode and the nullable SerialNumber/Pin properties without a
+        // nullable-annotation mismatch against EF's generic HasConversion<TProvider> overload.
+        Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter converter =
+            new EncryptedStringConverter(codeProtector);
+
+        modelBuilder.Entity<DigitalInventoryCode>().Property(c => c.DigitalCode)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
+        modelBuilder.Entity<DigitalInventoryCode>().Property(c => c.SerialNumber)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
+        modelBuilder.Entity<DigitalInventoryCode>().Property(c => c.Pin)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
     }
 
     /// <summary>

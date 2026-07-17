@@ -30,6 +30,7 @@ internal static class OperationsEndpoints
             [FromQuery] string? status,
             [FromQuery] string? jobType,
             [FromQuery] string? search,
+            [FromQuery] string? queue,
             [FromQuery] DateTimeOffset? dateFrom,
             [FromQuery] DateTimeOffset? dateTo,
             [FromQuery] int page,
@@ -37,13 +38,23 @@ internal static class OperationsEndpoints
             [FromQuery] string? sort,
             ISender sender) =>
             MapResult(await sender.Send(new GetOperationalJobsQuery(
-                status, jobType, search, dateFrom, dateTo, page, pageSize, sort))))
+                status, jobType, search, queue, dateFrom, dateTo, page, pageSize, sort))))
             .WithName("GetOperationalJobs")
             .RequirePermission(PermissionConstants.Operations.View);
 
         group.MapGet("jobs/{id:guid}", async Task<IResult> (Guid id, ISender sender) =>
             MapResult(await sender.Send(new GetOperationalJobByIdQuery(id))))
             .WithName("GetOperationalJobById")
+            .RequirePermission(PermissionConstants.Operations.View);
+
+        group.MapGet("jobs/{id:guid}/history", async Task<IResult> (Guid id, ISender sender) =>
+            MapResult(await sender.Send(new GetJobExecutionHistoryQuery(id))))
+            .WithName("GetOperationalJobHistory")
+            .RequirePermission(PermissionConstants.Operations.View);
+
+        group.MapGet("recurring-jobs", async Task<IResult> (ISender sender) =>
+            MapResult(await sender.Send(new GetRecurringJobDefinitionsQuery())))
+            .WithName("GetRecurringJobDefinitions")
             .RequirePermission(PermissionConstants.Operations.View);
 
         group.MapPost("jobs/{id:guid}/retry", async Task<IResult> (Guid id, ISender sender) =>

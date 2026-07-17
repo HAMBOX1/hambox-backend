@@ -11,6 +11,10 @@ public static class IdentityErrors
         "Identity.EmailAlreadyExists",
         "A user with this email address already exists.");
 
+    public static readonly Error RegistrationNotAllowed = new(
+        "Identity.RegistrationNotAllowed",
+        "This email address cannot be used to register an account.");
+
     public static readonly Error InvalidCredentials = new(
         "Identity.InvalidCredentials",
         "The email address or password is incorrect.");
@@ -118,4 +122,44 @@ public static class IdentityErrors
     public static readonly Error AdminContextRequired = new(
         "Identity.AdminContextRequired",
         "This action requires an authenticated admin session with OTP verification.");
+
+    public static readonly Error GoogleTokenInvalid = new(
+        "Identity.GoogleTokenInvalid",
+        "The Google sign-in token is invalid or could not be verified.");
+
+    public static readonly Error GoogleAuthNotConfigured = new(
+        "Identity.GoogleAuthNotConfigured",
+        "Google sign-in is not configured on this server.");
+
+    public static readonly Error CannotRestrictOwner = new(
+        "Identity.CannotRestrictOwner",
+        "An Owner account cannot be suspended, blocked, or banned.");
+
+    public static readonly Error UserNotRestricted = new(
+        "Identity.UserNotRestricted",
+        "The user account is not currently suspended, blocked, or banned.");
+
+    public static readonly Error InvalidUserStateTransition = new(
+        "Identity.InvalidUserStateTransition",
+        "The requested action is not valid for the user's current status.");
+
+    public static readonly Error CountryRestrictionNotFound = new(
+        "Identity.CountryRestrictionNotFound",
+        "The country restriction was not found.");
+
+    public static readonly Error BlockedEmailNotFound = new(
+        "Identity.BlockedEmailNotFound",
+        "The blocked email entry was not found.");
+
+    public static readonly Error BlockedIpNotFound = new(
+        "Identity.BlockedIpNotFound",
+        "The blocked IP entry was not found.");
+
+    public static readonly Error BlockedEmailAlreadyExists = new(
+        "Identity.BlockedEmailAlreadyExists",
+        "This email address or domain pattern is already blocked.");
+
+    public static readonly Error BlockedIpAlreadyExists = new(
+        "Identity.BlockedIpAlreadyExists",
+        "This IP address or range is already blocked.");
 }

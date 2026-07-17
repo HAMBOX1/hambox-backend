@@ -2,6 +2,7 @@ using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Permissions;
 using HAMBOX.Modules.Identity.Domain.PlatformSettings;
 using HAMBOX.Modules.Identity.Domain.Roles;
+using HAMBOX.Modules.Identity.Domain.Security;
 using HAMBOX.Modules.Identity.Domain.Sessions;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
@@ -93,6 +94,31 @@ public interface IIdentityDbContext
     /// Gets the platform settings audit logs database set.
     /// </summary>
     DbSet<PlatformSettingsAuditLog> PlatformSettingsAuditLogs { get; }
+
+    /// <summary>
+    /// Gets the Security Center blocked emails/domains database set.
+    /// </summary>
+    DbSet<BlockedEmail> BlockedEmails { get; }
+
+    /// <summary>
+    /// Gets the Security Center blocked IP addresses/ranges database set.
+    /// </summary>
+    DbSet<BlockedIp> BlockedIps { get; }
+
+    /// <summary>
+    /// Gets the Security Center country restrictions database set.
+    /// </summary>
+    DbSet<CountryRestriction> CountryRestrictions { get; }
+
+    /// <summary>
+    /// Gets the Security Center blocked devices database set (architecture-only, no live usage).
+    /// </summary>
+    DbSet<BlockedDevice> BlockedDevices { get; }
+
+    /// <summary>
+    /// Gets the Security Center security event log database set.
+    /// </summary>
+    DbSet<SecurityEventLog> SecurityEventLogs { get; }
 
     /// <summary>
     /// Saves all changes made in this context to the database.

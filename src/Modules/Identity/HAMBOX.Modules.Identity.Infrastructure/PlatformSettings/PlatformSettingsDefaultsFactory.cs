@@ -288,7 +288,7 @@ internal static class PlatformSettingsDefaultsFactory
         new(30, 25, 4, 300);
 
     private static RetryPoliciesSettingsPayload CreateRetryPolicies() =>
-        new(3, 30, 120, 5);
+        new(3, 30, 120, 5, UseExponentialBackoff: false);
 
     private static NotificationsSettingsPayload CreateNotifications() =>
         new(true, false, false, true, true, true);

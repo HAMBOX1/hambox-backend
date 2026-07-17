@@ -47,9 +47,16 @@ internal sealed class CommerceTransactionService : ICommerceTransactionService
 
         await using var dbTransaction = await connection.BeginTransactionAsync(cancellationToken);
 
+        // EF's automatic savepoints assume each context is the sole owner of the ambient
+        // transaction. With one raw transaction manually shared across two DbContext instances,
+        // that bookkeeping breaks and a later SaveChanges call fails with "Cannot issue SAVE
+        // TRANSACTION when there is no active transaction". Microsoft's documented fix for
+        // sharing a transaction across contexts is to disable automatic savepoints on each.
+        _commerceDbContext.Database.AutoSavepointsEnabled = false;
         await _commerceDbContext.Database.UseTransactionAsync(dbTransaction, cancellationToken);
         if (_catalogDbContext is CatalogDbContext catalogWithSharedConnection)
         {
+            catalogWithSharedConnection.Database.AutoSavepointsEnabled = false;
             await catalogWithSharedConnection.Database.UseTransactionAsync(dbTransaction, cancellationToken);
         }
 

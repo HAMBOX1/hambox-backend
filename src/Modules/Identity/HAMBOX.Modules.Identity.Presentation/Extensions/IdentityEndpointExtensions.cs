@@ -25,6 +25,7 @@ public static class IdentityEndpointExtensions
         builder.MapAuthEndpoints();
         builder.MapRoleEndpoints(apiVersionSet);
         builder.MapSettingsEndpoints(apiVersionSet);
+        builder.MapSecurityEndpoints(apiVersionSet);
         return builder;
     }
 }

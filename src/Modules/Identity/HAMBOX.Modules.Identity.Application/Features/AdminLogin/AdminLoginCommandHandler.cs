@@ -22,7 +22,9 @@ internal sealed class AdminLoginCommandHandler(
     IOtpCodeGenerator otpCodeGenerator,
     IEmailService emailService,
     IAuthTokenIssuer authTokenIssuer,
-    IPlatformSettingsProvider platformSettings) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
+    IPlatformSettingsProvider platformSettings,
+    ISecurityBlocklistService blocklistService,
+    ISecurityEventLogger securityEventLogger) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
 {
     public async Task<Result<AdminLoginChallengeResponse>> Handle(
         AdminLoginCommand request,
@@ -40,6 +42,20 @@ internal sealed class AdminLoginCommandHandler(
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        if (await blocklistService.IsEmailBlockedAsync(user.Email, cancellationToken))
+        {
+            await RecordFailureAsync(user.Id, request, "Email address is blocked", cancellationToken);
+            await securityEventLogger.LogAsync(
+                SecurityEventType.BlockedLogin,
+                SecurityEventSeverity.High,
+                $"Admin login rejected for {user.Email}: email address is blocked.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                cancellationToken: cancellationToken);
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
+        }
+
         if (!user.EmailConfirmed)
         {
             await RecordFailureAsync(user.Id, request, "Email not confirmed", cancellationToken);
@@ -49,6 +65,19 @@ internal sealed class AdminLoginCommandHandler(
         if (user.Status != UserStatus.Active)
         {
             await RecordFailureAsync(user.Id, request, "Account not active", cancellationToken);
+
+            if (user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended)
+            {
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.BlockedLogin,
+                    SecurityEventSeverity.Medium,
+                    $"Admin login rejected for {user.Email}: account is {user.Status}.",
+                    targetUserId: user.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    cancellationToken: cancellationToken);
+            }
+
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AccountNotActive);
         }
 

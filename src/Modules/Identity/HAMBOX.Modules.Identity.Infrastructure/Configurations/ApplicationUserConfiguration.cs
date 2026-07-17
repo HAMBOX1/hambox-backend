@@ -76,6 +76,16 @@ internal sealed class ApplicationUserConfiguration : IEntityTypeConfiguration<Ap
         builder.Property(u => u.TwoFactorEnabled)
             .IsRequired();
 
+        builder.Property(u => u.BlockReason)
+            .HasMaxLength(500);
+
+        builder.Property(u => u.BlockNotes)
+            .HasMaxLength(2000);
+
+        builder.Property(u => u.BlockExpiresOnUtc);
+
+        builder.Property(u => u.BlockedByUserId);
+
         // Audit properties (IAuditable)
         builder.Property(u => u.CreatedBy)
             .HasMaxLength(256);

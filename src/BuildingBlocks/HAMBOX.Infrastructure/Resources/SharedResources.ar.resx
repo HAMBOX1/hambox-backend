@@ -30,6 +30,12 @@
   <data name="Errors.Internal.Detail" xml:space="preserve">
     <value>حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.</value>
   </data>
+  <data name="Errors.IdempotencyConflict.Title" xml:space="preserve">
+    <value>الطلب قيد المعالجة بالفعل</value>
+  </data>
+  <data name="Errors.IdempotencyConflict.Detail" xml:space="preserve">
+    <value>لا يزال هناك طلب بنفس مفتاح المطابقة قيد المعالجة. يرجى الانتظار والمحاولة مرة أخرى.</value>
+  </data>
   <data name="Errors.Identity_EmailAlreadyExists" xml:space="preserve">
     <value>يوجد مستخدم مسجل بهذا البريد الإلكتروني بالفعل.</value>
   </data>
@@ -62,5 +68,32 @@
   </data>
   <data name="Errors.Identity_ProfileUpdateFailed" xml:space="preserve">
     <value>تعذر تحديث الملف الشخصي.</value>
+  </data>
+  <data name="Errors.Identity_RegistrationNotAllowed" xml:space="preserve">
+    <value>لا يمكن استخدام هذا البريد الإلكتروني لإنشاء حساب.</value>
+  </data>
+  <data name="Errors.Identity_CannotRestrictOwner" xml:space="preserve">
+    <value>لا يمكن تعليق أو حظر أو حظر مالك النظام.</value>
+  </data>
+  <data name="Errors.Identity_UserNotRestricted" xml:space="preserve">
+    <value>حساب المستخدم غير معلّق أو محظور حاليًا.</value>
+  </data>
+  <data name="Errors.Identity_InvalidUserStateTransition" xml:space="preserve">
+    <value>هذا الإجراء غير صالح لحالة المستخدم الحالية.</value>
+  </data>
+  <data name="Errors.Identity_CountryRestrictionNotFound" xml:space="preserve">
+    <value>لم يتم العثور على قيد الدولة.</value>
+  </data>
+  <data name="Errors.Identity_BlockedEmailNotFound" xml:space="preserve">
+    <value>لم يتم العثور على إدخال البريد الإلكتروني المحظور.</value>
+  </data>
+  <data name="Errors.Identity_BlockedIpNotFound" xml:space="preserve">
+    <value>لم يتم العثور على إدخال عنوان IP المحظور.</value>
+  </data>
+  <data name="Errors.Identity_BlockedEmailAlreadyExists" xml:space="preserve">
+    <value>هذا البريد الإلكتروني أو نمط النطاق محظور بالفعل.</value>
+  </data>
+  <data name="Errors.Identity_BlockedIpAlreadyExists" xml:space="preserve">
+    <value>عنوان IP أو النطاق هذا محظور بالفعل.</value>
   </data>
 </root>

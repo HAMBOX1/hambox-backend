@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Communication;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -26,6 +27,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly IInventoryEngine _inventoryEngine;
     private readonly CartResponseBuilder _cartResponseBuilder;
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
+    private readonly ICommunicationService _communicationService;
     private readonly ILogger<CheckoutCommandHandler> _logger;
 
     public CheckoutCommandHandler(
@@ -36,6 +38,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         IInventoryEngine inventoryEngine,
         CartResponseBuilder cartResponseBuilder,
         IEnumerable<IPaymentProvider> paymentProviders,
+        ICommunicationService communicationService,
         ILogger<CheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -45,6 +48,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         _inventoryEngine = inventoryEngine;
         _cartResponseBuilder = cartResponseBuilder;
         _paymentProviders = paymentProviders;
+        _communicationService = communicationService;
         _logger = logger;
     }
 
@@ -319,23 +323,6 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     }
                 }
 
-                var notification = UserNotification.Create(
-                    _currentUserService.UserId!,
-                    "Order Completed",
-                    $"Your order {order.OrderNumber} is complete. License keys are ready in My Library.",
-                    "Order",
-                    $"/account/library?orderId={order.Id}");
-
-                _commerceDbContext.UserNotifications.Add(notification);
-
-                _logger.LogInformation(
-                    "Order confirmation email simulated for {Email}: Order {OrderNumber}, Total {Total}, Provider {Provider}, Transaction {TransactionId}",
-                    order.Email,
-                    order.OrderNumber,
-                    order.TotalAmount,
-                    order.PaymentProvider,
-                    order.PaymentTransactionId);
-
                 foreach (var item in cart.Items.Where(i => i.ProductVariantId is null))
                 {
                     products[item.ProductId].CommitSale(item.Quantity);
@@ -369,7 +356,20 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                 new Error("Checkout.Failed", ex.Message));
         }
 
-        return Result.Success(CommerceMapper.ToOrderDto(createdOrder!));
+        await _communicationService.SendAsync(new CommunicationRequest(
+            UserId: _currentUserService.UserId!,
+            TemplateKey: "OrderConfirmation",
+            Category: CommunicationCategory.Order,
+            Variables: new Dictionary<string, string>
+            {
+                ["OrderNumber"] = createdOrder!.OrderNumber,
+                ["Total"] = createdOrder.TotalAmount.ToString("0.00"),
+            },
+            RelatedEntityType: "Order",
+            RelatedEntityId: createdOrder.Id.ToString(),
+            ActionUrl: $"/account/library?orderId={createdOrder.Id}"), cancellationToken);
+
+        return Result.Success(CommerceMapper.ToOrderDto(createdOrder));
     }
 
     private static bool IsInventoryFailure(InvalidOperationException ex)

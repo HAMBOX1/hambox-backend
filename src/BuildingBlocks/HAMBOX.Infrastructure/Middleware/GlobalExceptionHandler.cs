@@ -1,4 +1,5 @@
 using FluentValidation;
+using HAMBOX.Application.Idempotency;
 using HAMBOX.Infrastructure.Resources;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -30,6 +31,10 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status401Unauthorized,
                 localizer["Errors.Unauthorized.Title"].Value,
                 localizer["Errors.Unauthorized.Detail"].Value),
+            IdempotencyConflictException => CreateProblemDetails(
+                StatusCodes.Status409Conflict,
+                localizer["Errors.IdempotencyConflict.Title"].Value,
+                localizer["Errors.IdempotencyConflict.Detail"].Value),
             _ => CreateProblemDetails(
                 StatusCodes.Status500InternalServerError,
                 localizer["Errors.Internal.Title"].Value,

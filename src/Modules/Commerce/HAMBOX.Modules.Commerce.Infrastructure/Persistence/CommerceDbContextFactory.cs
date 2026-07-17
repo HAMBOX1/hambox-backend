@@ -1,3 +1,4 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Infrastructure.Services;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
@@ -52,6 +53,14 @@ public sealed class CommerceDbContextFactory : IDesignTimeDbContextFactory<Comme
 
         optionsBuilder.AddInterceptors(auditInterceptor);
 
-        return new CommerceDbContext(optionsBuilder.Options);
+        return new CommerceDbContext(optionsBuilder.Options, new DesignTimeCodeProtector());
+    }
+
+    // Migration authoring only inspects the model shape; it never calls Protect/Unprotect.
+    private sealed class DesignTimeCodeProtector : ICodeProtector
+    {
+        public string Protect(string plainText) => plainText;
+
+        public string Unprotect(string cipherText) => cipherText;
     }
 }

@@ -61,6 +61,8 @@ public sealed record OperationalJobDto(
     string JobType,
     string Status,
     string Priority,
+    string Queue,
+    int ProgressPercent,
     int Attempts,
     int MaxAttempts,
     string? WorkerId,
@@ -74,6 +76,25 @@ public sealed record OperationalJobDto(
     DateTimeOffset? NextVisibleOnUtc,
     DateTimeOffset? LastRetryOnUtc,
     double? DurationSeconds);
+
+public sealed record BackgroundJobExecutionHistoryDto(
+    Guid Id,
+    int AttemptNumber,
+    string Status,
+    DateTimeOffset StartedOnUtc,
+    DateTimeOffset? FinishedOnUtc,
+    long? DurationMs,
+    string? Exception,
+    string? WorkerId,
+    string? CorrelationId);
+
+public sealed record RecurringJobDefinitionDto(
+    string Key,
+    string JobType,
+    string Queue,
+    string Priority,
+    double IntervalMinutes,
+    DateTimeOffset? LastEnqueuedOnUtc);
 
 public sealed record DeliveryMonitorItemDto(
     Guid OrderId,

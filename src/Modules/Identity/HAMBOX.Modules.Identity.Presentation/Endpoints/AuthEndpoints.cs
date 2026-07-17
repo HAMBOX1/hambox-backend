@@ -3,6 +3,7 @@ using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
 using HAMBOX.Modules.Identity.Application.Features.GetMe;
+using HAMBOX.Modules.Identity.Application.Features.GoogleLogin;
 using HAMBOX.Modules.Identity.Application.Features.Login;
 using HAMBOX.Modules.Identity.Application.Features.Logout;
 using HAMBOX.Modules.Identity.Application.Features.RefreshToken;
@@ -41,11 +42,20 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var language = httpContext.Request.Headers["Accept-Language"].ToString() is { Length: > 0 } acceptLanguage
+                ? acceptLanguage.Split(',')[0].Split(';')[0].Trim()
+                : "en";
+
             var command = new RegisterCommand(
                 request.Email,
                 request.Password,
                 request.FirstName,
-                request.LastName);
+                request.LastName,
+                ipAddress,
+                userAgent,
+                language);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -65,6 +75,21 @@ public static class AuthEndpoints
                 request.Password,
                 ipAddress,
                 userAgent);
+
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
+
+        group.MapPost("google", async (
+            [FromBody] GoogleLoginRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+
+            var command = new GoogleLoginCommand(request.IdToken, ipAddress, userAgent);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -257,6 +282,11 @@ public sealed record RegisterRequest(string Email, string Password, string First
 /// Represents a login request.
 /// </summary>
 public sealed record LoginRequest(string Email, string Password);
+
+/// <summary>
+/// Represents a Google sign-in request.
+/// </summary>
+public sealed record GoogleLoginRequest(string IdToken);
 
 /// <summary>
 /// Represents a refresh token request.

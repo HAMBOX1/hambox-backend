@@ -49,6 +49,10 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Promotions = new("15000000-0000-0000-0000-000000000024");
         public static readonly Guid Operations = new("15000000-0000-0000-0000-000000000025");
         public static readonly Guid Analytics = new("15000000-0000-0000-0000-000000000026");
+        public static readonly Guid Legal = new("15000000-0000-0000-0000-000000000027");
+        public static readonly Guid Suppliers = new("15000000-0000-0000-0000-000000000028");
+        public static readonly Guid Security = new("15000000-0000-0000-0000-000000000029");
+        public static readonly Guid Communication = new("15000000-0000-0000-0000-000000000030");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -79,6 +83,10 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Promotions, "Promotions", "Promotions", "Commerce", 135),
         new(GroupIds.Operations, "Operations", "Operations", "Operations", 75),
         new(GroupIds.Analytics, "Analytics", "Analytics", "Analytics", 185),
+        new(GroupIds.Legal, "Legal", "Legal Center", "Platform", 145),
+        new(GroupIds.Suppliers, "Suppliers", "Suppliers", "Operations", 146),
+        new(GroupIds.Security, "Security", "Security Center", "Security", 147, "Blocked users, emails, countries, IPs, and security events"),
+        new(GroupIds.Communication, "Communication", "Communication Center", "Communication", 148, "Templates, notifications, providers, and delivery history"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -222,6 +230,39 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000229"), GroupIds.Reports, PermissionConstants.Reports.Export, 2),
         new(new Guid("20000000-0000-0000-0000-000000000230"), GroupIds.Reports, PermissionConstants.Reports.Schedule, 3),
         new(new Guid("20000000-0000-0000-0000-000000000231"), GroupIds.Reports, PermissionConstants.Reports.Delete, 4),
+
+        // Inventory.RevealCodes appended to preserve RolePermission seed indices
+        new(new Guid("21000000-0000-0000-0000-000000000001"), GroupIds.Inventory, PermissionConstants.Catalog.Inventory.RevealCodes, 11),
+
+        // Legal Center (232-235) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000232"), GroupIds.Legal, PermissionConstants.Legal.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000233"), GroupIds.Legal, PermissionConstants.Legal.Create, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000234"), GroupIds.Legal, PermissionConstants.Legal.Edit, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000235"), GroupIds.Legal, PermissionConstants.Legal.Publish, 4),
+
+        // Suppliers (236-240) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000236"), GroupIds.Suppliers, PermissionConstants.Suppliers.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000237"), GroupIds.Suppliers, PermissionConstants.Suppliers.Create, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000238"), GroupIds.Suppliers, PermissionConstants.Suppliers.Edit, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000239"), GroupIds.Suppliers, PermissionConstants.Suppliers.Delete, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000240"), GroupIds.Suppliers, PermissionConstants.Suppliers.ManageMappings, 5),
+
+        // Security Center (241-246) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000241"), GroupIds.Security, PermissionConstants.Security.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000242"), GroupIds.Security, PermissionConstants.Security.ManageUsers, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000243"), GroupIds.Security, PermissionConstants.Security.ManageEmails, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000244"), GroupIds.Security, PermissionConstants.Security.ManageCountries, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000245"), GroupIds.Security, PermissionConstants.Security.ManageIPs, 5),
+        new(new Guid("20000000-0000-0000-0000-000000000246"), GroupIds.Security, PermissionConstants.Security.ViewEvents, 6),
+
+        // Communication Center (247-251) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000247"), GroupIds.Communication, PermissionConstants.Communication.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000248"), GroupIds.Communication, PermissionConstants.Communication.Manage, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000249"), GroupIds.Communication, PermissionConstants.Communication.Send, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000250"), GroupIds.Communication, PermissionConstants.Communication.ManageTemplates, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000251"), GroupIds.Communication, PermissionConstants.Communication.ManageProviders, 5),
+
+        new(new Guid("20000000-0000-0000-0000-000000000252"), GroupIds.Legal, PermissionConstants.Legal.Delete, 5),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

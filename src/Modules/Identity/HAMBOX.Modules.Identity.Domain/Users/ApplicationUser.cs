@@ -81,6 +81,28 @@ public sealed class ApplicationUser : AggregateRoot, IAuditable, ISoftDeletable
     public UserStatus Status { get; private set; }
 
     /// <summary>
+    /// Gets the reason recorded for the current suspension, block, or ban. Null when the account is active.
+    /// </summary>
+    public string? BlockReason { get; private set; }
+
+    /// <summary>
+    /// Gets the administrator's free-text notes recorded alongside the current block, if any.
+    /// </summary>
+    public string? BlockNotes { get; private set; }
+
+    /// <summary>
+    /// Gets the date and time, in UTC, when a temporary block expires and the account is
+    /// automatically restored to <see cref="UserStatus.Active"/>. Null for permanent bans and
+    /// for suspensions, which require a manual unblock.
+    /// </summary>
+    public DateTimeOffset? BlockExpiresOnUtc { get; private set; }
+
+    /// <summary>
+    /// Gets the identifier of the administrator who applied the current suspension, block, or ban.
+    /// </summary>
+    public Guid? BlockedByUserId { get; private set; }
+
+    /// <summary>
     /// Gets the security stamp used to invalidate existing tokens when security-critical
     /// changes occur (e.g., password change, email confirmation, suspension).
     /// </summary>
@@ -193,35 +215,107 @@ public sealed class ApplicationUser : AggregateRoot, IAuditable, ISoftDeletable
     /// <summary>
     /// Suspends the user account. Only valid from <see cref="UserStatus.Active"/> status.
     /// </summary>
+    /// <param name="reason">The administrator-supplied reason for the suspension.</param>
+    /// <param name="notes">Optional free-text administrator notes.</param>
+    /// <param name="actorUserId">The identifier of the administrator performing the action.</param>
     /// <exception cref="InvalidOperationException">Thrown when the user is not active.</exception>
-    public void Suspend()
+    public void Suspend(string reason, string? notes = null, Guid? actorUserId = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
         if (Status != UserStatus.Active)
         {
             throw new InvalidOperationException("Only active users can be suspended.");
         }
 
         Status = UserStatus.Suspended;
+        BlockReason = reason;
+        BlockNotes = notes;
+        BlockExpiresOnUtc = null;
+        BlockedByUserId = actorUserId;
         SecurityStamp = Guid.NewGuid().ToString("N");
 
         RaiseDomainEvent(new UserSuspendedDomainEvent(Id));
     }
 
     /// <summary>
-    /// Permanently blocks the user account.
+    /// Blocks the user account, temporarily if <paramref name="expiresOnUtc"/> is supplied.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when the user is already blocked.</exception>
-    public void Block()
+    /// <param name="reason">The administrator-supplied reason for the block.</param>
+    /// <param name="notes">Optional free-text administrator notes.</param>
+    /// <param name="actorUserId">The identifier of the administrator performing the action.</param>
+    /// <param name="expiresOnUtc">
+    /// The date/time the temporary block expires, or <see langword="null"/> for an indefinite block
+    /// that still requires a manual <see cref="Unblock"/>.
+    /// </param>
+    /// <exception cref="InvalidOperationException">Thrown when the user is already blocked or banned.</exception>
+    public void Block(string reason, string? notes = null, Guid? actorUserId = null, DateTimeOffset? expiresOnUtc = null)
     {
-        if (Status == UserStatus.Blocked)
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        if (Status is UserStatus.Blocked or UserStatus.Banned)
         {
             throw new InvalidOperationException("User is already blocked.");
         }
 
         Status = UserStatus.Blocked;
+        BlockReason = reason;
+        BlockNotes = notes;
+        BlockExpiresOnUtc = expiresOnUtc;
+        BlockedByUserId = actorUserId;
         SecurityStamp = Guid.NewGuid().ToString("N");
 
         RaiseDomainEvent(new UserBlockedDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Permanently bans the user account. Unlike <see cref="Block"/>, a ban never auto-expires.
+    /// </summary>
+    /// <param name="reason">The administrator-supplied reason for the ban.</param>
+    /// <param name="notes">Optional free-text administrator notes.</param>
+    /// <param name="actorUserId">The identifier of the administrator performing the action.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the user is already banned.</exception>
+    public void Ban(string reason, string? notes = null, Guid? actorUserId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        if (Status == UserStatus.Banned)
+        {
+            throw new InvalidOperationException("User is already banned.");
+        }
+
+        Status = UserStatus.Banned;
+        BlockReason = reason;
+        BlockNotes = notes;
+        BlockExpiresOnUtc = null;
+        BlockedByUserId = actorUserId;
+        SecurityStamp = Guid.NewGuid().ToString("N");
+
+        RaiseDomainEvent(new UserBannedDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Restores a suspended, blocked, or banned user account to <see cref="UserStatus.Active"/>.
+    /// </summary>
+    /// <param name="actorUserId">The identifier of the administrator performing the action, if manual.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the account is not currently restricted.</exception>
+    public void Unblock(Guid? actorUserId = null)
+    {
+        if (Status is not (UserStatus.Suspended or UserStatus.Blocked or UserStatus.Banned))
+        {
+            throw new InvalidOperationException("Only suspended, blocked, or banned users can be unblocked.");
+        }
+
+        Status = UserStatus.Active;
+        BlockReason = null;
+        BlockNotes = null;
+        BlockExpiresOnUtc = null;
+        BlockedByUserId = actorUserId;
+        AccessFailedCount = 0;
+        LockoutEnd = null;
+        SecurityStamp = Guid.NewGuid().ToString("N");
+
+        RaiseDomainEvent(new UserUnblockedDomainEvent(Id));
     }
 
     /// <summary>

@@ -1,7 +1,10 @@
 using FluentValidation;
+using HAMBOX.Application.BackgroundJobs;
+using HAMBOX.Application.Idempotency;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
+using HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 using HAMBOX.Modules.Commerce.Infrastructure.Services;
 using HAMBOX.Modules.Commerce.Infrastructure.Services.Reports;
@@ -31,7 +34,8 @@ public static class CommerceInfrastructureExtensions
             options.UseSqlServer(connectionString,
                 o => o.MigrationsHistoryTable("__EFMigrationsHistory", "commerce"))
             .AddInterceptors(
-                sp.GetRequiredService<AuditInterceptor>()));
+                sp.GetRequiredService<AuditInterceptor>(),
+                sp.GetRequiredService<SoftDeleteInterceptor>()));
 
         services.AddScoped<ICommerceDbContext>(sp => sp.GetRequiredService<CommerceDbContext>());
         services.AddScoped<ICommerceTransactionService, CommerceTransactionService>();
@@ -41,11 +45,27 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<IPaymentProvider>(sp => sp.GetRequiredService<ImmediatePaymentProvider>());
         services.AddScoped<PaymentProviderResolver>();
         services.AddScoped<ICheckoutConfigurationProvider, CheckoutConfigurationProvider>();
+        services.AddScoped<IIdempotencyService, IdempotencyService>();
 
         services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly);
 
         services.AddSingleton<IWorkerRuntimeState, WorkerRuntimeState>();
-        services.AddScoped<IOperationalJobQueue, OperationalJobQueue>();
+
+        // Default background-job engine: one storage class serves both the Commerce-internal queue
+        // surface and the cross-module IBackgroundJobScheduler surface (see OperationalJobQueue).
+        services.AddScoped<OperationalJobQueue>();
+        services.AddScoped<IOperationalJobQueue>(sp => sp.GetRequiredService<OperationalJobQueue>());
+        services.AddScoped<IBackgroundJobScheduler>(sp => sp.GetRequiredService<OperationalJobQueue>());
+
+        // Every existing operational job type as its own handler — one line each, mirrors
+        // SuppliersInfrastructureExtensions' ISupplierProvider registration block.
+        services.AddScoped<IBackgroundJobHandler, ExpireInventoryReservationsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, RetryOrderFulfillmentJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, RetryDeliveryJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, HealthProbeJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, GenerateOperationalAlertsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, SupplierHealthCheckJobHandler>();
+
         services.AddScoped<IOperationsMonitorService, OperationsMonitorService>();
         services.AddScoped<IAnalyticsAggregationService, AnalyticsAggregationService>();
         services.AddScoped<ISystemHealthService, SystemHealthService>();

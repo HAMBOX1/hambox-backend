@@ -225,7 +225,11 @@ internal sealed class GetInventoryCodesQueryHandler : IRequestHandler<GetInvento
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            query = query.Where(c => c.DigitalCode.Contains(request.SearchTerm) || (c.SerialNumber != null && c.SerialNumber.Contains(request.SearchTerm)));
+            // Codes are encrypted at rest (non-deterministic ciphertext), so substring matching on the
+            // raw column no longer works. CodeHash already exists for exact-match duplicate detection;
+            // reuse it here instead of adding new crypto/search machinery.
+            var searchHash = DigitalInventoryCode.ComputeHash(request.SearchTerm);
+            query = query.Where(c => c.CodeHash == searchHash);
         }
 
         var items = await query
@@ -238,7 +242,12 @@ internal sealed class GetInventoryCodesQueryHandler : IRequestHandler<GetInvento
                 c.ExpirationDate, c.ReservedOnUtc, c.SoldOnUtc))
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<DigitalInventoryCodeDto>>(items);
+        // Grid never exposes plaintext — only the dedicated reveal endpoint may.
+        var masked = items
+            .Select(c => c with { DigitalCode = InventoryCodeMasking.Mask(c.DigitalCode), SerialNumber = c.SerialNumber is null ? null : InventoryCodeMasking.Mask(c.SerialNumber) })
+            .ToList();
+
+        return Result.Success<IReadOnlyList<DigitalInventoryCodeDto>>(masked);
     }
 }
 

@@ -28,6 +28,12 @@
     <ProjectReference Include="..\..\Modules\Commerce\HAMBOX.Modules.Commerce.Presentation\HAMBOX.Modules.Commerce.Presentation.csproj" />
     <ProjectReference Include="..\..\Modules\Themes\HAMBOX.Modules.Themes.Infrastructure\HAMBOX.Modules.Themes.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Themes\HAMBOX.Modules.Themes.Presentation\HAMBOX.Modules.Themes.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Legal\HAMBOX.Modules.Legal.Infrastructure\HAMBOX.Modules.Legal.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Legal\HAMBOX.Modules.Legal.Presentation\HAMBOX.Modules.Legal.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Suppliers\HAMBOX.Modules.Suppliers.Infrastructure\HAMBOX.Modules.Suppliers.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Suppliers\HAMBOX.Modules.Suppliers.Presentation\HAMBOX.Modules.Suppliers.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Communication\HAMBOX.Modules.Communication.Infrastructure\HAMBOX.Modules.Communication.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Communication\HAMBOX.Modules.Communication.Presentation\HAMBOX.Modules.Communication.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

@@ -27,6 +27,7 @@ public sealed class OrderLicenseKey : Entity
         ProductVariantId = productVariantId;
         DigitalInventoryCodeId = digitalInventoryCodeId;
         LicenseKey = licenseKey;
+        LicenseKeyHash = Hash(licenseKey);
     }
 
     /// <summary>
@@ -52,6 +53,12 @@ public sealed class OrderLicenseKey : Entity
     /// Gets the license key value.
     /// </summary>
     public string LicenseKey { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// SHA-256 hash of the plaintext license key, used for exact-match lookups now that
+    /// <see cref="LicenseKey"/> is encrypted at rest and can no longer be searched in SQL.
+    /// </summary>
+    public string LicenseKeyHash { get; private set; } = string.Empty;
 
     /// <summary>
     /// Creates a license key for an order item.
@@ -90,4 +97,8 @@ public sealed class OrderLicenseKey : Entity
             digitalInventoryCodeId,
             licenseKey);
     }
+
+    public static string Hash(string licenseKey) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(licenseKey.Trim().ToUpperInvariant())));
 }

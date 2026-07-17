@@ -68,6 +68,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 p.Status.ToString(),
                 p.CategoryId,
                 _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn,
+                _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameAr,
                 p.Images.FirstOrDefault(i => i.IsPrimary)!.Url
                     ?? p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
                 null,

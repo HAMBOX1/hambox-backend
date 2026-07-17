@@ -306,8 +306,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<string>("DigitalCode")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTimeOffset?>("ExpirationDate")
                         .HasColumnType("datetimeoffset");
@@ -328,8 +328,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Pin")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<decimal?>("PurchaseCost")
                         .HasColumnType("decimal(18,2)");
@@ -341,8 +341,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("SerialNumber")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTimeOffset?>("SoldOnUtc")
                         .HasColumnType("datetimeoffset");
@@ -394,11 +394,18 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("PerformedByUserId")
                         .HasColumnType("nvarchar(max)");
@@ -409,12 +416,18 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid?>("VariantId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OccurredOnUtc");
+
+                    b.HasIndex("OrderId");
 
                     b.HasIndex("VariantId");
 

@@ -1,6 +1,10 @@
+using HAMBOX.Application.Abstractions;
+using HAMBOX.Domain.Entities;
+using HAMBOX.Infrastructure.Persistence.Conversions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Carts;
+using HAMBOX.Modules.Commerce.Domain.Idempotency;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -13,7 +17,7 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 /// <summary>
 /// Represents the Entity Framework Core database context for the Commerce module.
 /// </summary>
-public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> options)
+public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> options, ICodeProtector codeProtector)
     : DbContext(options), ICommerceDbContext
 {
     /// <inheritdoc />
@@ -82,6 +86,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     public DbSet<OperationalJob> OperationalJobs => Set<OperationalJob>();
 
+    public DbSet<BackgroundJobExecutionHistory> BackgroundJobExecutionHistory => Set<BackgroundJobExecutionHistory>();
+
     public DbSet<ApiRequestLog> ApiRequestLogs => Set<ApiRequestLog>();
 
     public DbSet<OperationalAuditLog> OperationalAuditLogs => Set<OperationalAuditLog>();
@@ -95,6 +101,9 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     public DbSet<ScheduledReportExecution> ScheduledReportExecutions => Set<ScheduledReportExecution>();
 
     /// <inheritdoc />
+    public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+
+    /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -102,5 +111,39 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
         modelBuilder.HasDefaultSchema("commerce");
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CommerceDbContext).Assembly);
+
+        ApplyCodeEncryption(modelBuilder);
+        ApplyGlobalQueryFilters(modelBuilder);
+    }
+
+    /// <summary>
+    /// Encrypts delivered license keys/codes at rest. Storage is ciphertext only; the application
+    /// layer keeps reading/writing plaintext, since EF applies the conversion transparently.
+    /// </summary>
+    private void ApplyCodeEncryption(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrderLicenseKey>().Property(k => k.LicenseKey)
+            .HasConversion(new EncryptedStringConverter(codeProtector))
+            .HasMaxLength(2000);
+    }
+
+    private static void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+            var property = System.Linq.Expressions.Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+            var condition = System.Linq.Expressions.Expression.Equal(
+                property,
+                System.Linq.Expressions.Expression.Constant(false));
+            var lambda = System.Linq.Expressions.Expression.Lambda(condition, parameter);
+
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+        }
     }
 }

@@ -289,7 +289,8 @@ public sealed record RetryPoliciesSettingsPayload(
     int RetryCount,
     int RetryDelaySeconds,
     int TimeoutSeconds,
-    int DeadLetterThreshold);
+    int DeadLetterThreshold,
+    bool UseExponentialBackoff = false);
 
 public sealed record NotificationsSettingsPayload(
     bool EmailEnabled,

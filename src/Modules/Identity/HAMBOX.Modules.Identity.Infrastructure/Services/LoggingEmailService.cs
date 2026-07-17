@@ -54,6 +54,22 @@ internal sealed class LoggingEmailService(
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public Task SendTemplatedEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation(
+            "Email delivery disabled. Templated email '{Subject}' queued for {MaskedEmail}. CorrelationId={CorrelationId}",
+            subject,
+            EmailLogHelper.MaskEmail(toEmail),
+            correlationId);
+        return Task.CompletedTask;
+    }
+
     private void LogOtp(
         string emailType,
         Guid userId,

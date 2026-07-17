@@ -36,7 +36,8 @@ public sealed record UserNotificationDto(
     string Category,
     bool IsRead,
     DateTimeOffset CreatedOnUtc,
-    string? ActionUrl = null);
+    string? ActionUrl = null,
+    bool IsArchived = false);
 
 /// <summary>
 /// Represents a customer-owned license key reveal response.

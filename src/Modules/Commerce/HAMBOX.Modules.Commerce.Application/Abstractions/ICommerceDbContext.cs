@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Carts;
+using HAMBOX.Modules.Commerce.Domain.Idempotency;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -114,6 +115,8 @@ public interface ICommerceDbContext
 
     DbSet<OperationalJob> OperationalJobs { get; }
 
+    DbSet<BackgroundJobExecutionHistory> BackgroundJobExecutionHistory { get; }
+
     DbSet<ApiRequestLog> ApiRequestLogs { get; }
 
     DbSet<OperationalAuditLog> OperationalAuditLogs { get; }
@@ -125,6 +128,8 @@ public interface ICommerceDbContext
     DbSet<ReportDownload> ReportDownloads { get; }
     DbSet<ScheduledReport> ScheduledReports { get; }
     DbSet<ScheduledReportExecution> ScheduledReportExecutions { get; }
+
+    DbSet<IdempotencyKey> IdempotencyKeys { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -82,18 +82,22 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="nameEn">The category name in English.</param>
     /// <param name="slug">The URL-friendly slug.</param>
     /// <returns>A new <see cref="Category"/> instance.</returns>
-    /// <exception cref="ArgumentException">Thrown when any required parameter is null or whitespace.</exception>
+    /// <remarks><paramref name="nameAr"/> is optional and falls back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="slug"/> is null or whitespace.</exception>
     public static Category Create(
         string nameAr,
         string nameEn,
         string slug,
         Guid? parentId = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
-        var category = new Category(Guid.NewGuid(), nameAr, nameEn, slug);
+        var category = new Category(
+            Guid.NewGuid(),
+            string.IsNullOrWhiteSpace(nameAr) ? nameEn : nameAr,
+            nameEn,
+            slug);
         category.SetParent(parentId);
         return category;
     }
@@ -118,18 +122,18 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="nameAr">The new category name in Arabic.</param>
     /// <param name="nameEn">The new category name in English.</param>
     /// <param name="slug">The new URL-friendly slug.</param>
-    /// <exception cref="ArgumentException">Thrown when any required parameter is null or whitespace.</exception>
+    /// <remarks><paramref name="nameAr"/> is optional and falls back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="slug"/> is null or whitespace.</exception>
     public void Update(
         string nameAr,
         string nameEn,
         string slug,
         Guid? parentId = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nameAr);
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
-        NameAr = nameAr;
+        NameAr = string.IsNullOrWhiteSpace(nameAr) ? nameEn : nameAr;
         NameEn = nameEn;
         Slug = slug;
         SetParent(parentId);

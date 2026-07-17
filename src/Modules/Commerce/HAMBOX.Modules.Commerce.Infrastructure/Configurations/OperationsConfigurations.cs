@@ -14,6 +14,7 @@ internal sealed class OperationalJobConfiguration : IEntityTypeConfiguration<Ope
         builder.Property(x => x.PayloadJson);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.Priority).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.Queue).HasMaxLength(64).IsRequired();
         builder.Property(x => x.WorkerId).HasMaxLength(128);
         builder.Property(x => x.CorrelationId).HasMaxLength(128);
         builder.Property(x => x.RelatedEntityType).HasMaxLength(128);
@@ -23,6 +24,22 @@ internal sealed class OperationalJobConfiguration : IEntityTypeConfiguration<Ope
         builder.HasIndex(x => new { x.Status, x.NextVisibleOnUtc, x.Priority });
         builder.HasIndex(x => x.CreatedOnUtc);
         builder.HasIndex(x => x.JobType);
+        builder.HasIndex(x => x.Queue);
+    }
+}
+
+internal sealed class BackgroundJobExecutionHistoryConfiguration : IEntityTypeConfiguration<BackgroundJobExecutionHistory>
+{
+    public void Configure(EntityTypeBuilder<BackgroundJobExecutionHistory> builder)
+    {
+        builder.ToTable("BackgroundJobExecutionHistory");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.Exception).HasMaxLength(4000);
+        builder.Property(x => x.WorkerId).HasMaxLength(128);
+        builder.Property(x => x.CorrelationId).HasMaxLength(128);
+        builder.HasIndex(x => new { x.JobId, x.AttemptNumber });
+        builder.HasIndex(x => x.StartedOnUtc);
     }
 }
 

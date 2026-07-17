@@ -21,7 +21,9 @@ internal sealed class LoginCommandHandler(
     IPasswordHasher passwordHasher,
     IAdminAccessResolver adminAccessResolver,
     IAuthTokenIssuer authTokenIssuer,
-    IPlatformSettingsProvider platformSettings) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
+    IPlatformSettingsProvider platformSettings,
+    ISecurityBlocklistService blocklistService,
+    ISecurityEventLogger securityEventLogger) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
     public async Task<Result<AuthTokenResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -32,6 +34,22 @@ internal sealed class LoginCommandHandler(
 
         if (user is null)
         {
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+        }
+
+        if (await blocklistService.IsEmailBlockedAsync(user.Email, cancellationToken))
+        {
+            var blockedFailure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email address is blocked");
+            dbContext.LoginHistory.Add(blockedFailure);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await securityEventLogger.LogAsync(
+                SecurityEventType.BlockedLogin,
+                SecurityEventSeverity.High,
+                $"Login rejected for {user.Email}: email address is blocked.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                cancellationToken: cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
@@ -48,6 +66,19 @@ internal sealed class LoginCommandHandler(
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account not active");
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            if (user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended)
+            {
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.BlockedLogin,
+                    SecurityEventSeverity.Medium,
+                    $"Login rejected for {user.Email}: account is {user.Status}.",
+                    targetUserId: user.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    cancellationToken: cancellationToken);
+            }
+
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountNotActive);
         }
 
@@ -70,6 +101,15 @@ internal sealed class LoginCommandHandler(
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Invalid credentials");
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await securityEventLogger.LogAsync(
+                SecurityEventType.FailedLogin,
+                SecurityEventSeverity.Low,
+                $"Failed login attempt for {user.Email}: invalid credentials.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                cancellationToken: cancellationToken);
 
             if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
             {

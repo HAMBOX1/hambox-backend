@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Communication;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
@@ -23,19 +24,22 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly OrderFulfillmentService _fulfillmentService;
     private readonly IOperationalJobQueue _jobQueue;
+    private readonly ICommunicationService _communicationService;
 
     public RetryAdminOrderFulfillmentCommandHandler(
         ICommerceDbContext dbContext,
         ICommerceTransactionService transactionService,
         ICurrentUserService currentUserService,
         OrderFulfillmentService fulfillmentService,
-        IOperationalJobQueue jobQueue)
+        IOperationalJobQueue jobQueue,
+        ICommunicationService communicationService)
     {
         _dbContext = dbContext;
         _transactionService = transactionService;
         _currentUserService = currentUserService;
         _fulfillmentService = fulfillmentService;
         _jobQueue = jobQueue;
+        _communicationService = communicationService;
     }
 
     public async Task<Result<RetryAdminOrderFulfillmentResultDto>> Handle(
@@ -43,12 +47,13 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
         CancellationToken cancellationToken)
     {
         OrderFulfillmentResult? result = null;
+        Order? order = null;
 
         try
         {
             await _transactionService.ExecuteAsync(async ct =>
             {
-                var order = await _dbContext.Orders
+                order = await _dbContext.Orders
                     .Include(o => o.Items)
                     .FirstOrDefaultAsync(o => o.Id == command.OrderId, ct);
 
@@ -71,16 +76,6 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
                     $"Fulfillment retry delivered {result.CodesDelivered} code(s).",
                     actorId,
                     actorId));
-
-                if (result.OrderCompleted)
-                {
-                    _dbContext.UserNotifications.Add(Domain.Account.UserNotification.Create(
-                        order.UserId,
-                        "Order completed",
-                        $"Your order {order.OrderNumber} is complete. License keys are ready in My Library.",
-                        "Order",
-                        $"/account/library?orderId={order.Id}"));
-                }
 
                 await _dbContext.SaveChangesAsync(ct);
             }, cancellationToken);
@@ -109,8 +104,24 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
                 CommerceErrors.OrderFulfillmentFailed);
         }
 
+        if (result!.OrderCompleted)
+        {
+            await _communicationService.SendAsync(new CommunicationRequest(
+                UserId: order!.UserId,
+                TemplateKey: "OrderConfirmation",
+                Category: CommunicationCategory.Order,
+                Variables: new Dictionary<string, string>
+                {
+                    ["OrderNumber"] = order.OrderNumber,
+                    ["Total"] = order.TotalAmount.ToString("0.00"),
+                },
+                RelatedEntityType: "Order",
+                RelatedEntityId: order.Id.ToString(),
+                ActionUrl: $"/account/library?orderId={order.Id}"), cancellationToken);
+        }
+
         return Result.Success(new RetryAdminOrderFulfillmentResultDto(
-            result!.CodesDelivered,
+            result.CodesDelivered,
             result.OrderCompleted));
     }
 }

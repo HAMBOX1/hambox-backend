@@ -1,10 +1,11 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Communication;
+using HAMBOX.Application.Idempotency;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Services;
-using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -22,7 +23,7 @@ public sealed record MembershipCheckoutCommand(
     string Email,
     string Country,
     string PaymentMethod,
-    string? CouponCode = null) : IRequest<Result<OrderDto>>;
+    string? CouponCode = null) : IRequest<Result<OrderDto>>, IIdempotentRequest<OrderDto>;
 
 internal sealed class MembershipCheckoutCommandHandler
     : IRequestHandler<MembershipCheckoutCommand, Result<OrderDto>>
@@ -32,6 +33,7 @@ internal sealed class MembershipCheckoutCommandHandler
     private readonly ICurrentUserService _currentUserService;
     private readonly MembershipOperationsService _membershipOperations;
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
+    private readonly ICommunicationService _communicationService;
     private readonly ILogger<MembershipCheckoutCommandHandler> _logger;
 
     public MembershipCheckoutCommandHandler(
@@ -40,6 +42,7 @@ internal sealed class MembershipCheckoutCommandHandler
         ICurrentUserService currentUserService,
         MembershipOperationsService membershipOperations,
         IEnumerable<IPaymentProvider> paymentProviders,
+        ICommunicationService communicationService,
         ILogger<MembershipCheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -47,6 +50,7 @@ internal sealed class MembershipCheckoutCommandHandler
         _currentUserService = currentUserService;
         _membershipOperations = membershipOperations;
         _paymentProviders = paymentProviders;
+        _communicationService = communicationService;
         _logger = logger;
     }
 
@@ -158,23 +162,6 @@ internal sealed class MembershipCheckoutCommandHandler
 
                 order.LinkMembershipSubscription(subscription.Id);
 
-                var notificationTitle = action switch
-                {
-                    MembershipCheckoutAction.Subscribe => "Membership activated",
-                    MembershipCheckoutAction.Renew => "Membership renewed",
-                    MembershipCheckoutAction.Upgrade => "Membership upgraded",
-                    MembershipCheckoutAction.Downgrade => "Membership changed",
-                    _ => "Membership updated",
-                };
-
-                var notificationBody = $"Your {plan.Name} membership is now active. Order {order.OrderNumber} is complete.";
-                _commerceDbContext.UserNotifications.Add(UserNotification.Create(
-                    userId,
-                    notificationTitle,
-                    notificationBody,
-                    "Membership",
-                    $"/account/membership"));
-
                 _logger.LogInformation(
                     "Membership checkout completed for {UserId}: plan {PlanId}, action {Action}, order {OrderNumber}",
                     userId,
@@ -203,7 +190,30 @@ internal sealed class MembershipCheckoutCommandHandler
             return Result.Failure<OrderDto>(new Error("MembershipCheckout.Failed", ex.Message));
         }
 
-        return Result.Success(CommerceMapper.ToOrderDto(createdOrder!));
+        var actionLabel = action switch
+        {
+            MembershipCheckoutAction.Subscribe => "activated",
+            MembershipCheckoutAction.Renew => "renewed",
+            MembershipCheckoutAction.Upgrade => "upgraded",
+            MembershipCheckoutAction.Downgrade => "changed",
+            _ => "updated",
+        };
+
+        await _communicationService.SendAsync(new CommunicationRequest(
+            UserId: userId,
+            TemplateKey: "MembershipConfirmation",
+            Category: CommunicationCategory.Membership,
+            Variables: new Dictionary<string, string>
+            {
+                ["PlanName"] = plan.Name,
+                ["ActionLabel"] = actionLabel,
+                ["OrderNumber"] = createdOrder!.OrderNumber,
+            },
+            RelatedEntityType: "Order",
+            RelatedEntityId: createdOrder.Id.ToString(),
+            ActionUrl: "/account/membership"), cancellationToken);
+
+        return Result.Success(CommerceMapper.ToOrderDto(createdOrder));
     }
 
     private static Result ValidateAction(

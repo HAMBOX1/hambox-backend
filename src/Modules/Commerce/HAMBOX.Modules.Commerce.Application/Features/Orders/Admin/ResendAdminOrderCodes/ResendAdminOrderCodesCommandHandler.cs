@@ -1,8 +1,8 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Communication;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
-using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -16,13 +16,16 @@ internal sealed class ResendAdminOrderCodesCommandHandler : IRequestHandler<Rese
 {
     private readonly ICommerceDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ICommunicationService _communicationService;
 
     public ResendAdminOrderCodesCommandHandler(
         ICommerceDbContext dbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ICommunicationService communicationService)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _communicationService = communicationService;
     }
 
     public async Task<Result> Handle(ResendAdminOrderCodesCommand command, CancellationToken cancellationToken)
@@ -46,17 +49,6 @@ internal sealed class ResendAdminOrderCodesCommandHandler : IRequestHandler<Rese
             return Result.Failure(CommerceErrors.OrderLicenseKeyNotFound);
         }
 
-        var body = keys.Count == 1
-            ? "Your digital product code has been resent. Open your library to view it."
-            : $"{keys.Count} digital product codes were resent. Open your library to view them.";
-
-        _dbContext.UserNotifications.Add(UserNotification.Create(
-            order.UserId,
-            "Digital codes resent",
-            body,
-            "Orders",
-            $"/account/library?orderId={order.Id}"));
-
         var actorId = _currentUserService.UserId ?? "system";
         _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
             order.Id,
@@ -66,6 +58,20 @@ internal sealed class ResendAdminOrderCodesCommandHandler : IRequestHandler<Rese
             actorId));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _communicationService.SendAsync(new CommunicationRequest(
+            UserId: order.UserId,
+            TemplateKey: "CodesResent",
+            Category: CommunicationCategory.Order,
+            Variables: new Dictionary<string, string>
+            {
+                ["OrderNumber"] = order.OrderNumber,
+                ["CodeCount"] = keys.Count.ToString(),
+            },
+            RelatedEntityType: "Order",
+            RelatedEntityId: order.Id.ToString(),
+            ActionUrl: $"/account/library?orderId={order.Id}"), cancellationToken);
+
         return Result.Success();
     }
 }

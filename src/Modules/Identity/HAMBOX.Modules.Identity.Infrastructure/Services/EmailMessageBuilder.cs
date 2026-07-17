@@ -89,6 +89,24 @@ internal static class EmailMessageBuilder
         return message;
     }
 
+    /// <summary>
+    /// Builds a message from an already-rendered subject/HTML body — used by the Communication
+    /// Platform's <c>EmailCommunicationProvider</c>, where the subject/body come from a
+    /// <c>CommunicationTemplate</c> rather than one of the hardcoded identity flows above.
+    /// </summary>
+    public static MimeMessage BuildTemplatedMessage(EmailSettings settings, string recipientEmail, string subject, string htmlBody)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientEmail);
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject);
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(settings.FromName, settings.FromAddress));
+        message.To.Add(MailboxAddress.Parse(recipientEmail));
+        message.Subject = subject;
+        message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
+        return message;
+    }
+
     private static MimeMessage BuildMessage(
         EmailSettings settings,
         string recipientEmail,

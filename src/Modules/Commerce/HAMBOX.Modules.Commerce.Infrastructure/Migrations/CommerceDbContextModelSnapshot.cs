@@ -37,8 +37,15 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.Property<string>("LicenseKey")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("LicenseKeyHash")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasDefaultValue("");
 
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
@@ -56,6 +63,9 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LicenseKeyHash")
+                        .HasDatabaseName("IX_OrderLicenseKeys_LicenseKeyHash");
 
                     b.HasIndex("OrderId")
                         .HasDatabaseName("IX_OrderLicenseKeys_OrderId");
@@ -215,6 +225,15 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
@@ -235,6 +254,9 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_UserNotifications_UserId");
+
+                    b.HasIndex("UserId", "IsArchived")
+                        .HasDatabaseName("IX_UserNotifications_UserId_IsArchived");
 
                     b.HasIndex("UserId", "IsRead")
                         .HasDatabaseName("IX_UserNotifications_UserId_IsRead");
@@ -356,6 +378,70 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasFilter("[UserId] IS NOT NULL");
 
                     b.ToTable("ShoppingCarts", "commerce");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Idempotency.IdempotencyKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("ResponseStatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SerializedResponse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("State")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresOnUtc")
+                        .HasDatabaseName("IX_IdempotencyKeys_ExpiresOnUtc");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("IX_IdempotencyKeys_Key");
+
+                    b.ToTable("IdempotencyKeys", "commerce");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipAuditLog", b =>
@@ -692,6 +778,53 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.ToTable("ApiRequestLogs", "commerce");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Operations.BackgroundJobExecutionHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<long?>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Exception")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("FinishedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("StartedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("WorkerId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedOnUtc");
+
+                    b.HasIndex("JobId", "AttemptNumber");
+
+                    b.ToTable("BackgroundJobExecutionHistory", "commerce");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Operations.OperationalAlert", b =>
                 {
                     b.Property<Guid>("Id")
@@ -838,6 +971,14 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<int>("ProgressPercent")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Queue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("RelatedEntityId")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
@@ -863,6 +1004,8 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.HasIndex("CreatedOnUtc");
 
                     b.HasIndex("JobType");
+
+                    b.HasIndex("Queue");
 
                     b.HasIndex("Status", "NextVisibleOnUtc", "Priority");
 

@@ -17,5 +17,6 @@ public enum InventoryAuditAction
     InventoryAdjusted = 12,
     OptionGroupCreated = 13,
     OptionCreated = 14,
-    PlanCreated = 15
+    PlanCreated = 15,
+    CodeRevealed = 16
 }

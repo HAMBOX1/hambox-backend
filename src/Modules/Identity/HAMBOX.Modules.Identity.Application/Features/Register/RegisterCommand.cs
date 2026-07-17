@@ -10,8 +10,14 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// <param name="Password">The password of the user.</param>
 /// <param name="FirstName">The first name of the user.</param>
 /// <param name="LastName">The last name of the user.</param>
+/// <param name="IpAddress">The client IP address, used to record legal acceptance.</param>
+/// <param name="UserAgent">The client user agent, used to record legal acceptance.</param>
+/// <param name="Language">The client's preferred language, used to record legal acceptance.</param>
 public sealed record RegisterCommand(
     string Email,
     string Password,
     string FirstName,
-    string LastName) : IRequest<Result>;
+    string LastName,
+    string IpAddress,
+    string UserAgent,
+    string Language) : IRequest<Result>;

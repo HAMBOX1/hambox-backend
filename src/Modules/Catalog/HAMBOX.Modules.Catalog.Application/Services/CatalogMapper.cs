@@ -35,6 +35,7 @@ internal static class CatalogMapper
     public static ProductDto ToProductDto(
         Product product,
         string categoryName,
+        string categoryNameAr,
         bool includeImages)
     {
         var images = includeImages ? ToProductImageDtos(product.Images) : null;
@@ -49,6 +50,7 @@ internal static class CatalogMapper
             product.Status.ToString(),
             product.CategoryId,
             categoryName,
+            categoryNameAr,
             GetPrimaryImageUrl(product),
             images,
             product.CreatedOnUtc);

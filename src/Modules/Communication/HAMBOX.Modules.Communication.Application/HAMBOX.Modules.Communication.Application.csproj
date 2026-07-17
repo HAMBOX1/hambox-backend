@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HAMBOX.Modules.Communication.Domain\HAMBOX.Modules.Communication.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\Commerce\HAMBOX.Modules.Commerce.Application\HAMBOX.Modules.Commerce.Application.csproj" />
+  </ItemGroup>
+
+</Project>

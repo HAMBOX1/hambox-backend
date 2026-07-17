@@ -143,9 +143,10 @@ internal sealed class GetAdminOrdersQueryHandler
         }
 
         var term = searchTerm.Trim();
+        var termHash = OrderLicenseKey.Hash(term);
         var licenseOrderIds = _dbContext.OrderLicenseKeys
             .AsNoTracking()
-            .Where(k => k.LicenseKey.Contains(term))
+            .Where(k => k.LicenseKeyHash == termHash)
             .Select(k => k.OrderId);
 
         return query.Where(o =>

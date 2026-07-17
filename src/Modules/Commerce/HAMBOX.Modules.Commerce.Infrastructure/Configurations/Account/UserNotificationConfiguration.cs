@@ -38,6 +38,14 @@ internal sealed class UserNotificationConfiguration : IEntityTypeConfiguration<U
         builder.Property(n => n.IsRead)
             .IsRequired();
 
+        builder.Property(n => n.IsArchived)
+            .IsRequired();
+
+        builder.Property(n => n.IsDeleted)
+            .IsRequired();
+
+        builder.Property(n => n.DeletedOnUtc);
+
         builder.Property(n => n.CreatedOnUtc)
             .IsRequired();
 
@@ -48,5 +56,8 @@ internal sealed class UserNotificationConfiguration : IEntityTypeConfiguration<U
 
         builder.HasIndex(n => new { n.UserId, n.IsRead })
             .HasDatabaseName("IX_UserNotifications_UserId_IsRead");
+
+        builder.HasIndex(n => new { n.UserId, n.IsArchived })
+            .HasDatabaseName("IX_UserNotifications_UserId_IsArchived");
     }
 }
