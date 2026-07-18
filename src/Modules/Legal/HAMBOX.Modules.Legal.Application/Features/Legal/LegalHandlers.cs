@@ -246,7 +246,7 @@ internal sealed class UpdateLegalSectionCommandHandler(ILegalDbContext dbContext
             request.Request.ShowInNavigation,
             request.Request.RequireAcceptance);
 
-        var draft = section.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished);
+        var draft = section.GetCurrentDraft();
         if (draft is null)
         {
             draft = section.CreateDraftVersion(
@@ -285,11 +285,12 @@ internal sealed class PublishLegalSectionCommandHandler(ILegalDbContext dbContex
         var requestedVersionId = request.VersionId is { } id && id != Guid.Empty ? id : (Guid?)null;
 
         // "No specific version requested" means "publish the current draft" — the same
-        // unpublished version Update edits — not simply whichever version has the highest
-        // VersionNumber, since an older draft can coexist with a newer already-published version.
+        // version Update edits. Must go through GetCurrentDraft(), not a raw "any unpublished
+        // version" scan: once a later version is published, the version it replaced becomes
+        // unpublished too, and a naive scan would resurrect that old, superseded version instead.
         var version = requestedVersionId.HasValue
             ? section.Versions.FirstOrDefault(v => v.Id == requestedVersionId)
-            : section.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished);
+            : section.GetCurrentDraft();
 
         if (version is null)
         {

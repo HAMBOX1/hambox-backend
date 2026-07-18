@@ -53,6 +53,17 @@ public sealed class LegalSection : AggregateRoot, IAuditable, ISoftDeletable
         return version;
     }
 
+    /// <summary>
+    /// The version awaiting publish, if any. Must be the single most-recent version overall —
+    /// not merely "any unpublished version" — because publishing an edit unpublishes the
+    /// previously-live version too, and that older version must never be mistaken for the draft.
+    /// </summary>
+    public LegalSectionVersion? GetCurrentDraft()
+    {
+        var latest = _versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+        return latest is not null && !latest.IsPublished ? latest : null;
+    }
+
     public LegalSectionVersion PublishVersion(Guid versionId, string? publishedBy)
     {
         var version = _versions.SingleOrDefault(v => v.Id == versionId)

@@ -6,6 +6,7 @@ using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Enums;
+using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -74,6 +75,23 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 null,
                 p.CreatedOnUtc))
             .ToListAsync(cancellationToken);
+
+        var productIds = products.Select(p => p.Id).ToList();
+        var stockByProduct = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v => productIds.Contains(v.ProductId))
+            .Join(
+                _dbContext.DigitalInventoryCodes.AsNoTracking().Where(c => c.Status == InventoryCodeStatus.Available),
+                v => v.Id,
+                c => c.VariantId,
+                (v, c) => v.ProductId)
+            .GroupBy(productId => productId)
+            .Select(g => new { ProductId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Count, cancellationToken);
+
+        products = products
+            .Select(p => p with { AvailableStock = stockByProduct.GetValueOrDefault(p.Id, 0) })
+            .ToList();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {

@@ -102,6 +102,5 @@ public static class LegalMapper
         published.VersionNumber,
         published.PublishedOnUtc);
 
-    private static LegalSectionVersion? CurrentDraft(LegalSection section) =>
-        section.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished);
+    private static LegalSectionVersion? CurrentDraft(LegalSection section) => section.GetCurrentDraft();
 }

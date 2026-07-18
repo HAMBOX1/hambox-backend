@@ -16,6 +16,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="PrimaryImageUrl">The URL of the primary image, if any.</param>
 /// <param name="Images">The ordered product images. Populated on detail reads.</param>
 /// <param name="CreatedOnUtc">When the product was created.</param>
+/// <param name="AvailableStock">Total available inventory code count across all variants. Populated on list reads.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -29,4 +30,5 @@ public sealed record ProductDto(
     string CategoryNameAr,
     string? PrimaryImageUrl,
     IReadOnlyList<ProductImageDto>? Images,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    int AvailableStock = 0);
