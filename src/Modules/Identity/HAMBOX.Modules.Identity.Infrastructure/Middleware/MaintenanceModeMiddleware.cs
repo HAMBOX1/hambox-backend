@@ -8,11 +8,17 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HAMBOX.Modules.Identity.Infrastructure.Middleware;
 
 /// <summary>
-/// Blocks storefront API traffic when maintenance mode is enabled, except for allowed admin roles.
+/// Blocks storefront API traffic when maintenance mode is enabled, except for allowed admin roles
+/// or a request carrying a valid maintenance-bypass token (see <see cref="IMaintenanceBypassTokenIssuer"/>).
 /// </summary>
 public sealed class MaintenanceModeMiddleware(RequestDelegate next)
 {
-  public async Task InvokeAsync(HttpContext context, IPlatformSettingsProvider settingsProvider)
+  private const string BypassHeaderName = "X-Maintenance-Bypass";
+
+  public async Task InvokeAsync(
+      HttpContext context,
+      IPlatformSettingsProvider settingsProvider,
+      IMaintenanceBypassTokenIssuer bypassTokenIssuer)
   {
     var path = context.Request.Path.Value ?? string.Empty;
     if (path.StartsWith("/api/v", StringComparison.OrdinalIgnoreCase)
@@ -29,6 +35,11 @@ public sealed class MaintenanceModeMiddleware(RequestDelegate next)
 
         var allowed = maintenance.AllowedRoleNames.Any(r =>
             string.Equals(r, role, StringComparison.OrdinalIgnoreCase));
+
+        if (!allowed && context.Request.Headers.TryGetValue(BypassHeaderName, out var bypassToken))
+        {
+          allowed = bypassTokenIssuer.TryValidate(bypassToken.ToString());
+        }
 
         if (!allowed)
         {

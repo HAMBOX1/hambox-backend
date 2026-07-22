@@ -249,6 +249,34 @@ internal static class InventoryEndpoints
             return Results.BadRequest(Problem(result));
         })
         .RequirePermission(PermissionConstants.Catalog.Inventory.Export);
+
+        group.MapPost("/products/{productId:guid}/variants/bulk-delete", async (
+            Guid productId,
+            [FromBody] BulkVariantIdsRequest body,
+            ISender sender) => await Send(sender, new BulkDeleteProductVariantsCommand(productId, body.VariantIds)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
+
+        group.MapPost("/products/{productId:guid}/variants/bulk-duplicate", async (
+            Guid productId,
+            [FromBody] BulkVariantIdsRequest body,
+            ISender sender) => await Send(sender, new BulkDuplicateProductVariantsCommand(productId, body.VariantIds)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
+        group.MapGet("/products/{productId:guid}/variants/codes/export", async (
+            Guid productId,
+            [FromQuery] Guid[] variantIds,
+            [FromQuery] string? status,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ExportVariantsInventoryCodesQuery(productId, variantIds, status));
+            if (result.IsSuccess)
+            {
+                return Results.File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+            }
+
+            return Results.BadRequest(Problem(result));
+        })
+        .RequirePermission(PermissionConstants.Catalog.Inventory.Export);
     }
 
     private static async Task<Results<Ok<T>, BadRequest<ProblemDetails>>> Send<T>(ISender sender, IRequest<Result<T>> request)
@@ -340,3 +368,4 @@ internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrde
 internal sealed record UpdateOptionRequest(string Label, int SortOrder);
 internal sealed record ReorderIdsRequest(IReadOnlyList<Guid> OrderedIds);
 internal sealed record BulkCodeIdsRequest(IReadOnlyList<Guid> CodeIds);
+internal sealed record BulkVariantIdsRequest(IReadOnlyList<Guid> VariantIds);

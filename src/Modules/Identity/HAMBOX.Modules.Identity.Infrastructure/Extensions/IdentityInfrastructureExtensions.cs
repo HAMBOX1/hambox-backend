@@ -194,6 +194,7 @@ public static class IdentityInfrastructureExtensions
         services.AddMemoryCache();
         services.AddDataProtection();
         services.AddSingleton<IPlatformSettingsSecretProtector, PlatformSettingsSecretProtector>();
+        services.AddSingleton<IMaintenanceBypassTokenIssuer, MaintenanceBypassTokenIssuer>();
         services.AddScoped<IPlatformSettingsService, PlatformSettingsService>();
         services.AddScoped<IPlatformSettingsProvider>(sp => sp.GetRequiredService<IPlatformSettingsService>());
 

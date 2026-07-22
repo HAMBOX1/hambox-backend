@@ -103,10 +103,10 @@ internal sealed class DigitalInventoryCodeConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable("DigitalInventoryCodes");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.DigitalCode).IsRequired().HasMaxLength(500);
+        builder.Property(x => x.DigitalCode).IsRequired().HasMaxLength(1000);
         builder.Property(x => x.CodeHash).IsRequired().HasMaxLength(64);
-        builder.Property(x => x.SerialNumber).HasMaxLength(200);
-        builder.Property(x => x.Pin).HasMaxLength(100);
+        builder.Property(x => x.SerialNumber).HasMaxLength(500);
+        builder.Property(x => x.Pin).HasMaxLength(300);
         builder.Property(x => x.Currency).IsRequired().HasMaxLength(3);
         builder.Property(x => x.PurchaseCost).HasColumnType("decimal(18,2)");
         builder.Property(x => x.SellingPriceOverride).HasColumnType("decimal(18,2)");

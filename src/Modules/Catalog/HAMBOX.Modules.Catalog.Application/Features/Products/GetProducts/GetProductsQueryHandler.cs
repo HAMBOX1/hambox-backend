@@ -117,7 +117,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         }
     }
 
-    private static IQueryable<Domain.Products.Product> ApplySort(
+    private IQueryable<Domain.Products.Product> ApplySort(
         IQueryable<Domain.Products.Product> query,
         ProductSortBy? sortBy)
     {
@@ -125,6 +125,36 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         {
             ProductSortBy.PriceAsc => query.OrderBy(p => p.Price).ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.PriceDesc => query.OrderByDescending(p => p.Price).ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.NameAsc => query.OrderBy(p => p.NameEn).ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.NameDesc => query.OrderByDescending(p => p.NameEn).ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.CategoryAsc => query
+                .OrderBy(p => _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn)
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.CategoryDesc => query
+                .OrderByDescending(p => _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn)
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.StatusAsc => query.OrderBy(p => p.Status).ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.StatusDesc => query.OrderByDescending(p => p.Status).ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.StockAsc => query
+                .OrderBy(p => _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id)
+                    .Join(
+                        _dbContext.DigitalInventoryCodes.Where(c => c.Status == InventoryCodeStatus.Available),
+                        v => v.Id,
+                        c => c.VariantId,
+                        (v, c) => c.Id)
+                    .Count())
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.StockDesc => query
+                .OrderByDescending(p => _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id)
+                    .Join(
+                        _dbContext.DigitalInventoryCodes.Where(c => c.Status == InventoryCodeStatus.Available),
+                        v => v.Id,
+                        c => c.VariantId,
+                        (v, c) => c.Id)
+                    .Count())
+                .ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.Newest => query.OrderByDescending(p => p.CreatedOnUtc),
             _ => query.OrderByDescending(p => p.CreatedOnUtc),
         };

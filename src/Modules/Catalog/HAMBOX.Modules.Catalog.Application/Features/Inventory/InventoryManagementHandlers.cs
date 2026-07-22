@@ -54,6 +54,11 @@ public sealed record ExportInventoryCodesQuery(Guid VariantId, string? Status) :
 
 public sealed record ExportInventoryCodesDto(string FileName, string ContentType, byte[] Content);
 
+public sealed record BulkVariantsResultDto(int SuccessCount, int ErrorCount, IReadOnlyList<string> Errors);
+public sealed record BulkDeleteProductVariantsCommand(Guid ProductId, IReadOnlyList<Guid> VariantIds) : IRequest<Result<BulkVariantsResultDto>>;
+public sealed record BulkDuplicateProductVariantsCommand(Guid ProductId, IReadOnlyList<Guid> VariantIds) : IRequest<Result<BulkVariantsResultDto>>;
+public sealed record ExportVariantsInventoryCodesQuery(Guid ProductId, IReadOnlyList<Guid> VariantIds, string? Status) : IRequest<Result<ExportInventoryCodesDto>>;
+
 internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<UpdateProductVariantCommand, Result>
 {
     private readonly ICatalogDbContext _db;
@@ -732,6 +737,138 @@ internal sealed class ExportInventoryCodesQueryHandler : IRequestHandler<ExportI
         var bytes = Encoding.UTF8.GetBytes(builder.ToString());
         return Result.Success(new ExportInventoryCodesDto(
             $"variant-{request.VariantId}-codes.csv",
+            "text/csv",
+            bytes));
+    }
+
+    private static string EscapeCsv(string value) =>
+        value.Contains(',') || value.Contains('"') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+}
+
+internal sealed class BulkDeleteProductVariantsCommandHandler : IRequestHandler<BulkDeleteProductVariantsCommand, Result<BulkVariantsResultDto>>
+{
+    private readonly ISender _sender;
+
+    public BulkDeleteProductVariantsCommandHandler(ISender sender) => _sender = sender;
+
+    public async Task<Result<BulkVariantsResultDto>> Handle(BulkDeleteProductVariantsCommand request, CancellationToken cancellationToken)
+    {
+        if (request.VariantIds.Count == 0)
+        {
+            return Result.Failure<BulkVariantsResultDto>(CatalogErrors.VariantBulkEmpty);
+        }
+
+        var success = 0;
+        var errors = new List<string>();
+
+        foreach (var variantId in request.VariantIds.Distinct())
+        {
+            var result = await _sender.Send(new DeleteProductVariantCommand(variantId), cancellationToken);
+            if (result.IsSuccess)
+            {
+                success++;
+            }
+            else
+            {
+                errors.Add($"{variantId}: {result.Error.Description}");
+            }
+        }
+
+        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors));
+    }
+}
+
+internal sealed class BulkDuplicateProductVariantsCommandHandler : IRequestHandler<BulkDuplicateProductVariantsCommand, Result<BulkVariantsResultDto>>
+{
+    private readonly ISender _sender;
+
+    public BulkDuplicateProductVariantsCommandHandler(ISender sender) => _sender = sender;
+
+    public async Task<Result<BulkVariantsResultDto>> Handle(BulkDuplicateProductVariantsCommand request, CancellationToken cancellationToken)
+    {
+        if (request.VariantIds.Count == 0)
+        {
+            return Result.Failure<BulkVariantsResultDto>(CatalogErrors.VariantBulkEmpty);
+        }
+
+        var success = 0;
+        var errors = new List<string>();
+
+        foreach (var variantId in request.VariantIds.Distinct())
+        {
+            var result = await _sender.Send(new DuplicateProductVariantCommand(variantId, null), cancellationToken);
+            if (result.IsSuccess)
+            {
+                success++;
+            }
+            else
+            {
+                errors.Add($"{variantId}: {result.Error.Description}");
+            }
+        }
+
+        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors));
+    }
+}
+
+internal sealed class ExportVariantsInventoryCodesQueryHandler : IRequestHandler<ExportVariantsInventoryCodesQuery, Result<ExportInventoryCodesDto>>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public ExportVariantsInventoryCodesQueryHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result<ExportInventoryCodesDto>> Handle(ExportVariantsInventoryCodesQuery request, CancellationToken cancellationToken)
+    {
+        if (request.VariantIds.Count == 0)
+        {
+            return Result.Failure<ExportInventoryCodesDto>(CatalogErrors.VariantBulkEmpty);
+        }
+
+        var skuByVariantId = await _db.ProductVariants
+            .AsNoTracking()
+            .Where(v => v.ProductId == request.ProductId && request.VariantIds.Contains(v.Id))
+            .Select(v => new { v.Id, v.Sku })
+            .ToDictionaryAsync(v => v.Id, v => v.Sku, cancellationToken);
+
+        var query = _db.DigitalInventoryCodes.AsNoTracking().Where(c => request.VariantIds.Contains(c.VariantId));
+
+        if (!string.IsNullOrWhiteSpace(request.Status) && Enum.TryParse<InventoryCodeStatus>(request.Status, out var status))
+        {
+            query = query.Where(c => c.Status == status);
+        }
+
+        // Codes are encrypted at rest, so ordering by the raw column would sort by ciphertext.
+        var codes = await query.OrderBy(c => c.CreatedOnUtc).ToListAsync(cancellationToken);
+        var builder = new StringBuilder();
+        builder.AppendLine("Variant,Code,Status,SerialNumber,ExpirationDate");
+
+        foreach (var code in codes)
+        {
+            var maskedCode = InventoryCodeMasking.Mask(code.DigitalCode);
+            var maskedSerial = code.SerialNumber is null ? string.Empty : InventoryCodeMasking.Mask(code.SerialNumber);
+            var sku = skuByVariantId.GetValueOrDefault(code.VariantId, code.VariantId.ToString());
+            builder.AppendLine($"{EscapeCsv(sku)},{EscapeCsv(maskedCode)},{code.Status},{EscapeCsv(maskedSerial)},{code.ExpirationDate:O}");
+        }
+
+        foreach (var variantId in request.VariantIds.Distinct())
+        {
+            _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                InventoryAuditAction.CodeExported,
+                variantId: variantId,
+                performedByUserId: _currentUser.UserId,
+                details: $"Exported codes as part of a {request.VariantIds.Count}-variant bulk export"));
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var bytes = Encoding.UTF8.GetBytes(builder.ToString());
+        return Result.Success(new ExportInventoryCodesDto(
+            $"product-{request.ProductId}-variants-codes.csv",
             "text/csv",
             bytes));
     }

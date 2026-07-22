@@ -1,8 +1,14 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Products;
+using HAMBOX.Modules.Catalog.Application.Features.Products.AdjustProductPrice;
+using HAMBOX.Modules.Catalog.Application.Features.Products.BulkDeleteProducts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.BulkDuplicateProducts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.BulkProducts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.ChangeProductCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Products.CreateProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.DeleteProduct;
+using HAMBOX.Modules.Catalog.Application.Features.Products.ExportProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.UpdateProduct;
@@ -181,6 +187,67 @@ internal static class ProductEndpoints
         })
         .WithName("DuplicateProduct")
         .RequirePermission(PermissionConstants.Catalog.Products.Create);
+
+        // POST /api/v1/products/{id}/category
+        group.MapPost("{id:guid}/category", async (Guid id, [FromBody] ChangeProductCategoryRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new ChangeProductCategoryCommand(id, request.CategoryId)))
+            .WithName("ChangeProductCategory")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // POST /api/v1/products/{id}/price
+        group.MapPost("{id:guid}/price", async (Guid id, [FromBody] AdjustProductPriceRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new AdjustProductPriceCommand(id, request.Mode, request.Value)))
+            .WithName("AdjustProductPrice")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // POST /api/v1/products/bulk — publish / unpublish / archive / change-category / adjust-price
+        group.MapPost("bulk", async Task<Results<Ok<BulkProductsResultDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] BulkProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new BulkProductsCommand(request));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("BulkProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // POST /api/v1/products/bulk-delete
+        group.MapPost("bulk-delete", async Task<Results<Ok<BulkProductsResultDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] BulkDeleteProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new BulkDeleteProductsCommand(request));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("BulkDeleteProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.Delete);
+
+        // POST /api/v1/products/bulk-duplicate
+        group.MapPost("bulk-duplicate", async Task<Results<Ok<BulkProductsResultDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] BulkDuplicateProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new BulkDuplicateProductsCommand(request));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("BulkDuplicateProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.Create);
+
+        // POST /api/v1/products/bulk-export
+        group.MapPost("bulk-export", async (
+            [FromBody] ExportProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ExportProductsQuery(request));
+            if (result.IsSuccess)
+            {
+                return Results.File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+            }
+
+            return Results.BadRequest(Problem(result));
+        })
+        .WithName("ExportProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.View);
     }
 
     private static async Task<Results<NoContent, BadRequest<ProblemDetails>>> SendEmptyResult(ISender sender, IRequest<Result> request)
@@ -202,3 +269,5 @@ internal sealed record DuplicateProductRequest(string? NameSuffix);
 
 internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId);
 internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status);
+internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
+internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);

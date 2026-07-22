@@ -42,6 +42,22 @@ public static class CatalogErrors
         "Products.InsufficientStock",
         "The product does not have sufficient stock for the requested quantity.");
 
+    public static readonly Error ProductBulkEmpty = new(
+        "Products.BulkEmpty",
+        "Select at least one product for bulk actions.");
+
+    public static Error ProductBulkActionNotSupported(string action) => new(
+        "Products.BulkActionNotSupported",
+        $"Bulk action '{action}' is not supported.");
+
+    public static Error ProductBulkSelectionTooLarge(int maxMatches) => new(
+        "Products.BulkSelectionTooLarge",
+        $"More than {maxMatches} products match this filter. Narrow the filter before running a bulk action.");
+
+    public static readonly Error InvalidPriceAdjustment = new(
+        "Products.InvalidPriceAdjustment",
+        "The price adjustment would result in a negative price.");
+
     /// <summary>
     /// Gets the error for when a product is not active.
     /// </summary>
@@ -108,6 +124,10 @@ public static class CatalogErrors
     public static readonly Error DuplicateVariantCombination = new(
         "Inventory.DuplicateVariantCombination",
         "A variant with this option combination already exists.");
+
+    public static readonly Error VariantBulkEmpty = new(
+        "Inventory.VariantBulkEmpty",
+        "Select at least one variant for bulk actions.");
 
     public static readonly Error OptionGroupNotFound = new(
         "Inventory.OptionGroupNotFound",

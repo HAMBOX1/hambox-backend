@@ -35,6 +35,10 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(c => c.ParentId);
 
+        builder.Property(c => c.SortOrder)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.HasIndex(c => c.ParentId)
             .HasDatabaseName("IX_Categories_ParentId");
 

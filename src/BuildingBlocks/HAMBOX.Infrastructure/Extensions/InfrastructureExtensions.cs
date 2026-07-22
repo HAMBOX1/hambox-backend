@@ -8,6 +8,7 @@ using HAMBOX.Infrastructure.Options;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Infrastructure.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,7 +44,13 @@ public static class InfrastructureExtensions
         services.Configure<FileStorageSettings>(configuration.GetSection(FileStorageSettings.SectionName));
         services.AddSingleton<IFileStorage, LocalFileStorage>();
 
-        services.AddDataProtection();
+        // Keys must survive app restarts/redeploys or every restart silently invalidates every
+        // previously-protected value at rest (inventory codes, license keys). Stored under "uploads"
+        // because that directory is explicitly excluded from the WebDeploy delete-sync (see the
+        // HamboxWebDeploy publish profile's MsDeploySkipRules), so it isn't wiped on publish.
+        services.AddDataProtection()
+            .SetApplicationName("Hambox")
+            .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "uploads", "dataprotection-keys")));
         services.AddSingleton<ICodeProtector, DataProtectionCodeProtector>();
 
         // 1. Exception Handling + ProblemDetails

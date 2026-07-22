@@ -97,6 +97,12 @@ public sealed class InventoryCodeEncryptionMigrator(
         }
         catch (CryptographicException)
         {
+            if (ProtectedValueFormat.LooksAlreadyProtected(value))
+            {
+                logger.LogWarning("Digital inventory code already encrypted but unreadable by the current key ring (key rotated?); left as-is.");
+                return (false, value);
+            }
+
             return (true, protector.Protect(value));
         }
     }

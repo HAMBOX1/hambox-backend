@@ -6,6 +6,7 @@ using HAMBOX.Modules.Identity.Application.Features.GetMe;
 using HAMBOX.Modules.Identity.Application.Features.GoogleLogin;
 using HAMBOX.Modules.Identity.Application.Features.Login;
 using HAMBOX.Modules.Identity.Application.Features.Logout;
+using HAMBOX.Modules.Identity.Application.Features.MaintenanceBypass;
 using HAMBOX.Modules.Identity.Application.Features.RefreshToken;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Application.Features.ResendVerification;
@@ -141,6 +142,17 @@ public static class AuthEndpoints
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var command = new ResendAdminOtpCommand(request.ChallengeId, ipAddress);
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
+
+        group.MapPost("maintenance-bypass", async (
+            [FromBody] MaintenanceBypassRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var command = new VerifyMaintenanceBypassCommand(request.Email, request.Password);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         });
@@ -337,3 +349,8 @@ public sealed record VerifyAdminOtpRequest(Guid ChallengeId, string Code);
 /// Represents an admin OTP resend request.
 /// </summary>
 public sealed record ResendAdminOtpRequest(Guid ChallengeId);
+
+/// <summary>
+/// Represents a maintenance-mode bypass request.
+/// </summary>
+public sealed record MaintenanceBypassRequest(string Email, string Password);

@@ -38,7 +38,11 @@ internal sealed class CreateCategoryCommandHandler : IRequestHandler<CreateCateg
             return Result.Failure<Guid>(parentError.Error);
         }
 
+        var siblingCount = await _dbContext.Categories
+            .CountAsync(c => c.ParentId == request.ParentId, cancellationToken);
+
         var category = Category.Create(request.NameAr, request.NameEn, request.Slug, request.ParentId);
+        category.SetSortOrder(siblingCount);
         _dbContext.Categories.Add(category);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

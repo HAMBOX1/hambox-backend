@@ -137,6 +137,7 @@ try
         await app.ApplyMigrationsAsync<LegalDbContext>();
         await app.ApplyMigrationsAsync<SuppliersDbContext>();
         await app.ApplyMigrationsAsync<CommunicationDbContext>();
+        await PermissionSynchronizer.SyncAsync(app.Services);
         await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
         await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
         await app.SeedProductionDemoDataAsync();
@@ -152,6 +153,7 @@ try
     {
         // Migrations are applied manually in Production; the schema (including LicenseKeyHash)
         // must already exist by the time this runs.
+        await PermissionSynchronizer.SyncAsync(app.Services);
         await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
         await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
         await app.SeedProductionDemoDataAsync();

@@ -5,6 +5,8 @@ using HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.DeleteCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategories;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryById;
+using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryTree;
+using HAMBOX.Modules.Catalog.Application.Features.Categories.ReorderCategories;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.UpdateCategory;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
@@ -58,6 +60,27 @@ internal static class CategoryEndpoints
         })
         .WithName("GetCategories")
         .AllowAnonymous();
+
+        // GET /api/v1/categories/tree
+        group.MapGet("tree", async Task<Results<Ok<IReadOnlyList<CategoryTreeItemDto>>, BadRequest<ProblemDetails>>> (ISender sender) =>
+        {
+            var result = await sender.Send(new GetCategoryTreeQuery());
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetCategoryTree")
+        .RequirePermission(PermissionConstants.Catalog.Categories.View);
 
         // GET /api/v1/categories/{id}
         group.MapGet("{id:guid}", async Task<Results<Ok<CategoryDto>, NotFound<ProblemDetails>>> (Guid id, ISender sender) =>
@@ -125,6 +148,31 @@ internal static class CategoryEndpoints
         .WithName("UpdateCategory")
         .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
 
+        // PUT /api/v1/categories/reorder
+        group.MapPut("reorder", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (
+            [FromBody] ReorderCategoriesRequest request,
+            ISender sender) =>
+        {
+            var command = new ReorderCategoriesCommand(
+                request.Entries.Select(e => new CategoryReorderEntry(e.Id, e.ParentId, e.SortOrder)).ToList());
+            var result = await sender.Send(command);
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.NoContent();
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("ReorderCategories")
+        .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
+
         // DELETE /api/v1/categories/{id}
         group.MapDelete("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, ISender sender) =>
         {
@@ -170,3 +218,5 @@ internal static class CategoryEndpoints
 
 internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug, Guid? ParentId);
 internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId);
+internal sealed record ReorderCategoriesRequest(IReadOnlyList<CategoryReorderEntryRequest> Entries);
+internal sealed record CategoryReorderEntryRequest(Guid Id, Guid? ParentId, int SortOrder);

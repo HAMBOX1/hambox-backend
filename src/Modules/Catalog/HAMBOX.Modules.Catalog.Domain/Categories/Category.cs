@@ -63,6 +63,11 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// Gets the display order among sibling categories (same <see cref="ParentId"/>).
+    /// </summary>
+    public int SortOrder { get; private set; }
+
     /// <inheritdoc />
     public string? CreatedBy { get; private set; }
 
@@ -150,6 +155,14 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
         }
 
         ParentId = parentId;
+    }
+
+    /// <summary>
+    /// Sets the display order among sibling categories.
+    /// </summary>
+    public void SetSortOrder(int sortOrder)
+    {
+        SortOrder = sortOrder;
     }
 
     /// <summary>

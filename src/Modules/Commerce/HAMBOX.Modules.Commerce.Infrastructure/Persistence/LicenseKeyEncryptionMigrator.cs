@@ -59,27 +59,27 @@ public sealed class LicenseKeyEncryptionMigrator(
         {
             string plaintext;
             string cipherText;
-            bool needsUpdate;
 
             try
             {
                 protector.Unprotect(row.LicenseKey);
                 plaintext = row.LicenseKey;
                 cipherText = row.LicenseKey;
-                needsUpdate = false;
             }
             catch (CryptographicException)
             {
+                if (ProtectedValueFormat.LooksAlreadyProtected(row.LicenseKey))
+                {
+                    logger.LogWarning("License key {Id} already encrypted but unreadable by the current key ring (key rotated?); left as-is.", row.Id);
+                    continue;
+                }
+
                 plaintext = row.LicenseKey;
                 cipherText = protector.Protect(row.LicenseKey);
-                needsUpdate = true;
             }
 
             var expectedHash = OrderLicenseKey.Hash(plaintext);
-            if (row.LicenseKeyHash != expectedHash)
-            {
-                needsUpdate = true;
-            }
+            var needsUpdate = cipherText != row.LicenseKey || row.LicenseKeyHash != expectedHash;
 
             if (!needsUpdate)
             {

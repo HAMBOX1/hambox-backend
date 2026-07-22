@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace HAMBOX.Modules.Identity.Application.Authorization;
 
 /// <summary>
@@ -235,40 +237,37 @@ public static class PermissionConstants
         public const string ManageProviders = "Communication.ManageProviders";
     }
 
-    /// <summary>All permission names for policy registration.</summary>
-    public static readonly IReadOnlyCollection<string> All =
-    [
-        Dashboard.View,
-        Catalog.Categories.View, Catalog.Categories.Create, Catalog.Categories.Edit, Catalog.Categories.Delete,
-        Catalog.Products.View, Catalog.Products.Create, Catalog.Products.Edit, Catalog.Products.Delete,
-        Catalog.Inventory.View, Catalog.Inventory.Create, Catalog.Inventory.Edit, Catalog.Inventory.Delete,
-        Catalog.Inventory.Import, Catalog.Inventory.Export, Catalog.Inventory.ManageCodes,
-        Catalog.Inventory.ViewCosts, Catalog.Inventory.ManageBatches, Catalog.Inventory.ManageSuppliers,
-        Orders.View, Orders.Edit, Orders.Refund,
-        Customers.View, Customers.Edit,
-        Users.View, Users.Edit, Users.AssignRoles,
-        Roles.View, Roles.Create, Roles.Edit, Roles.Delete, Roles.AssignUsers,
-        Permissions.View,
-        Memberships.View, Memberships.Create, Memberships.Edit, Memberships.Delete,
-        Memberships.Assign, Memberships.Renew, Memberships.Cancel, Memberships.ConfigureBenefits,
-        Coupons.View, Coupons.Create, Coupons.Edit, Coupons.Delete, Coupons.Generate, Coupons.Export, Coupons.Import,
-        Promotions.View, Promotions.Create, Promotions.Edit, Promotions.Delete, Promotions.Publish,
-        Themes.View, Themes.Create, Themes.Edit, Themes.Delete, Themes.Publish,
-        Themes.Schedule, Themes.Assign, Themes.Export, Themes.Import, Themes.Rollback,
-        Legal.View, Legal.Create, Legal.Edit, Legal.Publish, Legal.Delete,
-        Suppliers.View, Suppliers.Create, Suppliers.Edit, Suppliers.Delete, Suppliers.ManageMappings,
-        Reviews.View, Reviews.Moderate,
-        Notifications.View, Notifications.Send,
-        Referral.View, Referral.Manage,
-        Reports.View, Reports.Export, Reports.Schedule, Reports.Delete,
-        Localization.Manage,
-        Settings.View, Settings.Edit,
-        Support.View, Support.Manage,
-        Media.Upload, Media.Delete,
-        AuditLogs.View,
-        Operations.View, Operations.Manage, Operations.Retry, Operations.Export, Operations.Clear,
-        Analytics.View, Analytics.Export, Analytics.Compare, Analytics.Manage,
-        Security.View, Security.ManageUsers, Security.ManageEmails, Security.ManageCountries, Security.ManageIPs, Security.ViewEvents,
-        Communication.View, Communication.Manage, Communication.Send, Communication.ManageTemplates, Communication.ManageProviders,
-    ];
+    /// <summary>
+    /// Every non-obsolete permission name declared anywhere in this class, discovered by reflection
+    /// so a new <c>public const string</c> added under any nested group is automatically included —
+    /// no hand-maintained list to fall out of sync. Drives authorization-policy registration
+    /// (<c>IdentityInfrastructureExtensions.AddAuthorization</c>) and the Owner role's resolved
+    /// permission set (<c>PermissionResolver</c>); also the source enumerated by
+    /// <c>PermissionSynchronizer</c> to keep the Owner role's granted permissions current.
+    /// </summary>
+    public static readonly IReadOnlyCollection<string> All = DiscoverAll();
+
+    private static IReadOnlyCollection<string> DiscoverAll()
+    {
+        var names = new List<string>();
+        CollectFrom(typeof(PermissionConstants), names);
+        return names.AsReadOnly();
+    }
+
+    private static void CollectFrom(Type type, List<string> names)
+    {
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        foreach (var field in type.GetFields(flags))
+        {
+            if (!field.IsLiteral || field.FieldType != typeof(string)) continue;
+            if (field.GetCustomAttribute<ObsoleteAttribute>() is not null) continue;
+            if (field.GetRawConstantValue() is string value) names.Add(value);
+        }
+
+        foreach (var nested in type.GetNestedTypes(flags))
+        {
+            CollectFrom(nested, names);
+        }
+    }
 }
