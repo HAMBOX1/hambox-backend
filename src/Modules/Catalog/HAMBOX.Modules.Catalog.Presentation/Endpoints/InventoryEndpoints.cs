@@ -106,8 +106,8 @@ internal static class InventoryEndpoints
             ISender sender) => await SendEmpty(sender, new UpdateProductOptionGroupCommand(groupId, body.DisplayName, body.SortOrder, body.IsRequired)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
-        group.MapDelete("/option-groups/{groupId:guid}", async (Guid groupId, ISender sender) =>
-            await SendEmpty(sender, new DeleteProductOptionGroupCommand(groupId)))
+        group.MapDelete("/option-groups/{groupId:guid}", async (Guid groupId, [FromQuery] bool force, ISender sender) =>
+            await SendEmpty(sender, new DeleteProductOptionGroupCommand(groupId, force)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
         group.MapPut("/products/{productId:guid}/option-groups/reorder", async (

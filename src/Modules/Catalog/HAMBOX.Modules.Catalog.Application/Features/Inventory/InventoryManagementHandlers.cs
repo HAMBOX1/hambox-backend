@@ -35,7 +35,7 @@ public sealed record UpdateProductOptionGroupCommand(
     int SortOrder,
     bool IsRequired) : IRequest<Result>;
 
-public sealed record DeleteProductOptionGroupCommand(Guid GroupId) : IRequest<Result>;
+public sealed record DeleteProductOptionGroupCommand(Guid GroupId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionGroupsCommand(Guid ProductId, IReadOnlyList<Guid> OrderedGroupIds) : IRequest<Result>;
 
 public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder) : IRequest<Result>;
@@ -318,8 +318,13 @@ internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<U
 internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<DeleteProductOptionGroupCommand, Result>
 {
     private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
 
-    public DeleteProductOptionGroupCommandHandler(ICatalogDbContext db) => _db = db;
+    public DeleteProductOptionGroupCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
 
     public async Task<Result> Handle(DeleteProductOptionGroupCommand request, CancellationToken cancellationToken)
     {
@@ -341,10 +346,42 @@ internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<D
 
         if (subtreeOptionIds.Count > 0)
         {
-            var inUse = await _db.ProductVariantOptions.AnyAsync(vo => subtreeOptionIds.Contains(vo.OptionId), cancellationToken);
-            if (inUse)
+            var affectedVariantIds = await _db.ProductVariantOptions
+                .Where(vo => subtreeOptionIds.Contains(vo.OptionId))
+                .Join(_db.ProductVariants.Where(v => !v.IsDeleted), vo => vo.VariantId, v => v.Id, (vo, v) => v.Id)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (affectedVariantIds.Count > 0)
             {
-                return Result.Failure(CatalogErrors.OptionGroupInUse);
+                if (!request.Force)
+                {
+                    return Result.Failure(CatalogErrors.OptionGroupInUse);
+                }
+
+                var hasSoldCodes = await _db.DigitalInventoryCodes.AnyAsync(
+                    c => affectedVariantIds.Contains(c.VariantId) && (c.Status == InventoryCodeStatus.Sold || c.Status == InventoryCodeStatus.Reserved),
+                    cancellationToken);
+
+                if (hasSoldCodes)
+                {
+                    return Result.Failure(CatalogErrors.InvalidCodeStatus);
+                }
+
+                var affectedVariants = await _db.ProductVariants
+                    .Where(v => affectedVariantIds.Contains(v.Id))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var variant in affectedVariants)
+                {
+                    variant.SoftDelete();
+                    _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                        InventoryAuditAction.VariantDeleted,
+                        productId: variant.ProductId,
+                        variantId: variant.Id,
+                        performedByUserId: _currentUser.UserId,
+                        details: $"Cascade-deleted with option group {group.Id}"));
+                }
             }
         }
 
