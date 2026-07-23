@@ -51,29 +51,22 @@ internal sealed class GenerateProductVariantsCommandHandler
             .OrderBy(g => g.SortOrder)
             .ToListAsync(cancellationToken);
 
-        if (groups.Count == 0)
+        var rootGroups = groups.Where(g => g.ParentOptionId is null).ToList();
+        if (rootGroups.Count == 0)
         {
             return Result.Failure<GenerateProductVariantsResultDto>(CatalogErrors.NoOptionGroups);
         }
 
-        if (groups.Any(group => group.Options.Count == 0))
+        if (rootGroups.Any(group => group.Options.Count == 0))
         {
             return Result.Failure<GenerateProductVariantsResultDto>(CatalogErrors.EmptyOptionGroup);
         }
 
-        var optionIdsPerGroup = groups
-            .Select(group => group.Options
-                .OrderBy(option => option.SortOrder)
-                .Select(option => option.Id)
-                .ToList()
-                .AsReadOnly())
-            .ToList();
-
-        var combinations = VariantCombinationHelper.BuildCartesianProduct(optionIdsPerGroup);
-        if (combinations.Count == 0)
-        {
-            return Result.Failure<GenerateProductVariantsResultDto>(CatalogErrors.EmptyOptionGroup);
-        }
+        // Recursive tree walk: root groups cross-multiply with each other (same as the old flat
+        // behavior), but an option only combines with its own child groups, never a sibling
+        // branch's — an empty child group just makes its parent option a leaf instead of blocking
+        // generation for the whole product.
+        var combinations = VariantCombinationHelper.Expand(groups);
 
         var optionLookup = groups
             .SelectMany(group => group.Options)

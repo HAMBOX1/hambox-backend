@@ -10,10 +10,11 @@ public sealed class ProductOptionGroup : Entity, IAuditable
     {
     }
 
-    private ProductOptionGroup(Guid id, Guid productId, string key, string displayName, int sortOrder, bool isRequired)
+    private ProductOptionGroup(Guid id, Guid productId, Guid? parentOptionId, string key, string displayName, int sortOrder, bool isRequired)
         : base(id)
     {
         ProductId = productId;
+        ParentOptionId = parentOptionId;
         Key = key;
         DisplayName = displayName;
         SortOrder = sortOrder;
@@ -21,6 +22,7 @@ public sealed class ProductOptionGroup : Entity, IAuditable
     }
 
     public Guid ProductId { get; private set; }
+    public Guid? ParentOptionId { get; private set; }
     public string Key { get; private set; } = string.Empty;
     public string DisplayName { get; private set; } = string.Empty;
     public int SortOrder { get; private set; }
@@ -29,11 +31,11 @@ public sealed class ProductOptionGroup : Entity, IAuditable
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
 
-    public static ProductOptionGroup Create(Guid productId, string key, string displayName, int sortOrder = 0, bool isRequired = true)
+    public static ProductOptionGroup Create(Guid productId, string key, string displayName, int sortOrder = 0, bool isRequired = true, Guid? parentOptionId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
-        return new ProductOptionGroup(Guid.NewGuid(), productId, key.Trim().ToLowerInvariant(), displayName.Trim(), sortOrder, isRequired);
+        return new ProductOptionGroup(Guid.NewGuid(), productId, parentOptionId, key.Trim().ToLowerInvariant(), displayName.Trim(), sortOrder, isRequired);
     }
 
     public void Update(string displayName, int sortOrder, bool isRequired)

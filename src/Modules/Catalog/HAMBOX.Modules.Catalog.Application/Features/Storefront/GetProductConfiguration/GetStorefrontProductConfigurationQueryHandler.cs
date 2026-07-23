@@ -55,7 +55,7 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
             .ToListAsync(cancellationToken);
 
         var optionGroupDtos = groups.Select(g => new ProductOptionGroupDto(
-            g.Id, g.ProductId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
+            g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
             g.Options.OrderBy(o => o.SortOrder)
                 .Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder))
                 .ToList())).ToList();

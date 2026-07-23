@@ -167,6 +167,36 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("Categories", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Categories.ProductCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("IX_ProductCategories_CategoryId");
+
+                    b.HasIndex("ProductId", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProductCategories_ProductId_CategoryId");
+
+                    b.ToTable("ProductCategories", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Drafts.ProductDraft", b =>
                 {
                     b.Property<Guid>("Id")
@@ -698,6 +728,9 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("ParentOptionId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
 
@@ -706,8 +739,13 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ParentOptionId", "Key")
+                        .IsUnique()
+                        .HasFilter("[ParentOptionId] IS NOT NULL");
+
                     b.HasIndex("ProductId", "Key")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[ParentOptionId] IS NULL");
 
                     b.ToTable("ProductOptionGroups", "catalog");
                 });
@@ -849,6 +887,87 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("ProductVariantOptions", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Packaging.CatalogPackageJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BackgroundJobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ProgressPercent")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResultFileName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("ResultStorageKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SummaryJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BackgroundJobId");
+
+                    b.HasIndex("CreatedOnUtc");
+
+                    b.ToTable("CatalogPackageJobs", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Products.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -938,6 +1057,21 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("Products", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Categories.ProductCategory", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Categories.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
+                        .WithMany("AdditionalCategories")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Images.ProductImage", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
@@ -954,6 +1088,14 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasForeignKey("OptionGroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Inventory.ProductOptionGroup", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Inventory.ProductOption", null)
+                        .WithMany()
+                        .HasForeignKey("ParentOptionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Inventory.ProductVariantOption", b =>
@@ -986,6 +1128,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Products.Product", b =>
                 {
+                    b.Navigation("AdditionalCategories");
+
                     b.Navigation("Images");
                 });
 #pragma warning restore 612, 618

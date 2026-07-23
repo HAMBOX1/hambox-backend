@@ -91,7 +91,7 @@ internal static class InventoryEndpoints
             Guid productId,
             [FromBody] CreateOptionGroupRequest body,
             ISender sender) => await SendCreated(sender, new CreateProductOptionGroupCommand(
-                productId, body.Key, body.DisplayName, body.SortOrder, body.IsRequired)))
+                productId, body.Key, body.DisplayName, body.SortOrder, body.IsRequired, body.ParentOptionId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
         group.MapPost("/option-groups/{groupId:guid}/options", async (
@@ -326,7 +326,7 @@ internal sealed record CreateVariantRequest(
     int LowStockThreshold,
     IReadOnlyList<Guid> OptionIds);
 
-internal sealed record CreateOptionGroupRequest(string Key, string DisplayName, int SortOrder, bool IsRequired);
+internal sealed record CreateOptionGroupRequest(string Key, string DisplayName, int SortOrder, bool IsRequired, Guid? ParentOptionId = null);
 internal sealed record CreateOptionRequest(string Value, string Label, int SortOrder);
 internal sealed record CreateSupplierRequest(
     string CompanyName,

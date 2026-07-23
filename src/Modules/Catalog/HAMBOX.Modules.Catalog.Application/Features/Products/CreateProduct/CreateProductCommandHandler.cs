@@ -27,6 +27,21 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
             return Result.Failure<Guid>(CatalogErrors.CategoryNotFound);
         }
 
+        var additionalCategoryIds = request.AdditionalCategoryIds ?? [];
+        if (additionalCategoryIds.Count > 0)
+        {
+            var existingCount = await _dbContext.Categories
+                .Where(c => additionalCategoryIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (existingCount != additionalCategoryIds.Distinct().Count())
+            {
+                return Result.Failure<Guid>(CatalogErrors.CategoryNotFound);
+            }
+        }
+
         var product = Product.Create(
             request.NameAr,
             request.NameEn,
@@ -35,8 +50,14 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
             request.Price,
             request.CategoryId);
 
+        var newAdditionalCategories = product.SetAdditionalCategories(additionalCategoryIds);
+
         _dbContext.Products.Add(product);
-        
+        foreach (var newAdditionalCategory in newAdditionalCategories)
+        {
+            _dbContext.ProductCategories.Add(newAdditionalCategory);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(product.Id);

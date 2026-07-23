@@ -62,7 +62,15 @@ public sealed record ImportCodeItem(
     decimal? PurchaseCost = null,
     DateTimeOffset? ExpirationDate = null);
 
-public sealed record ImportCodesResult(int Imported, int Duplicates, int Invalid);
+/// <summary>Where a submitted code was already found — global across the whole catalog, not just the target variant/batch.</summary>
+public sealed record ImportCodeDuplicate(string Code, string ProductName, string VariantSku, string? BatchName);
+
+public sealed record ImportCodesResult(
+    int TotalSubmitted,
+    int Imported,
+    int Duplicates,
+    int Invalid,
+    IReadOnlyList<ImportCodeDuplicate> DuplicateDetails);
 
 public sealed record InventoryStatisticsSnapshot(
     int Available,

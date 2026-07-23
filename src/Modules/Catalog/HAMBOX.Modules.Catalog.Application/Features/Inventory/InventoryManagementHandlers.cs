@@ -332,23 +332,28 @@ internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<D
             return Result.Failure(CatalogErrors.OptionGroupNotFound);
         }
 
-        var optionIds = await _db.ProductOptions
-            .Where(o => o.OptionGroupId == request.GroupId)
-            .Select(o => o.Id)
-            .ToListAsync(cancellationToken);
-
-        if (optionIds.Count > 0)
+        var directOptionIds = group.Options.Select(o => o.Id).ToList();
+        var subtreeOptionIds = new List<Guid>(directOptionIds);
+        foreach (var optionId in directOptionIds)
         {
-            var inUse = await _db.ProductVariantOptions.AnyAsync(vo => optionIds.Contains(vo.OptionId), cancellationToken);
+            subtreeOptionIds.AddRange(await OptionGroupSubtreeHelper.CollectDescendantOptionIdsAsync(_db, optionId, cancellationToken));
+        }
+
+        if (subtreeOptionIds.Count > 0)
+        {
+            var inUse = await _db.ProductVariantOptions.AnyAsync(vo => subtreeOptionIds.Contains(vo.OptionId), cancellationToken);
             if (inUse)
             {
                 return Result.Failure(CatalogErrors.OptionGroupInUse);
             }
-
-            var options = await _db.ProductOptions.Where(o => o.OptionGroupId == request.GroupId).ToListAsync(cancellationToken);
-            _db.ProductOptions.RemoveRange(options);
         }
 
+        foreach (var optionId in directOptionIds)
+        {
+            await OptionGroupSubtreeHelper.DeleteOptionDescendantsAsync(_db, optionId, cancellationToken);
+        }
+
+        _db.ProductOptions.RemoveRange(group.Options);
         _db.ProductOptionGroups.Remove(group);
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
@@ -363,8 +368,10 @@ internal sealed class ReorderProductOptionGroupsCommandHandler : IRequestHandler
 
     public async Task<Result> Handle(ReorderProductOptionGroupsCommand request, CancellationToken cancellationToken)
     {
+        // Only root groups (ParentOptionId == null) are reordered against each other here; a nested
+        // child group's sibling scope is the option it's parented under, not the whole product.
         var groups = await _db.ProductOptionGroups
-            .Where(g => g.ProductId == request.ProductId)
+            .Where(g => g.ProductId == request.ProductId && g.ParentOptionId == null)
             .ToListAsync(cancellationToken);
 
         if (groups.Count != request.OrderedGroupIds.Count)
@@ -422,12 +429,16 @@ internal sealed class DeleteProductOptionCommandHandler : IRequestHandler<Delete
             return Result.Failure(CatalogErrors.OptionNotFound);
         }
 
-        var inUse = await _db.ProductVariantOptions.AnyAsync(vo => vo.OptionId == option.Id, cancellationToken);
+        var descendantOptionIds = await OptionGroupSubtreeHelper.CollectDescendantOptionIdsAsync(_db, option.Id, cancellationToken);
+        var subtreeOptionIds = descendantOptionIds.Append(option.Id).ToList();
+
+        var inUse = await _db.ProductVariantOptions.AnyAsync(vo => subtreeOptionIds.Contains(vo.OptionId), cancellationToken);
         if (inUse)
         {
             return Result.Failure(CatalogErrors.OptionInUse);
         }
 
+        await OptionGroupSubtreeHelper.DeleteOptionDescendantsAsync(_db, option.Id, cancellationToken);
         _db.ProductOptions.Remove(option);
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();

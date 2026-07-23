@@ -287,26 +287,94 @@ internal sealed class InventoryEngine : IInventoryEngine
         var batch = await _db.InventoryBatches.FirstOrDefaultAsync(b => b.Id == batchId && b.VariantId == variantId, cancellationToken)
             ?? throw new InvalidOperationException("Batch not found.");
 
-        var existingHashes = await _db.DigitalInventoryCodes
-            .Select(c => c.CodeHash)
-            .ToHashSetAsync(cancellationToken);
+        var targetVariant = await _db.ProductVariants
+            .AsNoTracking()
+            .Where(v => v.Id == variantId)
+            .Select(v => new { v.Sku, v.ProductId })
+            .FirstAsync(cancellationToken);
+
+        var targetProductName = await _db.Products
+            .AsNoTracking()
+            .Where(p => p.Id == targetVariant.ProductId)
+            .Select(p => p.NameEn)
+            .FirstAsync(cancellationToken);
+
+        var totalSubmitted = codes.Count;
+
+        var normalized = codes
+            .Select(item => (
+                Item: item,
+                Hash: string.IsNullOrWhiteSpace(item.DigitalCode) ? null : DigitalInventoryCode.ComputeHash(item.DigitalCode)))
+            .ToList();
+
+        var candidateHashes = normalized
+            .Where(n => n.Hash is not null)
+            .Select(n => n.Hash!)
+            .Distinct()
+            .ToList();
+
+        // Indexed lookup against the unique CodeHash index — only the submitted hashes are ever
+        // pulled back, never the whole table, so this stays cheap regardless of catalog size.
+        var existingRows = await _db.DigitalInventoryCodes
+            .AsNoTracking()
+            .Where(c => candidateHashes.Contains(c.CodeHash))
+            .Select(c => new { c.CodeHash, c.VariantId, c.BatchId })
+            .ToListAsync(cancellationToken);
+
+        var locationByHash = existingRows.ToDictionary(r => r.CodeHash, r => (VariantId: r.VariantId, BatchId: r.BatchId));
+
+        // Batch-resolve the product/variant/batch names for every *other* location a duplicate
+        // already lives in, so "where does this already exist" never costs an N+1 query.
+        var foreignVariantIds = locationByHash.Values.Select(v => v.VariantId).Where(id => id != variantId).Distinct().ToList();
+        var foreignBatchIds = locationByHash.Values.Select(v => v.BatchId).Where(id => id != batchId).Distinct().ToList();
+
+        var variantLookup = foreignVariantIds.Count == 0
+            ? new Dictionary<Guid, (string Sku, string ProductName)>()
+            : await _db.ProductVariants
+                .AsNoTracking()
+                .Where(v => foreignVariantIds.Contains(v.Id))
+                .Join(_db.Products.AsNoTracking(), v => v.ProductId, p => p.Id, (v, p) => new { v.Id, v.Sku, ProductName = p.NameEn })
+                .ToDictionaryAsync(v => v.Id, v => (v.Sku, v.ProductName), cancellationToken);
+
+        var batchLookup = foreignBatchIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _db.InventoryBatches
+                .AsNoTracking()
+                .Where(b => foreignBatchIds.Contains(b.Id))
+                .Select(b => new { b.Id, b.Name })
+                .ToDictionaryAsync(b => b.Id, b => b.Name, cancellationToken);
+
+        (string ProductName, string VariantSku, string? BatchName) ResolveLocation(Guid dupVariantId, Guid dupBatchId)
+        {
+            if (dupVariantId == variantId)
+            {
+                return (targetProductName, targetVariant.Sku, batch.Name);
+            }
+
+            if (variantLookup.TryGetValue(dupVariantId, out var v))
+            {
+                return (v.ProductName, v.Sku, batchLookup.GetValueOrDefault(dupBatchId));
+            }
+
+            return ("Unknown product", "Unknown variant", null);
+        }
 
         var imported = 0;
-        var duplicates = 0;
         var invalid = 0;
+        var duplicateDetails = new List<ImportCodeDuplicate>();
 
-        foreach (var item in codes)
+        foreach (var (item, hash) in normalized)
         {
-            if (string.IsNullOrWhiteSpace(item.DigitalCode))
+            if (hash is null)
             {
                 invalid++;
                 continue;
             }
 
-            var hash = DigitalInventoryCode.ComputeHash(item.DigitalCode);
-            if (existingHashes.Contains(hash))
+            if (locationByHash.TryGetValue(hash, out var location))
             {
-                duplicates++;
+                var (productName, variantSku, batchName) = ResolveLocation(location.VariantId, location.BatchId);
+                duplicateDetails.Add(new ImportCodeDuplicate(item.DigitalCode.Trim(), productName, variantSku, batchName));
                 continue;
             }
 
@@ -324,9 +392,13 @@ internal sealed class InventoryEngine : IInventoryEngine
                 item.ExpirationDate);
 
             _db.DigitalInventoryCodes.Add(code);
-            existingHashes.Add(hash);
+            // A later repeat of this same code within the same submission should also report as a
+            // duplicate, pointing back here rather than silently importing twice.
+            locationByHash[hash] = (variantId, batchId);
             imported++;
         }
+
+        var duplicates = duplicateDetails.Count;
 
         if (imported > 0)
         {
@@ -336,11 +408,11 @@ internal sealed class InventoryEngine : IInventoryEngine
                 variantId: variantId,
                 batchId: batchId,
                 performedByUserId: performedByUserId ?? _currentUser.UserId,
-                details: $"Imported {imported} codes ({duplicates} duplicates, {invalid} invalid)"));
+                details: $"Imported {imported} of {totalSubmitted} codes ({duplicates} duplicates, {invalid} invalid)"));
         }
 
         await _db.SaveChangesAsync(cancellationToken);
-        return new ImportCodesResult(imported, duplicates, invalid);
+        return new ImportCodesResult(totalSubmitted, imported, duplicates, invalid, duplicateDetails);
     }
 
     private async Task ReleaseReservationRecordsAsync(

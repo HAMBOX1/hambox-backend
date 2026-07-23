@@ -331,7 +331,9 @@ public sealed record IntegrationsSettingsPayload(
 public sealed record MaintenanceSettingsPayload(
     bool Enabled,
     string Message,
-    string[] AllowedRoleNames);
+    string[] AllowedRoleNames,
+    string? BypassPassword,
+    bool HasStoredBypassPassword);
 
 public sealed record LegalSettingsPayload(
     string TermsHtml,

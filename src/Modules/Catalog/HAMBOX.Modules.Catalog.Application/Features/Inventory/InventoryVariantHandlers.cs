@@ -207,7 +207,7 @@ internal sealed class GetProductOptionGroupsQueryHandler : IRequestHandler<GetPr
             .ToListAsync(cancellationToken);
 
         var dtos = groups.Select(g => new ProductOptionGroupDto(
-            g.Id, g.ProductId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
+            g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
             g.Options.OrderBy(o => o.SortOrder).Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder)).ToList()
         )).ToList();
 
@@ -220,7 +220,8 @@ public sealed record CreateProductOptionGroupCommand(
     string Key,
     string DisplayName,
     int SortOrder,
-    bool IsRequired) : IRequest<Result<Guid>>;
+    bool IsRequired,
+    Guid? ParentOptionId = null) : IRequest<Result<Guid>>;
 
 internal sealed class CreateProductOptionGroupCommandHandler : IRequestHandler<CreateProductOptionGroupCommand, Result<Guid>>
 {
@@ -235,7 +236,19 @@ internal sealed class CreateProductOptionGroupCommandHandler : IRequestHandler<C
 
     public async Task<Result<Guid>> Handle(CreateProductOptionGroupCommand request, CancellationToken cancellationToken)
     {
-        var group = ProductOptionGroup.Create(request.ProductId, request.Key, request.DisplayName, request.SortOrder, request.IsRequired);
+        if (request.ParentOptionId is { } parentOptionId)
+        {
+            var parentOptionBelongsToProduct = await _db.ProductOptions
+                .Join(_db.ProductOptionGroups, o => o.OptionGroupId, g => g.Id, (o, g) => new { o.Id, g.ProductId })
+                .AnyAsync(x => x.Id == parentOptionId && x.ProductId == request.ProductId, cancellationToken);
+
+            if (!parentOptionBelongsToProduct)
+            {
+                return Result.Failure<Guid>(CatalogErrors.OptionNotFound);
+            }
+        }
+
+        var group = ProductOptionGroup.Create(request.ProductId, request.Key, request.DisplayName, request.SortOrder, request.IsRequired, request.ParentOptionId);
         _db.ProductOptionGroups.Add(group);
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
             InventoryAuditAction.OptionGroupCreated,

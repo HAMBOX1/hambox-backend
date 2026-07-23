@@ -33,11 +33,20 @@ public sealed class FileStorageSettings
     /// <summary>
     /// Gets or sets the allowed MIME content types.
     /// </summary>
+    /// <remarks>
+    /// Also covers catalog import/export packages (<c>.hambox</c>/<c>.xlsx</c>/<c>.csv</c>) — this
+    /// is the one upload-policy knob the app has (surfaced as Platform Settings' "Media" category),
+    /// so it governs any uploaded file type, not only public storefront images.
+    /// </remarks>
     public string[] AllowedContentTypes { get; set; } =
     [
         "image/jpeg",
         "image/png",
         "image/webp",
-        "image/gif"
+        "image/gif",
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/csv"
     ];
 }

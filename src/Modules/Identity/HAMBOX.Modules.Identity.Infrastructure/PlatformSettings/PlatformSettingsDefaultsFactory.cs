@@ -321,7 +321,12 @@ internal static class PlatformSettingsDefaultsFactory
         new(null, null, null, false);
 
     private static MaintenanceSettingsPayload CreateMaintenance() =>
-        new(true, "HAMBOX is launching soon. We're putting the finishing touches on the platform — check back shortly!", ["Owner", "SuperAdmin", "Administrator"]);
+        new(
+            true,
+            "HAMBOX is launching soon. We're putting the finishing touches on the platform — check back shortly!",
+            ["Owner", "SuperAdmin", "Administrator"],
+            null,
+            false);
 
     private static LegalSettingsPayload CreateLegal() =>
         new(

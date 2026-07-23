@@ -36,7 +36,15 @@ internal sealed class ChangeProductCategoryCommandHandler : IRequestHandler<Chan
             }
 
             product.ChangeCategory(request.CategoryId);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result.Failure(CatalogErrors.ProductConcurrencyConflict);
+            }
         }
 
         return Result.Success();

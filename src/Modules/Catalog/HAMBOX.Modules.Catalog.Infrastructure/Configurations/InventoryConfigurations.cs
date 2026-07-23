@@ -25,7 +25,9 @@ internal sealed class ProductOptionGroupConfiguration : IEntityTypeConfiguration
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Key).IsRequired().HasMaxLength(100);
         builder.Property(x => x.DisplayName).IsRequired().HasMaxLength(200);
-        builder.HasIndex(x => new { x.ProductId, x.Key }).IsUnique();
+        builder.HasIndex(x => new { x.ProductId, x.Key }).IsUnique().HasFilter("[ParentOptionId] IS NULL");
+        builder.HasIndex(x => new { x.ParentOptionId, x.Key }).IsUnique().HasFilter("[ParentOptionId] IS NOT NULL");
+        builder.HasOne<ProductOption>().WithMany().HasForeignKey(x => x.ParentOptionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Options).WithOne().HasForeignKey(x => x.OptionGroupId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Options).HasField("_options");
     }

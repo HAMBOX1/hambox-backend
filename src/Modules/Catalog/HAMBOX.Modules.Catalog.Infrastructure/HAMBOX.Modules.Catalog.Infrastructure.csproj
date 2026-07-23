@@ -19,6 +19,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="ClosedXML" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,6 +27,11 @@
     <ProjectReference Include="..\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Infrastructure\HAMBOX.Infrastructure.csproj" />
+    <!-- Needed only for supplier-mapping export/import (Catalog<->Suppliers cross-schema atomic
+         writes, mirroring Commerce's CommerceTransactionService recipe) — same pragmatic
+         cross-module coupling already accepted for Commerce.Application -> Catalog.Application. -->
+    <ProjectReference Include="..\..\Suppliers\HAMBOX.Modules.Suppliers.Application\HAMBOX.Modules.Suppliers.Application.csproj" />
+    <ProjectReference Include="..\..\Suppliers\HAMBOX.Modules.Suppliers.Infrastructure\HAMBOX.Modules.Suppliers.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

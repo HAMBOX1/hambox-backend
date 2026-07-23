@@ -3,6 +3,7 @@ using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
+using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,11 @@ public interface ICatalogDbContext
     DbSet<ProductImage> ProductImages { get; }
 
     /// <summary>
+    /// Gets the product additional-category assignments database set.
+    /// </summary>
+    DbSet<ProductCategory> ProductCategories { get; }
+
+    /// <summary>
     /// Gets the product drafts database set.
     /// </summary>
     DbSet<ProductDraft> ProductDrafts { get; }
@@ -45,6 +51,7 @@ public interface ICatalogDbContext
     DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
     DbSet<SearchQueryLog> SearchQueryLogs { get; }
     DbSet<ProductViewEvent> ProductViewEvents { get; }
+    DbSet<CatalogPackageJob> CatalogPackageJobs { get; }
 
     /// <summary>
     /// Saves all changes made in this context to the database.

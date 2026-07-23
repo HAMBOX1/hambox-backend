@@ -29,6 +29,8 @@ public interface IPlatformSettingsProvider
 
     Task<MaintenanceSettingsPayload> GetMaintenanceAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> VerifyMaintenanceBypassPasswordAsync(string password, CancellationToken cancellationToken = default);
+
     Task<StorefrontContentSettingsPayload> GetStorefrontAsync(CancellationToken cancellationToken = default);
 
     Task<PublicPlatformSettingsDto> GetPublicSettingsAsync(CancellationToken cancellationToken = default);

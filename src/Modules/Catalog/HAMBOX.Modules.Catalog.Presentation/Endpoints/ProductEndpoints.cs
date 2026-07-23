@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Products;
@@ -10,6 +11,7 @@ using HAMBOX.Modules.Catalog.Application.Features.Products.CreateProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.DeleteProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.ExportProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById;
+using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductFacets;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.UpdateProduct;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -45,13 +47,15 @@ internal static class ProductEndpoints
             [FromQuery] ProductStatus? status,
             [FromQuery] Guid? categoryId,
             [FromQuery] ProductSortBy? sortBy,
+            [FromQuery] string? attributes,
             ISender sender) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize <= 0 ? 10 : pageSize;
-            var query = new GetProductsQuery(pageNumber, pageSize, searchTerm, status, categoryId, sortBy);
+            var query = new GetProductsQuery(
+                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes));
             var result = await sender.Send(query);
-            
+
             if (result.IsSuccess)
             {
                 return TypedResults.Ok(result.Value);
@@ -66,6 +70,32 @@ internal static class ProductEndpoints
             });
         })
         .WithName("GetProducts")
+        .AllowAnonymous();
+
+        // GET /api/v1/products/facets
+        group.MapGet("facets", async Task<Results<Ok<IReadOnlyList<ProductFacetGroupDto>>, BadRequest<ProblemDetails>>> (
+            [FromQuery] string? searchTerm,
+            [FromQuery] Guid? categoryId,
+            [FromQuery] string? attributes,
+            ISender sender) =>
+        {
+            var query = new GetProductFacetsQuery(searchTerm, categoryId, ParseAttributeFilters(attributes));
+            var result = await sender.Send(query);
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetProductFacets")
         .AllowAnonymous();
 
         // GET /api/v1/products/{id}
@@ -93,7 +123,7 @@ internal static class ProductEndpoints
         // POST /api/v1/products
         group.MapPost("", async Task<Results<Created<Guid>, BadRequest<ProblemDetails>>> ([FromBody] CreateProductRequest request, ISender sender) =>
         {
-            var command = new CreateProductCommand(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId);
+            var command = new CreateProductCommand(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.AdditionalCategoryIds);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -115,7 +145,7 @@ internal static class ProductEndpoints
         // PUT /api/v1/products/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateProductRequest request, ISender sender) =>
         {
-            var command = new UpdateProductCommand(id, request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.Status);
+            var command = new UpdateProductCommand(id, request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.Status, request.AdditionalCategoryIds);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -263,11 +293,33 @@ internal static class ProductEndpoints
         Type = result.Error.Code,
         Status = StatusCodes.Status400BadRequest
     };
+
+    /// <summary>
+    /// Parses the storefront's <c>attributes</c> query param — a JSON object mapping option-group
+    /// key to selected values, e.g. <c>{"platform":["pc","xbox"]}</c> — into a filter dictionary.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>>? ParseAttributeFilters(string? attributes)
+    {
+        if (string.IsNullOrWhiteSpace(attributes))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, List<string>>>(attributes)
+                ?.ToDictionary(kvp => kvp.Key, kvp => (IReadOnlyList<string>)kvp.Value);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }
 
 internal sealed record DuplicateProductRequest(string? NameSuffix);
 
-internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId);
-internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status);
+internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, IReadOnlyList<Guid>? AdditionalCategoryIds = null);
+internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status, IReadOnlyList<Guid>? AdditionalCategoryIds = null);
 internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);

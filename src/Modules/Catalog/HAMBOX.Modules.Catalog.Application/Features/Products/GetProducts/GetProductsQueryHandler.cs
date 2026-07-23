@@ -32,25 +32,10 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
     public async Task<Result<PagedResult<ProductDto>>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Products.AsNoTracking();
+        var query = ProductQueryFilters.ApplyBaseFilters(
+            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, request.Status);
 
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
-        {
-            query = query.Where(p => p.NameAr.Contains(request.SearchTerm) ||
-                                     p.NameEn.Contains(request.SearchTerm) ||
-                                     p.DescriptionAr.Contains(request.SearchTerm) ||
-                                     p.DescriptionEn.Contains(request.SearchTerm));
-        }
-
-        if (request.Status.HasValue)
-        {
-            query = query.Where(p => p.Status == request.Status.Value);
-        }
-
-        if (request.CategoryId.HasValue)
-        {
-            query = query.Where(p => p.CategoryId == request.CategoryId.Value);
-        }
+        query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 
         query = ApplySort(query, request.SortBy);
 
@@ -70,6 +55,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 p.CategoryId,
                 _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn,
                 _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameAr,
+                p.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
                 p.Images.FirstOrDefault(i => i.IsPrimary)!.Url
                     ?? p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
                 null,

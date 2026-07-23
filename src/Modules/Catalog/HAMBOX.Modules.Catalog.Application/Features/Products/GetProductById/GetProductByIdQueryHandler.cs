@@ -22,6 +22,7 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
         var product = await _dbContext.Products
             .AsNoTracking()
             .Include(entry => entry.Images)
+            .Include(entry => entry.AdditionalCategories)
             .FirstOrDefaultAsync(entry => entry.Id == request.Id, cancellationToken);
 
         if (product is null)

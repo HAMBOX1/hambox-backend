@@ -147,6 +147,7 @@ internal sealed class DuplicateProductCommandHandler : IRequestHandler<Duplicate
         var source = await _db.Products
             .AsNoTracking()
             .Include(p => p.Images)
+            .Include(p => p.AdditionalCategories)
             .FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
 
         if (source is null)
@@ -163,6 +164,8 @@ internal sealed class DuplicateProductCommandHandler : IRequestHandler<Duplicate
             source.Price,
             source.CategoryId);
 
+        var duplicateAdditionalCategories = duplicate.SetAdditionalCategories(source.AdditionalCategories.Select(pc => pc.CategoryId));
+
         foreach (var image in source.Images.OrderBy(i => i.DisplayOrder))
         {
             duplicate.AddImage(
@@ -176,6 +179,10 @@ internal sealed class DuplicateProductCommandHandler : IRequestHandler<Duplicate
         }
 
         _db.Products.Add(duplicate);
+        foreach (var newAdditionalCategory in duplicateAdditionalCategories)
+        {
+            _db.ProductCategories.Add(newAdditionalCategory);
+        }
 
         var optionGroups = await _db.ProductOptionGroups
             .AsNoTracking()

@@ -152,7 +152,7 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new VerifyMaintenanceBypassCommand(request.Email, request.Password);
+            var command = new VerifyMaintenanceBypassCommand(request.Password);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         });
@@ -353,4 +353,4 @@ public sealed record ResendAdminOtpRequest(Guid ChallengeId);
 /// <summary>
 /// Represents a maintenance-mode bypass request.
 /// </summary>
-public sealed record MaintenanceBypassRequest(string Email, string Password);
+public sealed record MaintenanceBypassRequest(string Password);

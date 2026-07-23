@@ -41,6 +41,14 @@ public interface IFileStorage
     Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Opens a previously stored file for reading. Every other <see cref="IFileStorage"/> consumer
+    /// only writes and later serves the file via <see cref="StoredFileResult.PublicUrl"/> through
+    /// static file middleware; catalog import/export is the first caller that needs the bytes back
+    /// server-side (to parse an uploaded package, or to stream a generated export for download).
+    /// </summary>
+    Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Determines whether the content type is allowed.
     /// </summary>
     bool IsAllowedContentType(string contentType);

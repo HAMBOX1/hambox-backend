@@ -7,6 +7,7 @@ using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
+using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +35,11 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     /// <summary>
+    /// Gets or sets the product additional-category assignments table.
+    /// </summary>
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+
+    /// <summary>
     /// Gets or sets the product drafts table.
     /// </summary>
     public DbSet<ProductDraft> ProductDrafts => Set<ProductDraft>();
@@ -50,6 +56,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
     public DbSet<ProductViewEvent> ProductViewEvents => Set<ProductViewEvent>();
+    public DbSet<CatalogPackageJob> CatalogPackageJobs => Set<CatalogPackageJob>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

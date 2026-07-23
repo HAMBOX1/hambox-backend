@@ -1,6 +1,9 @@
 using FluentValidation;
+using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Infrastructure.BackgroundJobs;
+using HAMBOX.Modules.Catalog.Infrastructure.Packaging;
 using HAMBOX.Modules.Catalog.Infrastructure.Services;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
@@ -39,6 +42,16 @@ public static class CatalogInfrastructureExtensions
         services.AddScoped<ICatalogDbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
         services.AddScoped<IInventoryEngine, InventoryEngine>();
         services.AddScoped<ProductionDemoDataSeeder>();
+
+        // Catalog import/export
+        services.AddSingleton<IPackageCryptoService, PackageCryptoService>();
+        services.AddScoped<IHamboxPackageWriter, HamboxPackageWriter>();
+        services.AddScoped<IHamboxPackageReader, HamboxPackageReader>();
+        services.AddScoped<ICatalogImportParser, CatalogImportParser>();
+        services.AddSingleton<IImportTemplateGenerator, CatalogImportTemplateGenerator>();
+        services.AddScoped<ICatalogSuppliersTransactionService, CatalogSuppliersTransactionService>();
+        services.AddScoped<IBackgroundJobHandler, ExportCatalogJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ExecuteCatalogImportJobHandler>();
 
         // 2. Register FluentValidation Validators
         services.AddValidatorsFromAssembly(typeof(CreateCategoryCommandValidator).Assembly);

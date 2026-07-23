@@ -6,7 +6,6 @@ internal sealed class VerifyMaintenanceBypassCommandValidator : AbstractValidato
 {
     public VerifyMaintenanceBypassCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
         RuleFor(x => x.Password).NotEmpty();
     }
 }

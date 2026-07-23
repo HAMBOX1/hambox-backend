@@ -36,6 +36,14 @@ public static class CatalogErrors
         "The requested product status transition is not allowed.");
 
     /// <summary>
+    /// Gets the error for when a product update loses an optimistic-concurrency race
+    /// (its row version no longer matches what was loaded — someone else saved first).
+    /// </summary>
+    public static readonly Error ProductConcurrencyConflict = new(
+        "Products.ConcurrencyConflict",
+        "This product was just changed by someone else. Refresh and try again.");
+
+    /// <summary>
     /// Gets the error for when a product does not have sufficient stock.
     /// </summary>
     public static readonly Error InsufficientStock = new(
@@ -164,4 +172,36 @@ public static class CatalogErrors
     public static readonly Error CategoryCycle = new(
         "Categories.Cycle",
         "The parent assignment would create a category cycle.");
+
+    public static readonly Error PackageJobNotFound = new(
+        "ImportExport.PackageJobNotFound",
+        "The import/export job was not found.");
+
+    public static readonly Error PackageNotUploaded = new(
+        "ImportExport.PackageNotUploaded",
+        "Upload a package before validating or executing an import.");
+
+    public static readonly Error PackageAlreadyExecuted = new(
+        "ImportExport.PackageAlreadyExecuted",
+        "This import has already been executed.");
+
+    public static readonly Error UnsupportedPackageFormat = new(
+        "ImportExport.UnsupportedFormat",
+        "Only .hambox, .xlsx, and .csv files are supported.");
+
+    public static readonly Error PackagePasswordRequired = new(
+        "ImportExport.PasswordRequired",
+        "This package is password-protected. Provide the password to continue.");
+
+    public static readonly Error InvalidPackagePassword = new(
+        "ImportExport.InvalidPassword",
+        "The package password is incorrect or the file is corrupted.");
+
+    public static readonly Error PackageParsingFailed = new(
+        "ImportExport.ParsingFailed",
+        "The file could not be read. Check that it matches the expected template.");
+
+    public static readonly Error ExportScopeEmpty = new(
+        "ImportExport.ExportScopeEmpty",
+        "Select at least one product, a filter, or the entire catalog to export.");
 }

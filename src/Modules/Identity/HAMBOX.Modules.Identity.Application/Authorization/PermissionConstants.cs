@@ -28,6 +28,8 @@ public static class PermissionConstants
             public const string Create = "Catalog.Products.Create";
             public const string Edit = "Catalog.Products.Edit";
             public const string Delete = "Catalog.Products.Delete";
+            public const string Import = "Catalog.Products.Import";
+            public const string Export = "Catalog.Products.Export";
         }
 
         public static class Inventory

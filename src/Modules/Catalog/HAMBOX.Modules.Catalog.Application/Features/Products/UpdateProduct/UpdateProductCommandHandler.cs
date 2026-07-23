@@ -21,6 +21,7 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
     public async Task<Result> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
     {
         var product = await _dbContext.Products
+            .Include(p => p.AdditionalCategories)
             .FirstOrDefaultAsync(p => p.Id == request.Id, cancellationToken);
 
         if (product is null)
@@ -36,6 +37,27 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
                 return Result.Failure(CatalogErrors.CategoryNotFound);
             }
             product.ChangeCategory(request.CategoryId);
+        }
+
+        var additionalCategoryIds = request.AdditionalCategoryIds ?? [];
+        if (additionalCategoryIds.Count > 0)
+        {
+            var existingCount = await _dbContext.Categories
+                .Where(c => additionalCategoryIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (existingCount != additionalCategoryIds.Distinct().Count())
+            {
+                return Result.Failure(CatalogErrors.CategoryNotFound);
+            }
+        }
+
+        var newAdditionalCategories = product.SetAdditionalCategories(additionalCategoryIds);
+        foreach (var newAdditionalCategory in newAdditionalCategories)
+        {
+            _dbContext.ProductCategories.Add(newAdditionalCategory);
         }
 
         product.Update(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn);
@@ -64,7 +86,14 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
             }
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(CatalogErrors.ProductConcurrencyConflict);
+        }
 
         return Result.Success();
     }

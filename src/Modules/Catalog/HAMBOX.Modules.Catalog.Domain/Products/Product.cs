@@ -1,4 +1,5 @@
 using HAMBOX.Domain.Entities;
+using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Events;
 using HAMBOX.Modules.Catalog.Domain.Images;
@@ -10,12 +11,14 @@ namespace HAMBOX.Modules.Catalog.Domain.Products;
 /// </summary>
 /// <remarks>
 /// Product is an aggregate root that manages its own lifecycle (Draft → Active → Inactive → Archived),
-/// pricing, and image collection. Products belong to a <see cref="Categories.Category"/> and
+/// pricing, and image collection. Every product has exactly one primary <see cref="Categories.Category"/>
+/// (<see cref="CategoryId"/>) plus zero or more additional, cross-listing categories, and
 /// support bilingual names and descriptions.
 /// </remarks>
 public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
 {
     private readonly List<ProductImage> _images = [];
+    private readonly List<ProductCategory> _additionalCategories = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Product"/> class.
@@ -79,8 +82,12 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public ProductStatus Status { get; private set; }
 
     /// <summary>
-    /// Gets the identifier of the category this product belongs to.
+    /// Gets the identifier of the primary category this product belongs to.
     /// </summary>
+    /// <remarks>
+    /// The primary category drives the canonical storefront URL, breadcrumbs, default
+    /// navigation, and SEO metadata. See <see cref="AdditionalCategories"/> for cross-listing.
+    /// </remarks>
     public Guid CategoryId { get; private set; }
 
     /// <summary>
@@ -102,6 +109,12 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// Gets the collection of images associated with this product.
     /// </summary>
     public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
+
+    /// <summary>
+    /// Gets the additional (non-primary) categories this product is cross-listed under.
+    /// Used for browsing, search, discovery, and promotions alongside <see cref="CategoryId"/>.
+    /// </summary>
+    public IReadOnlyCollection<ProductCategory> AdditionalCategories => _additionalCategories.AsReadOnly();
 
     /// <inheritdoc />
     public string? CreatedBy { get; private set; }
@@ -139,8 +152,8 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="price">The product price. Must be non-negative.</param>
     /// <param name="categoryId">The identifier of the category.</param>
     /// <returns>A new <see cref="Product"/> instance in Draft status.</returns>
-    /// <remarks><paramref name="nameAr"/> and <paramref name="descriptionAr"/> are optional and fall back to the English value when left blank.</remarks>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="descriptionEn"/> is null or whitespace, or when the category identifier is empty.</exception>
+    /// <remarks><paramref name="nameAr"/>, <paramref name="descriptionAr"/>, and <paramref name="descriptionEn"/> are optional; <paramref name="descriptionAr"/> falls back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> is null or whitespace, or when the category identifier is empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the price is negative.</exception>
     public static Product Create(
         string nameAr,
@@ -151,7 +164,6 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         Guid categoryId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
-        ArgumentException.ThrowIfNullOrWhiteSpace(descriptionEn);
         ArgumentOutOfRangeException.ThrowIfNegative(price);
 
         if (categoryId == Guid.Empty)
@@ -253,8 +265,8 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <param name="nameEn">The new product name in English.</param>
     /// <param name="descriptionAr">The new product description in Arabic.</param>
     /// <param name="descriptionEn">The new product description in English.</param>
-    /// <remarks><paramref name="nameAr"/> and <paramref name="descriptionAr"/> are optional and fall back to the English value when left blank.</remarks>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> or <paramref name="descriptionEn"/> is null or whitespace.</exception>
+    /// <remarks><paramref name="nameAr"/>, <paramref name="descriptionAr"/>, and <paramref name="descriptionEn"/> are optional; <paramref name="descriptionAr"/> falls back to the English value when left blank.</remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="nameEn"/> is null or whitespace.</exception>
     public void Update(
         string nameAr,
         string nameEn,
@@ -262,7 +274,6 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         string descriptionEn)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
-        ArgumentException.ThrowIfNullOrWhiteSpace(descriptionEn);
 
         NameAr = string.IsNullOrWhiteSpace(nameAr) ? nameEn : nameAr;
         NameEn = nameEn;
@@ -348,10 +359,15 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     }
 
     /// <summary>
-    /// Changes the category this product belongs to.
+    /// Changes the primary category this product belongs to.
     /// </summary>
-    /// <param name="categoryId">The new category identifier.</param>
+    /// <param name="categoryId">The new primary category identifier.</param>
     /// <exception cref="ArgumentException">Thrown when the category identifier is empty.</exception>
+    /// <remarks>
+    /// If <paramref name="categoryId"/> was already assigned as an additional category, it is
+    /// dropped from that set — a category can never be both the primary and an additional
+    /// category at the same time.
+    /// </remarks>
     public void ChangeCategory(Guid categoryId)
     {
         if (categoryId == Guid.Empty)
@@ -360,6 +376,46 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         }
 
         CategoryId = categoryId;
+        _additionalCategories.RemoveAll(pc => pc.CategoryId == categoryId);
+    }
+
+    /// <summary>
+    /// Replaces the full set of additional (non-primary) categories this product is
+    /// cross-listed under.
+    /// </summary>
+    /// <param name="categoryIds">The additional category identifiers. Duplicates are ignored.</param>
+    /// <returns>
+    /// The newly created <see cref="ProductCategory"/> rows. When <see cref="Product"/> is already
+    /// tracked by EF Core (e.g. loaded for an update, as opposed to a brand-new aggregate), adding
+    /// these via the collection navigation alone isn't enough for EF to recognize them as new rows —
+    /// the caller must explicitly add them to <c>ICatalogDbContext.ProductCategories</c>, mirroring
+    /// how <see cref="AddImage"/> callers explicitly add to <c>ProductImages</c>.
+    /// </returns>
+    /// <exception cref="ArgumentException">Thrown when a category id duplicates the primary category.</exception>
+    public IReadOnlyList<ProductCategory> SetAdditionalCategories(IEnumerable<Guid> categoryIds)
+    {
+        var distinctIds = categoryIds.Distinct().ToList();
+
+        if (distinctIds.Contains(CategoryId))
+        {
+            throw new ArgumentException(
+                "A category cannot be assigned as both the primary and an additional category.",
+                nameof(categoryIds));
+        }
+
+        _additionalCategories.RemoveAll(pc => !distinctIds.Contains(pc.CategoryId));
+
+        var existingIds = _additionalCategories.Select(pc => pc.CategoryId).ToHashSet();
+        var added = new List<ProductCategory>();
+
+        foreach (var categoryId in distinctIds.Where(id => !existingIds.Contains(id)))
+        {
+            var productCategory = ProductCategory.Create(Id, categoryId);
+            _additionalCategories.Add(productCategory);
+            added.Add(productCategory);
+        }
+
+        return added;
     }
 
     /// <summary>

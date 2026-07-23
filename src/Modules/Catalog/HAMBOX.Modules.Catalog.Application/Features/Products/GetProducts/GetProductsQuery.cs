@@ -12,4 +12,5 @@ public record GetProductsQuery(
     string? SearchTerm,
     ProductStatus? Status,
     Guid? CategoryId,
-    ProductSortBy? SortBy) : IRequest<Result<PagedResult<ProductDto>>>;
+    ProductSortBy? SortBy,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? AttributeFilters = null) : IRequest<Result<PagedResult<ProductDto>>>;

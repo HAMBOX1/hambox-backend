@@ -51,6 +51,7 @@ internal static class CatalogMapper
             product.CategoryId,
             categoryName,
             categoryNameAr,
+            product.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
             GetPrimaryImageUrl(product),
             images,
             product.CreatedOnUtc);

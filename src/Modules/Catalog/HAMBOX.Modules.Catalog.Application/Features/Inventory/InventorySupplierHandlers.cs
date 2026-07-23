@@ -164,7 +164,14 @@ public sealed record ImportInventoryCodesCommand(
     Guid BatchId,
     IReadOnlyList<string> Codes) : IRequest<Result<ImportCodesResultDto>>;
 
-public sealed record ImportCodesResultDto(int Imported, int Duplicates, int Invalid);
+public sealed record ImportCodeDuplicateDto(string Code, string ProductName, string VariantName, string? BatchName);
+
+public sealed record ImportCodesResultDto(
+    int TotalSubmitted,
+    int ImportedCount,
+    int DuplicateCount,
+    int InvalidCount,
+    IReadOnlyList<ImportCodeDuplicateDto> Duplicates);
 
 internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<ImportInventoryCodesCommand, Result<ImportCodesResultDto>>
 {
@@ -192,7 +199,12 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
                 _currentUser.UserId,
                 cancellationToken);
 
-            return Result.Success(new ImportCodesResultDto(result.Imported, result.Duplicates, result.Invalid));
+            var duplicates = result.DuplicateDetails
+                .Select(d => new ImportCodeDuplicateDto(d.Code, d.ProductName, d.VariantSku, d.BatchName))
+                .ToList();
+
+            return Result.Success(new ImportCodesResultDto(
+                result.TotalSubmitted, result.Imported, result.Duplicates, result.Invalid, duplicates));
         }
         catch (InvalidOperationException ex) when (ex.Message == "Batch not found.")
         {
@@ -272,7 +284,7 @@ internal sealed class GetInventoryAuditLogsQueryHandler : IRequestHandler<GetInv
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(l => new InventoryAuditLogDto(
-                l.Id, l.Action.ToString(), l.ProductId, l.VariantId, l.BatchId, l.CodeId, l.Details, l.OccurredOnUtc))
+                l.Id, l.Action.ToString(), l.ProductId, l.VariantId, l.BatchId, l.CodeId, l.PerformedByUserId, l.Details, l.OccurredOnUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<InventoryAuditLogDto>>(items);

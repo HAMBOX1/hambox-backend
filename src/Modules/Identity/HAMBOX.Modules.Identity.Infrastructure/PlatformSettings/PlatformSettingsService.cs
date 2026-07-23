@@ -20,6 +20,7 @@ internal sealed class PlatformSettingsService(
     IConfiguration configuration,
     IMemoryCache memoryCache,
     IPlatformSettingsSecretProtector secretProtector,
+    IPasswordHasher passwordHasher,
     ILogger<PlatformSettingsService> logger) : IPlatformSettingsService
 {
     private const string CachePrefix = "platform-settings:";
@@ -234,6 +235,21 @@ internal sealed class PlatformSettingsService(
     public Task<MaintenanceSettingsPayload> GetMaintenanceAsync(CancellationToken cancellationToken = default) =>
         GetAsync<MaintenanceSettingsPayload>(PlatformSettingsCategoryKeys.Maintenance, cancellationToken);
 
+    public async Task<bool> VerifyMaintenanceBypassPasswordAsync(
+        string password,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await dbContext.PlatformSettingsCategories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CategoryKey == PlatformSettingsCategoryKeys.Maintenance, cancellationToken);
+
+        var hash = row is null
+            ? null
+            : (JsonNode.Parse(row.PayloadJson) as JsonObject)?["bypassPasswordHash"]?.GetValue<string>();
+
+        return !string.IsNullOrWhiteSpace(hash) && passwordHasher.VerifyPassword(hash, password);
+    }
+
     public Task<StorefrontContentSettingsPayload> GetStorefrontAsync(CancellationToken cancellationToken = default) =>
         GetAsync<StorefrontContentSettingsPayload>(PlatformSettingsCategoryKeys.Storefront, cancellationToken);
 
@@ -367,6 +383,34 @@ internal sealed class PlatformSettingsService(
             return node.ToJsonString(JsonOptions);
         }
 
+        if (categoryKey == PlatformSettingsCategoryKeys.Maintenance)
+        {
+            var incoming = PlatformSettingsDefaultsFactory.Deserialize<MaintenanceSettingsPayload>(payloadJson);
+            var existingRow = await dbContext.PlatformSettingsCategories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.CategoryKey == categoryKey, cancellationToken);
+
+            string? hash = null;
+            if (!string.IsNullOrWhiteSpace(incoming.BypassPassword))
+            {
+                hash = passwordHasher.HashPassword(incoming.BypassPassword);
+            }
+            else if (existingRow is not null)
+            {
+                var existingNode = JsonNode.Parse(existingRow.PayloadJson) as JsonObject;
+                hash = existingNode?["bypassPasswordHash"]?.GetValue<string>();
+            }
+
+            var node = JsonNode.Parse(payloadJson) as JsonObject ?? new JsonObject();
+            node.Remove("bypassPassword");
+            if (!string.IsNullOrWhiteSpace(hash))
+            {
+                node["bypassPasswordHash"] = hash;
+            }
+
+            return node.ToJsonString(JsonOptions);
+        }
+
         return payloadJson;
     }
 
@@ -379,6 +423,14 @@ internal sealed class PlatformSettingsService(
             var hasCipher = node?.ContainsKey("passwordCipher") == true
                 || !string.IsNullOrWhiteSpace(configuration["EmailSettings:Password"]);
             return email with { Password = null, HasStoredPassword = hasCipher };
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.Maintenance)
+        {
+            var maintenance = PlatformSettingsDefaultsFactory.Deserialize<MaintenanceSettingsPayload>(mergedJson);
+            var node = JsonNode.Parse(mergedJson) as JsonObject;
+            var hasHash = node?.ContainsKey("bypassPasswordHash") == true;
+            return maintenance with { BypassPassword = null, HasStoredBypassPassword = hasHash };
         }
 
         return PlatformSettingsDefaultsFactory.GetDefaultPayload(categoryKey, configuration).GetType() switch

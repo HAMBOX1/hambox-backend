@@ -18,4 +18,8 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
+  </ItemGroup>
+
 </Project>

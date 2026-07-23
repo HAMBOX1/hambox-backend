@@ -114,6 +114,22 @@ public sealed class LocalFileStorage : IFileStorage
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
+
+        var absolutePath = Path.Combine(_rootPath, storageKey.Replace('/', Path.DirectorySeparatorChar));
+
+        if (!File.Exists(absolutePath))
+        {
+            throw new FileNotFoundException($"Stored file '{storageKey}' was not found.", absolutePath);
+        }
+
+        Stream stream = new FileStream(absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return Task.FromResult(stream);
+    }
+
     private HAMBOX.Application.PlatformSettings.MediaSettingsPayload ResolveMediaSettings()
     {
         using var scope = _scopeFactory.CreateScope();

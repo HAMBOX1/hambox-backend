@@ -62,7 +62,9 @@ internal static class BulkProductSelectionResolver
 
         if (selection.CategoryId.HasValue)
         {
-            query = query.Where(p => p.CategoryId == selection.CategoryId.Value);
+            query = query.Where(p =>
+                p.CategoryId == selection.CategoryId.Value ||
+                p.AdditionalCategories.Any(pc => pc.CategoryId == selection.CategoryId.Value));
         }
 
         var ids = await query.Select(p => p.Id).Take(MaxMatches + 1).ToListAsync(cancellationToken);

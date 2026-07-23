@@ -27,11 +27,23 @@ internal sealed class GetCategoryTreeQueryHandler(ICatalogDbContext dbContext)
             .Select(g => new { ParentId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.ParentId, g => g.Count, cancellationToken);
 
-        var productCounts = await dbContext.Products
+        var primaryLinks = await dbContext.Products
             .AsNoTracking()
-            .GroupBy(p => p.CategoryId)
-            .Select(g => new { CategoryId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.CategoryId, g => g.Count, cancellationToken);
+            .Select(p => new { p.CategoryId, ProductId = p.Id })
+            .ToListAsync(cancellationToken);
+
+        var additionalLinks = await dbContext.ProductCategories
+            .AsNoTracking()
+            .Select(pc => new { pc.CategoryId, pc.ProductId })
+            .ToListAsync(cancellationToken);
+
+        // A product counts once per category it's assigned to (primary or additional), so
+        // browsing "any assigned category" and this admin tree count stay consistent.
+        var productCounts = primaryLinks
+            .Select(l => (l.CategoryId, l.ProductId))
+            .Concat(additionalLinks.Select(l => (l.CategoryId, l.ProductId)))
+            .GroupBy(l => l.CategoryId)
+            .ToDictionary(g => g.Key, g => g.Select(l => l.ProductId).Distinct().Count());
 
         var items = categories
             .Select(c => new CategoryTreeItemDto(

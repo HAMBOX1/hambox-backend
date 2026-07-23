@@ -7,6 +7,7 @@ public sealed record ProductOptionDto(Guid Id, Guid OptionGroupId, string Value,
 public sealed record ProductOptionGroupDto(
     Guid Id,
     Guid ProductId,
+    Guid? ParentOptionId,
     string Key,
     string DisplayName,
     int SortOrder,
@@ -90,6 +91,7 @@ public sealed record InventoryAuditLogDto(
     Guid? VariantId,
     Guid? BatchId,
     Guid? CodeId,
+    string? PerformedByUserId,
     string? Details,
     DateTimeOffset OccurredOnUtc);
 
