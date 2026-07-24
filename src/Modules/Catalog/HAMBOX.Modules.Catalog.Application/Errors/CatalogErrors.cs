@@ -220,4 +220,12 @@ public static class CatalogErrors
     public static readonly Error ExportScopeEmpty = new(
         "ImportExport.ExportScopeEmpty",
         "Select at least one product, a filter, or the entire catalog to export.");
+
+    public static readonly Error InvalidInstructionsImage = new(
+        "Instructions.InvalidImage",
+        "The uploaded image is invalid.");
+
+    public static readonly Error InstructionsNotFound = new(
+        "Instructions.NotFound",
+        "Save instructions content before publishing.");
 }

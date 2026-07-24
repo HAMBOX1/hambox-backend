@@ -208,4 +208,15 @@ public sealed record CustomerLibraryItemDto(
     string? RedeemInstructions,
     string? InvoiceUrl,
     string? SupportUrl,
-    bool IsRecentPurchase);
+    bool IsRecentPurchase,
+    bool HasInstructions);
+
+/// <summary>
+/// Represents the private, published post-purchase documentation for a library item, as seen by the
+/// customer who purchased it.
+/// </summary>
+public sealed record LibraryItemInstructionsDto(
+    string Title,
+    string ContentHtml,
+    int Version,
+    DateTimeOffset? UpdatedOnUtc);

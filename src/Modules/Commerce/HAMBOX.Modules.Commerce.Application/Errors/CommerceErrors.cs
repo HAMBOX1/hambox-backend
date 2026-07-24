@@ -168,4 +168,13 @@ public static class CommerceErrors
     public static Error OrderManualCodeInvalid(string message) => new(
         "Orders.ManualCodeInvalid",
         message);
+
+    /// <summary>
+    /// Gets the single, deliberately non-specific error for every reason a customer may not view a
+    /// product's instructions (order not found, not theirs, not completed, or instructions not
+    /// published) — collapsed to one code so the 403 response never reveals which check failed.
+    /// </summary>
+    public static readonly Error InstructionsNotAccessible = new(
+        "Library.InstructionsNotAccessible",
+        "These instructions are not available.");
 }

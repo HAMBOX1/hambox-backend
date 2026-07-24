@@ -7,6 +7,7 @@ using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
+using HAMBOX.Modules.Catalog.Domain.Instructions;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.Modules.Catalog.Domain.Products;
@@ -54,6 +55,11 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     /// Gets or sets the product drafts table.
     /// </summary>
     public DbSet<ProductDraft> ProductDrafts => Set<ProductDraft>();
+
+    /// <summary>
+    /// Gets or sets the product instructions table.
+    /// </summary>
+    public DbSet<ProductInstructions> ProductInstructions => Set<ProductInstructions>();
 
     public DbSet<ProductPlan> ProductPlans => Set<ProductPlan>();
     public DbSet<ProductOptionGroup> ProductOptionGroups => Set<ProductOptionGroup>();

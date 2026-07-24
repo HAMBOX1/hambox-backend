@@ -3,6 +3,7 @@ using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
+using HAMBOX.Modules.Catalog.Domain.Instructions;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.Modules.Catalog.Domain.Products;
@@ -49,6 +50,11 @@ public interface ICatalogDbContext
     /// Gets the product drafts database set.
     /// </summary>
     DbSet<ProductDraft> ProductDrafts { get; }
+
+    /// <summary>
+    /// Gets the product instructions database set.
+    /// </summary>
+    DbSet<ProductInstructions> ProductInstructions { get; }
 
     DbSet<ProductPlan> ProductPlans { get; }
     DbSet<ProductOptionGroup> ProductOptionGroups { get; }

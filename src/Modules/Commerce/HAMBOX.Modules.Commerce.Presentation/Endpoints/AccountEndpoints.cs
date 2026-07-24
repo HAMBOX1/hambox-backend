@@ -118,6 +118,12 @@ internal static class AccountEndpoints
             return ToResult(result);
         }).WithName("RevealCustomerLibraryKey");
 
+        group.MapGet("library/{orderItemId:guid}/instructions", async (Guid orderItemId, ISender sender) =>
+        {
+            var result = await sender.Send(new GetLibraryItemInstructionsQuery(orderItemId));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.Forbid();
+        }).WithName("GetLibraryItemInstructions");
+
         group.MapGet("products/{productId:guid}/reviews", async (Guid productId, ISender sender) =>
         {
             var result = await sender.Send(new GetProductReviewsQuery(productId));

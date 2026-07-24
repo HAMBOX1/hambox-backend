@@ -93,6 +93,12 @@ internal sealed class GetCustomerLibraryQueryHandler
             productIds,
             cancellationToken);
 
+        var publishedInstructionsProductIds = await _catalogDbContext.ProductInstructions
+            .AsNoTracking()
+            .Where(i => productIds.Contains(i.ProductId) && i.IsPublished)
+            .Select(i => i.ProductId)
+            .ToHashSetAsync(cancellationToken);
+
         var variants = variantIds.Count > 0
             ? await _catalogDbContext.ProductVariants
                 .AsNoTracking()
@@ -155,7 +161,8 @@ internal sealed class GetCustomerLibraryQueryHandler
                 BuildRedeemInstructions(platform, product?.DescriptionEn),
                 null,
                 supportUrl,
-                isRecent);
+                isRecent,
+                publishedInstructionsProductIds.Contains(row.ProductId));
         }).ToList();
 
         items = ApplyFilters(items, request.SearchTerm, request.DeliveryStatus, request.Group);
