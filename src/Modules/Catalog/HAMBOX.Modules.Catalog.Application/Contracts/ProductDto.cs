@@ -14,6 +14,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="CategoryName">The primary category name (English).</param>
 /// <param name="CategoryNameAr">The primary category name (Arabic).</param>
 /// <param name="AdditionalCategoryIds">The identifiers of additional (non-primary) categories this product is cross-listed under.</param>
+/// <param name="CollectionIds">The identifiers of the internal, owner-only collections this product is organized under.</param>
 /// <param name="PrimaryImageUrl">The URL of the primary image, if any.</param>
 /// <param name="Images">The ordered product images. Populated on detail reads.</param>
 /// <param name="CreatedOnUtc">When the product was created.</param>
@@ -33,4 +34,5 @@ public sealed record ProductDto(
     string? PrimaryImageUrl,
     IReadOnlyList<ProductImageDto>? Images,
     DateTimeOffset CreatedOnUtc,
-    int AvailableStock = 0);
+    int AvailableStock = 0,
+    IReadOnlyList<Guid>? CollectionIds = null);

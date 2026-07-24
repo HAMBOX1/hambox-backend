@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
@@ -33,6 +34,16 @@ public interface ICatalogDbContext
     /// Gets the product additional-category assignments database set.
     /// </summary>
     DbSet<ProductCategory> ProductCategories { get; }
+
+    /// <summary>
+    /// Gets the collections database set (internal, owner-only product organization).
+    /// </summary>
+    DbSet<ProductCollection> ProductCollections { get; }
+
+    /// <summary>
+    /// Gets the product-collection assignments database set.
+    /// </summary>
+    DbSet<ProductCollectionItem> ProductCollectionItems { get; }
 
     /// <summary>
     /// Gets the product drafts database set.

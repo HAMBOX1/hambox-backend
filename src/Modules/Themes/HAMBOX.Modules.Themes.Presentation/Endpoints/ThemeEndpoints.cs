@@ -38,6 +38,10 @@ internal static class ThemeEndpoints
             MapResult(await sender.Send(new GetThemeStatisticsQuery())))
             .RequirePermission(PermissionConstants.Themes.View);
 
+        admin.MapGet("templates", async Task<IResult> (ISender sender) =>
+            MapResult(await sender.Send(new GetThemeTemplatesQuery())))
+            .RequirePermission(PermissionConstants.Themes.View);
+
         admin.MapGet("{id:guid}", async Task<IResult> (Guid id, ISender sender) =>
             MapResult(await sender.Send(new GetThemeByIdQuery(id))))
             .RequirePermission(PermissionConstants.Themes.View);

@@ -12,7 +12,8 @@ public sealed record CatalogPackageOptions(
     bool IncludeDigitalCodes = false,
     bool IncludeImages = true,
     bool IncludeLocalization = true,
-    bool IncludeSuppliers = false);
+    bool IncludeSuppliers = false,
+    bool IncludeCollections = true);
 
 /// <summary>
 /// Either an explicit id list, a server-resolved filter ("selected"/"filtered"), or the entire
@@ -41,10 +42,18 @@ public sealed record CatalogExportScope(
 public sealed record ParsedCategoryRow(
     int RowNumber, string Slug, string NameEn, string? NameAr, string? ParentSlug, bool IsActive, int SortOrder);
 
+/// <summary>
+/// A collection has no slug (internal-only, no URL) — dedupe/matching uses <c>Name</c> +
+/// <c>ParentName</c> instead (see <see cref="CatalogDedupeKeys.Collection"/>).
+/// </summary>
+public sealed record ParsedCollectionRow(
+    int RowNumber, string Name, string? Description, string? Color, string? Icon, string? ParentName, int SortOrder);
+
 public sealed record ParsedProductRow(
     int RowNumber, string ImportKey, string NameEn, string? NameAr, string? DescriptionEn, string? DescriptionAr,
     decimal Price, string CategorySlug, string? Status, int StockQuantity,
-    IReadOnlyList<string> ImagePaths, IReadOnlyList<string> AdditionalCategorySlugs);
+    IReadOnlyList<string> ImagePaths, IReadOnlyList<string> AdditionalCategorySlugs,
+    IReadOnlyList<string>? CollectionNames = null);
 
 public sealed record ParsedOptionGroupRow(
     string ProductImportKey, string Key, string DisplayName, string? ParentKey, int SortOrder, bool IsRequired);
@@ -79,11 +88,12 @@ public sealed record ParsedCatalogPackage(
     IReadOnlyList<ParsedCodeRow> Codes,
     IReadOnlyList<ParsedSupplierMappingRow> SupplierMappings,
     IReadOnlyDictionary<string, byte[]> Images,
-    bool CodesEncrypted)
+    bool CodesEncrypted,
+    IReadOnlyList<ParsedCollectionRow> Collections)
 {
     public static ParsedCatalogPackage Empty { get; } = new(
         [], [], [], [], [], [], [],
-        new Dictionary<string, byte[]>(), false);
+        new Dictionary<string, byte[]>(), false, []);
 }
 
 // ---------- Validation report (Step 2 of the wizard) ----------
@@ -137,6 +147,7 @@ public sealed record CatalogPackageJobDto(
 public static class CatalogDedupeKeys
 {
     public const string Category = "Slug";
+    public const string Collection = "Name+ParentName";
     public const string Product = "CategorySlug+NameEn";
     public const string Variant = "Sku";
     public const string Code = "CodeHash";

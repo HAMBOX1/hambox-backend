@@ -96,11 +96,19 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(pc => pc.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(p => p.Collections)
+            .WithOne()
+            .HasForeignKey(pc => pc.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Metadata for encapsulated collections
         builder.Metadata.FindNavigation(nameof(Product.Images))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Metadata.FindNavigation(nameof(Product.AdditionalCategories))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Metadata.FindNavigation(nameof(Product.Collections))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         // Indexes

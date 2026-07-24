@@ -1,5 +1,6 @@
 using HAMBOX.Domain.Entities;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Events;
 using HAMBOX.Modules.Catalog.Domain.Images;
@@ -19,6 +20,7 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
 {
     private readonly List<ProductImage> _images = [];
     private readonly List<ProductCategory> _additionalCategories = [];
+    private readonly List<ProductCollectionItem> _collections = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Product"/> class.
@@ -115,6 +117,15 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// Used for browsing, search, discovery, and promotions alongside <see cref="CategoryId"/>.
     /// </summary>
     public IReadOnlyCollection<ProductCategory> AdditionalCategories => _additionalCategories.AsReadOnly();
+
+    /// <summary>
+    /// Gets the internal, owner-only collections this product is organized under.
+    /// </summary>
+    /// <remarks>
+    /// Collections are independent of <see cref="CategoryId"/>/<see cref="AdditionalCategories"/> —
+    /// they never affect the storefront and have no "primary" concept.
+    /// </remarks>
+    public IReadOnlyCollection<ProductCollectionItem> Collections => _collections.AsReadOnly();
 
     /// <inheritdoc />
     public string? CreatedBy { get; private set; }
@@ -416,6 +427,66 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         }
 
         return added;
+    }
+
+    /// <summary>
+    /// Replaces the full set of collections this product is organized under.
+    /// </summary>
+    /// <param name="collectionIds">The collection identifiers. Duplicates are ignored.</param>
+    /// <returns>
+    /// The newly created <see cref="ProductCollectionItem"/> rows. When <see cref="Product"/> is
+    /// already tracked by EF Core, the caller must explicitly add these to
+    /// <c>ICatalogDbContext.ProductCollectionItems</c>, mirroring <see cref="SetAdditionalCategories"/>.
+    /// </returns>
+    public IReadOnlyList<ProductCollectionItem> SetCollections(IEnumerable<Guid> collectionIds)
+    {
+        var distinctIds = collectionIds.Distinct().ToList();
+
+        _collections.RemoveAll(pc => !distinctIds.Contains(pc.CollectionId));
+
+        var existingIds = _collections.Select(pc => pc.CollectionId).ToHashSet();
+        var added = new List<ProductCollectionItem>();
+
+        foreach (var collectionId in distinctIds.Where(id => !existingIds.Contains(id)))
+        {
+            var productCollectionItem = ProductCollectionItem.Create(Id, collectionId);
+            _collections.Add(productCollectionItem);
+            added.Add(productCollectionItem);
+        }
+
+        return added;
+    }
+
+    /// <summary>
+    /// Adds this product to a single collection, if it isn't already a member.
+    /// </summary>
+    /// <returns>The newly created <see cref="ProductCollectionItem"/>, or <c>null</c> if already a member.</returns>
+    public ProductCollectionItem? AddToCollection(Guid collectionId)
+    {
+        if (_collections.Any(pc => pc.CollectionId == collectionId))
+        {
+            return null;
+        }
+
+        var item = ProductCollectionItem.Create(Id, collectionId);
+        _collections.Add(item);
+        return item;
+    }
+
+    /// <summary>
+    /// Removes this product from a single collection, if it is currently a member.
+    /// </summary>
+    /// <returns>The removed <see cref="ProductCollectionItem"/>, or <c>null</c> if not a member.</returns>
+    public ProductCollectionItem? RemoveFromCollection(Guid collectionId)
+    {
+        var item = _collections.Find(pc => pc.CollectionId == collectionId);
+        if (item is null)
+        {
+            return null;
+        }
+
+        _collections.Remove(item);
+        return item;
     }
 
     /// <summary>

@@ -14,4 +14,5 @@ public record UpdateProductCommand(
     decimal Price,
     Guid CategoryId,
     ProductStatus Status,
-    IReadOnlyList<Guid>? AdditionalCategoryIds = null) : IRequest<Result>;
+    IReadOnlyList<Guid>? AdditionalCategoryIds = null,
+    IReadOnlyList<Guid>? CollectionIds = null) : IRequest<Result>;

@@ -197,6 +197,111 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("ProductCategories", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Collections.ProductCollection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsSystem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDeleted")
+                        .HasDatabaseName("IX_ProductCollections_IsDeleted")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("IX_ProductCollections_ParentId");
+
+                    b.ToTable("ProductCollections", "catalog");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Collections.ProductCollectionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CollectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CollectionId")
+                        .HasDatabaseName("IX_ProductCollectionItems_CollectionId");
+
+                    b.HasIndex("ProductId", "CollectionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProductCollectionItems_ProductId_CollectionId");
+
+                    b.ToTable("ProductCollectionItems", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Drafts.ProductDraft", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1072,6 +1177,21 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Collections.ProductCollectionItem", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Collections.ProductCollection", null)
+                        .WithMany()
+                        .HasForeignKey("CollectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
+                        .WithMany("Collections")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Images.ProductImage", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
@@ -1129,6 +1249,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Products.Product", b =>
                 {
                     b.Navigation("AdditionalCategories");
+
+                    b.Navigation("Collections");
 
                     b.Navigation("Images");
                 });

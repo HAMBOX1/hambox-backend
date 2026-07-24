@@ -21,7 +21,7 @@ internal sealed class GetThemesQueryHandler(IThemesDbContext dbContext)
 {
     public async Task<Result<PagedResult<ThemeListItemDto>>> Handle(GetThemesQuery request, CancellationToken cancellationToken)
     {
-        var query = dbContext.StoreThemes.AsNoTracking().Where(t => !t.IsDeleted);
+        var query = dbContext.StoreThemes.AsNoTracking().Where(t => !t.IsDeleted && !t.IsTemplate);
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
@@ -43,20 +43,62 @@ internal sealed class GetThemesQueryHandler(IThemesDbContext dbContext)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var versionCounts = await dbContext.ThemeVersions
+        var itemIds = items.Select(i => i.Id).ToList();
+        var versions = await dbContext.ThemeVersions
             .AsNoTracking()
-            .Where(v => items.Select(i => i.Id).Contains(v.ThemeId))
-            .GroupBy(v => v.ThemeId)
-            .Select(g => new { ThemeId = g.Key, Count = g.Count(), PublishedOn = g.Where(v => v.IsPublished).Max(v => v.PublishedOnUtc) })
-            .ToDictionaryAsync(x => x.ThemeId, cancellationToken);
+            .Where(v => itemIds.Contains(v.ThemeId))
+            .ToListAsync(cancellationToken);
+
+        var versionsByTheme = versions.GroupBy(v => v.ThemeId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var assignments = await dbContext.ThemeAssignments
+            .AsNoTracking()
+            .Where(a => itemIds.Contains(a.ThemeId) && a.IsActive)
+            .ToListAsync(cancellationToken);
+        var assignmentsByTheme = assignments.GroupBy(a => a.ThemeId).ToDictionary(g => g.Key, g => g.ToList());
 
         var dtos = items.Select(t =>
         {
-            versionCounts.TryGetValue(t.Id, out var meta);
-            return ThemeMapper.ToListItem(t, meta?.PublishedOn, meta?.Count ?? 0);
+            var themeVersions = versionsByTheme.GetValueOrDefault(t.Id, []);
+            var publishedOn = themeVersions.Where(v => v.IsPublished).Select(v => v.PublishedOnUtc).Max();
+            var previewVersion = themeVersions.FirstOrDefault(v => v.IsPublished)
+                ?? themeVersions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+            var previewTokens = previewVersion?.GetTokens();
+
+            var topAssignment = assignmentsByTheme.GetValueOrDefault(t.Id, [])
+                .OrderByDescending(a => a.Priority)
+                .FirstOrDefault();
+            var assignmentSummary = topAssignment is null ? null : $"{topAssignment.AssignmentType}: {topAssignment.TargetKey}";
+
+            return ThemeMapper.ToListItem(t, publishedOn, themeVersions.Count, previewTokens, assignmentSummary);
         }).ToList();
 
         return Result.Success(new PagedResult<ThemeListItemDto>(dtos, request.PageNumber, request.PageSize, total));
+    }
+}
+
+public sealed record GetThemeTemplatesQuery() : IRequest<Result<IReadOnlyList<ThemeTemplateDto>>>;
+
+internal sealed class GetThemeTemplatesQueryHandler(IThemesDbContext dbContext)
+    : IRequestHandler<GetThemeTemplatesQuery, Result<IReadOnlyList<ThemeTemplateDto>>>
+{
+    public async Task<Result<IReadOnlyList<ThemeTemplateDto>>> Handle(GetThemeTemplatesQuery request, CancellationToken cancellationToken)
+    {
+        var templates = await dbContext.StoreThemes.AsNoTracking()
+            .Where(t => !t.IsDeleted && t.IsTemplate)
+            .Include(t => t.Versions)
+            .OrderBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+
+        var dtos = templates
+            .Select(t =>
+            {
+                var version = t.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+                return new ThemeTemplateDto(t.Id, t.Name, t.Description, t.BaseMode.ToString(), version?.GetTokens() ?? new Dictionary<string, string>());
+            })
+            .ToList();
+
+        return Result.Success<IReadOnlyList<ThemeTemplateDto>>(dtos);
     }
 }
 
@@ -279,8 +321,15 @@ internal sealed class UpdateThemeCommandHandler(IThemesDbContext dbContext, ICur
 
         theme.Rename(request.Request.Name, null);
 
-        var draft = theme.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished)
-            ?? theme.CreateDraftVersion(request.Request.Tokens, request.Request.Notes);
+        var existingDraft = theme.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished);
+        var draft = existingDraft ?? theme.CreateDraftVersion(request.Request.Tokens, request.Request.Notes);
+        if (existingDraft is null)
+        {
+            // theme.CreateDraftVersion only appends to the aggregate's in-memory collection; EF's navigation-fixup
+            // misclassifies a brand-new child (client-generated Guid key) discovered off an already-tracked parent
+            // as Unchanged/Modified rather than Added, so it must be attached explicitly.
+            dbContext.ThemeVersions.Add(draft);
+        }
 
         draft.UpdateTokens(request.Request.Tokens, request.Request.Notes);
         var validation = ThemeValidator.Validate(request.Request.Tokens);
@@ -480,6 +529,7 @@ internal sealed class ScheduleThemeCommandHandler(IThemesDbContext dbContext, IC
         }
 
         var schedule = theme.AddSchedule(request.Request.StartsAtUtc, request.Request.EndsAtUtc, request.Request.RecurrenceRule);
+        dbContext.ThemeSchedules.Add(schedule);
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.Scheduled, currentUser.UserId);
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success(schedule.Id);
@@ -505,6 +555,7 @@ internal sealed class AssignThemeCommandHandler(IThemesDbContext dbContext, ICur
         }
 
         var assignment = theme.AddAssignment(type, request.Request.TargetKey, request.Request.Priority);
+        dbContext.ThemeAssignments.Add(assignment);
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.Assigned, currentUser.UserId, $"{{\"type\":\"{type}\",\"target\":\"{request.Request.TargetKey}\"}}");
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success(assignment.Id);
@@ -518,7 +569,9 @@ internal sealed class UpsertThemeAssetsCommandHandler(IThemesDbContext dbContext
 {
     public async Task<Result> Handle(UpsertThemeAssetsCommand request, CancellationToken cancellationToken)
     {
-        var theme = await dbContext.StoreThemes.FirstOrDefaultAsync(t => t.Id == request.Id && !t.IsDeleted, cancellationToken);
+        var theme = await dbContext.StoreThemes
+            .Include(t => t.Assets)
+            .FirstOrDefaultAsync(t => t.Id == request.Id && !t.IsDeleted, cancellationToken);
         if (theme is null)
         {
             return Result.Failure(ThemeErrors.ThemeNotFound);
@@ -531,7 +584,12 @@ internal sealed class UpsertThemeAssetsCommandHandler(IThemesDbContext dbContext
                 return Result.Failure(new Error("Theme.InvalidAssetType", $"Invalid asset type: {asset.AssetType}"));
             }
 
-            theme.UpsertAsset(assetType, asset.Url, asset.AltText);
+            var isNew = !theme.Assets.Any(a => a.AssetType == assetType);
+            var upserted = theme.UpsertAsset(assetType, asset.Url, asset.AltText);
+            if (isNew)
+            {
+                dbContext.ThemeAssets.Add(upserted);
+            }
         }
 
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.Edited, currentUser.UserId, "{\"section\":\"assets\"}");

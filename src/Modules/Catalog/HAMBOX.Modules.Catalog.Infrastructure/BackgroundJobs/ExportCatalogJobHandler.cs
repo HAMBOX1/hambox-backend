@@ -6,6 +6,7 @@ using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
@@ -109,6 +110,7 @@ internal sealed class ExportCatalogJobHandler(
             .Where(p => productIds.Contains(p.Id))
             .Include(p => p.Images)
             .Include(p => p.AdditionalCategories)
+            .Include(p => p.Collections)
             .ToListAsync(ct);
 
         var referencedCategoryIds = products.Select(p => p.CategoryId)
@@ -124,6 +126,18 @@ internal sealed class ExportCatalogJobHandler(
         var categoryRows = categoriesInScope.Select((c, i) => new ParsedCategoryRow(
             i + 1, c.Slug, c.NameEn, c.NameAr, c.ParentId.HasValue ? categorySlugById.GetValueOrDefault(c.ParentId.Value) : null,
             c.IsActive, c.SortOrder)).ToList();
+
+        var referencedCollectionIds = products.SelectMany(p => p.Collections.Select(pc => pc.CollectionId)).ToHashSet();
+
+        var allCollections = options.IncludeCollections
+            ? await catalogDb.ProductCollections.AsNoTracking().ToListAsync(ct)
+            : [];
+        var collectionsInScope = CollectCollectionsWithAncestors(allCollections, referencedCollectionIds);
+        var collectionNameById = allCollections.ToDictionary(c => c.Id, c => c.Name);
+
+        var collectionRows = collectionsInScope.Select((c, i) => new ParsedCollectionRow(
+            i + 1, c.Name, c.Description, c.Color, c.Icon,
+            c.ParentId.HasValue ? collectionNameById.GetValueOrDefault(c.ParentId.Value) : null, c.SortOrder)).ToList();
 
         var images = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         var productRows = new List<ParsedProductRow>();
@@ -166,6 +180,8 @@ internal sealed class ExportCatalogJobHandler(
                 options.IncludeInventory ? product.StockQuantity : 0,
                 imagePaths,
                 product.AdditionalCategories.Select(ac => categorySlugById.GetValueOrDefault(ac.CategoryId, string.Empty))
+                    .Where(s => s.Length > 0).ToList(),
+                product.Collections.Select(pc => collectionNameById.GetValueOrDefault(pc.CollectionId, string.Empty))
                     .Where(s => s.Length > 0).ToList()));
         }
 
@@ -274,7 +290,8 @@ internal sealed class ExportCatalogJobHandler(
         }
 
         return new ParsedCatalogPackage(
-            categoryRows, productRows, optionGroupRows, optionRows, variantRows, codeRows, supplierMappingRows, images, payload.EncryptCodes);
+            categoryRows, productRows, optionGroupRows, optionRows, variantRows, codeRows, supplierMappingRows, images, payload.EncryptCodes,
+            collectionRows);
     }
 
     private static List<Category> CollectWithAncestors(List<Category> allCategories, HashSet<Guid> seedIds)
@@ -294,11 +311,28 @@ internal sealed class ExportCatalogJobHandler(
         return [.. result.Values];
     }
 
+    private static List<ProductCollection> CollectCollectionsWithAncestors(List<ProductCollection> allCollections, HashSet<Guid> seedIds)
+    {
+        var byId = allCollections.ToDictionary(c => c.Id);
+        var result = new Dictionary<Guid, ProductCollection>();
+
+        foreach (var id in seedIds)
+        {
+            var current = byId.GetValueOrDefault(id);
+            while (current is not null && result.TryAdd(current.Id, current))
+            {
+                current = current.ParentId.HasValue ? byId.GetValueOrDefault(current.ParentId.Value) : null;
+            }
+        }
+
+        return [.. result.Values];
+    }
+
     private static byte[] BuildProductsXlsx(IReadOnlyList<ParsedProductRow> products)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Products");
-        string[] headers = ["ImportKey", "NameEn", "NameAr", "DescriptionEn", "DescriptionAr", "Price", "CategorySlug", "Status", "StockQuantity", "AdditionalCategorySlugs"];
+        string[] headers = ["ImportKey", "NameEn", "NameAr", "DescriptionEn", "DescriptionAr", "Price", "CategorySlug", "Status", "StockQuantity", "AdditionalCategorySlugs", "CollectionNames"];
         for (var i = 0; i < headers.Length; i++)
         {
             sheet.Cell(1, i + 1).Value = headers[i];
@@ -318,6 +352,7 @@ internal sealed class ExportCatalogJobHandler(
             sheet.Cell(r + 2, 8).Value = p.Status ?? string.Empty;
             sheet.Cell(r + 2, 9).Value = p.StockQuantity;
             sheet.Cell(r + 2, 10).Value = string.Join(',', p.AdditionalCategorySlugs);
+            sheet.Cell(r + 2, 11).Value = string.Join(',', p.CollectionNames ?? []);
         }
 
         sheet.Columns().AdjustToContents();
@@ -329,13 +364,13 @@ internal sealed class ExportCatalogJobHandler(
     private static byte[] BuildProductsCsv(IReadOnlyList<ParsedProductRow> products)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("ImportKey,NameEn,NameAr,DescriptionEn,DescriptionAr,Price,CategorySlug,Status,StockQuantity,AdditionalCategorySlugs");
+        builder.AppendLine("ImportKey,NameEn,NameAr,DescriptionEn,DescriptionAr,Price,CategorySlug,Status,StockQuantity,AdditionalCategorySlugs,CollectionNames");
         foreach (var p in products)
         {
             builder.AppendLine(string.Join(',',
                 Escape(p.ImportKey), Escape(p.NameEn), Escape(p.NameAr ?? ""), Escape(p.DescriptionEn ?? ""),
                 Escape(p.DescriptionAr ?? ""), p.Price, Escape(p.CategorySlug), Escape(p.Status ?? ""),
-                p.StockQuantity, Escape(string.Join(';', p.AdditionalCategorySlugs))));
+                p.StockQuantity, Escape(string.Join(';', p.AdditionalCategorySlugs)), Escape(string.Join(';', p.CollectionNames ?? []))));
         }
 
         return Encoding.UTF8.GetBytes(builder.ToString());

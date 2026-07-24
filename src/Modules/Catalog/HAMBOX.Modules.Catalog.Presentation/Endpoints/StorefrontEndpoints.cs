@@ -2,6 +2,8 @@ using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Storefront.GetStorefrontContent;
 using HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration;
+using HAMBOX.Modules.Identity.Application.Authorization;
+using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -65,5 +67,29 @@ internal static class StorefrontEndpoints
         })
         .WithName("GetStorefrontProductConfiguration")
         .AllowAnonymous();
+
+        // GET /api/v1/storefront/products/{productId}/configuration/preview — admin-only, ignores Draft/Inactive status
+        // so an owner can preview a product before publishing it.
+        group.MapGet("products/{productId:guid}/configuration/preview", async Task<Results<Ok<StorefrontProductConfigurationDto>, BadRequest<ProblemDetails>>> (
+            Guid productId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetStorefrontProductConfigurationQuery(productId, AllowUnpublished: true));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetStorefrontProductConfigurationPreview")
+        .RequirePermission(PermissionConstants.Catalog.Products.View);
     }
 }

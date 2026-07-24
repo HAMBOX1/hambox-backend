@@ -42,6 +42,21 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
             }
         }
 
+        var collectionIds = request.CollectionIds ?? [];
+        if (collectionIds.Count > 0)
+        {
+            var existingCollectionCount = await _dbContext.ProductCollections
+                .Where(c => collectionIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (existingCollectionCount != collectionIds.Distinct().Count())
+            {
+                return Result.Failure<Guid>(CatalogErrors.CollectionNotFound);
+            }
+        }
+
         var product = Product.Create(
             request.NameAr,
             request.NameEn,
@@ -51,11 +66,16 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
             request.CategoryId);
 
         var newAdditionalCategories = product.SetAdditionalCategories(additionalCategoryIds);
+        var newCollectionItems = product.SetCollections(collectionIds);
 
         _dbContext.Products.Add(product);
         foreach (var newAdditionalCategory in newAdditionalCategories)
         {
             _dbContext.ProductCategories.Add(newAdditionalCategory);
+        }
+        foreach (var newCollectionItem in newCollectionItems)
+        {
+            _dbContext.ProductCollectionItems.Add(newCollectionItem);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration;
 
-public sealed record GetStorefrontProductConfigurationQuery(Guid ProductId)
+public sealed record GetStorefrontProductConfigurationQuery(Guid ProductId, bool AllowUnpublished = false)
     : IRequest<Result<StorefrontProductConfigurationDto>>;
 
 internal sealed class GetStorefrontProductConfigurationQueryHandler
@@ -42,7 +42,7 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
 
-        if (product is null || product.Status != ProductStatus.Active)
+        if (product is null || (!request.AllowUnpublished && product.Status != ProductStatus.Active))
         {
             return Result.Failure<StorefrontProductConfigurationDto>(CatalogErrors.ProductNotFound);
         }
@@ -63,7 +63,8 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
         var variants = await _db.ProductVariants
             .AsNoTracking()
             .Include(v => v.SelectedOptions)
-            .Where(v => v.ProductId == request.ProductId && v.Status == ProductVariantStatus.Active && v.IsVisible)
+            .Where(v => v.ProductId == request.ProductId
+                && (request.AllowUnpublished || (v.Status == ProductVariantStatus.Active && v.IsVisible)))
             .OrderBy(v => v.SortOrder)
             .ToListAsync(cancellationToken);
 
@@ -85,7 +86,10 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
                 v.SelectedOptions.Select(o => o.OptionId).ToList());
         }).ToList();
 
-        await TryLogProductViewAsync(request.ProductId, cancellationToken);
+        if (!request.AllowUnpublished)
+        {
+            await TryLogProductViewAsync(request.ProductId, cancellationToken);
+        }
 
         return Result.Success(new StorefrontProductConfigurationDto(
             product.Id,

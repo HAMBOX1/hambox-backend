@@ -173,6 +173,22 @@ public static class CatalogErrors
         "Categories.Cycle",
         "The parent assignment would create a category cycle.");
 
+    public static readonly Error CollectionNotFound = new(
+        "Collections.NotFound",
+        "The collection with the specified identifier was not found.");
+
+    public static readonly Error CollectionHasChildren = new(
+        "Collections.HasChildren",
+        "The collection has child collections and cannot be deleted.");
+
+    public static readonly Error CollectionCycle = new(
+        "Collections.Cycle",
+        "The parent assignment would create a collection cycle.");
+
+    public static readonly Error CollectionIsSystem = new(
+        "Collections.IsSystem",
+        "System-defined collections cannot be deleted.");
+
     public static readonly Error PackageJobNotFound = new(
         "ImportExport.PackageJobNotFound",
         "The import/export job was not found.");

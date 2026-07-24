@@ -33,6 +33,7 @@ internal sealed class HamboxPackageReader(IPackageCryptoService crypto) : IHambo
         using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
 
         var categories = ReadJsonEntry<List<ParsedCategoryRow>>(archive, "categories.json") ?? [];
+        var collections = ReadJsonEntry<List<ParsedCollectionRow>>(archive, "collections.json") ?? [];
         var products = ReadJsonEntry<List<ParsedProductRow>>(archive, "products.json") ?? [];
         var optionGroups = ReadJsonEntry<List<ParsedOptionGroupRow>>(archive, "option-groups.json") ?? [];
         var options = ReadJsonEntry<List<ParsedOptionRow>>(archive, "options.json") ?? [];
@@ -69,7 +70,7 @@ internal sealed class HamboxPackageReader(IPackageCryptoService crypto) : IHambo
         }
 
         return new ParsedCatalogPackage(
-            categories, products, optionGroups, options, variants, codes, supplierMappings, images, codesEncrypted);
+            categories, products, optionGroups, options, variants, codes, supplierMappings, images, codesEncrypted, collections);
     }
 
     private static T? ReadJsonEntry<T>(ZipArchive archive, string entryName)

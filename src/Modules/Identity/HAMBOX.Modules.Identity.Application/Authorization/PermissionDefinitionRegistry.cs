@@ -53,6 +53,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Suppliers = new("15000000-0000-0000-0000-000000000028");
         public static readonly Guid Security = new("15000000-0000-0000-0000-000000000029");
         public static readonly Guid Communication = new("15000000-0000-0000-0000-000000000030");
+        public static readonly Guid Collections = new("15000000-0000-0000-0000-000000000031");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -87,6 +88,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Suppliers, "Suppliers", "Suppliers", "Operations", 146),
         new(GroupIds.Security, "Security", "Security Center", "Security", 147, "Blocked users, emails, countries, IPs, and security events"),
         new(GroupIds.Communication, "Communication", "Communication Center", "Communication", 148, "Templates, notifications, providers, and delivery history"),
+        new(GroupIds.Collections, "Collections", "Collections", "Catalog", 45, "Internal, owner-only product organization (never customer-facing)"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -263,6 +265,12 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000251"), GroupIds.Communication, PermissionConstants.Communication.ManageProviders, 5),
 
         new(new Guid("20000000-0000-0000-0000-000000000252"), GroupIds.Legal, PermissionConstants.Legal.Delete, 5),
+
+        // Collections (253-256) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000253"), GroupIds.Collections, PermissionConstants.Catalog.Collections.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000254"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Create, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000255"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Edit, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000256"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Delete, 4),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

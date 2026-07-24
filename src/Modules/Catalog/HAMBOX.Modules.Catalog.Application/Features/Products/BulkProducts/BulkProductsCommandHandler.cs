@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Features.Products.AdjustProductPrice;
+using HAMBOX.Modules.Catalog.Application.Features.Products.AssignProductCollection;
 using HAMBOX.Modules.Catalog.Application.Features.Products.ChangeProductCategory;
+using HAMBOX.Modules.Catalog.Application.Features.Products.RemoveProductCollection;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 // PublishProductCommand / DeactivateProductCommand / ArchiveProductCommand live directly in Features.Products (ProductLifecycleHandlers.cs).
@@ -38,6 +40,11 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBulkActionNotSupported(action));
         }
 
+        if ((action == "assign-collection" || action == "remove-collection") && request.TargetCollectionId is null)
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBulkActionNotSupported(action));
+        }
+
         var selection = new BulkProductSelection(
             request.ProductIds, request.SearchTerm, request.Status, request.CategoryId, request.SelectAllMatching);
 
@@ -61,6 +68,10 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                     new ChangeProductCategoryCommand(productId, request.TargetCategoryId!.Value), cancellationToken),
                 "adjust-price" => await _sender.Send(
                     new AdjustProductPriceCommand(productId, request.PriceMode!.Value, request.PriceValue!.Value), cancellationToken),
+                "assign-collection" => await _sender.Send(
+                    new AssignProductCollectionCommand(productId, request.TargetCollectionId!.Value), cancellationToken),
+                "remove-collection" => await _sender.Send(
+                    new RemoveProductCollectionCommand(productId, request.TargetCollectionId!.Value), cancellationToken),
                 _ => Result.Failure(CatalogErrors.ProductBulkActionNotSupported(action)),
             };
 

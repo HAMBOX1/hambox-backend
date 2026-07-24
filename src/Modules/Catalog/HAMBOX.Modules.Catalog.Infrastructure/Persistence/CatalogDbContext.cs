@@ -4,6 +4,7 @@ using HAMBOX.Infrastructure.Persistence.Conversions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Drafts;
 using HAMBOX.Modules.Catalog.Domain.Images;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
@@ -38,6 +39,16 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     /// Gets or sets the product additional-category assignments table.
     /// </summary>
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+
+    /// <summary>
+    /// Gets or sets the collections table (internal, owner-only product organization).
+    /// </summary>
+    public DbSet<ProductCollection> ProductCollections => Set<ProductCollection>();
+
+    /// <summary>
+    /// Gets or sets the product-collection assignments table.
+    /// </summary>
+    public DbSet<ProductCollectionItem> ProductCollectionItems => Set<ProductCollectionItem>();
 
     /// <summary>
     /// Gets or sets the product drafts table.

@@ -4,6 +4,7 @@ using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
@@ -163,6 +164,69 @@ internal sealed class ExecuteCatalogImportJobHandler(
             {
                 summary.Failed++;
                 summary.Errors.Add($"Category '{stuck.Row.Slug}': parent category could not be resolved.");
+            }
+
+            await catalogDb.SaveChangesAsync(cancellationToken);
+        }
+
+        // ---------- Collections (parents before children — iterative pass, mirrors Categories).
+        // ponytail: parent lookup keyed by flat Name (last-write-wins on duplicate names across
+        // different parents) rather than a fully-qualified path — collections are informal tags,
+        // not a strict namespace like Category.Slug; revisit if same-name collisions cause confusion. ----------
+        if (options.IncludeCollections)
+        {
+            var nameToId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+            (await catalogDb.ProductCollections.AsNoTracking().Select(c => new { c.Id, c.Name }).ToListAsync(cancellationToken))
+                .ForEach(c => nameToId[c.Name] = c.Id);
+
+            var remainingCollections = new List<CatalogImportPlanRow<ParsedCollectionRow>>(
+                plan.Collections.Where(r => r.Status != CatalogImportRowStatus.Invalid));
+            var progressedCollections = true;
+            while (remainingCollections.Count > 0 && progressedCollections)
+            {
+                progressedCollections = false;
+                foreach (var planRow in remainingCollections.ToList())
+                {
+                    var row = planRow.Row;
+                    if (!string.IsNullOrEmpty(row.ParentName) && !nameToId.ContainsKey(row.ParentName))
+                    {
+                        continue; // parent not resolved yet — retry next pass
+                    }
+
+                    Guid? parentId = string.IsNullOrEmpty(row.ParentName) ? null : nameToId[row.ParentName];
+
+                    if (planRow.ExistingId is { } existingId && strategy != CatalogDuplicateStrategy.Rename)
+                    {
+                        if (strategy == CatalogDuplicateStrategy.Skip)
+                        {
+                            summary.Skipped++;
+                        }
+                        else
+                        {
+                            var existing = await catalogDb.ProductCollections.FirstAsync(c => c.Id == existingId, cancellationToken);
+                            existing.Update(row.Name, row.Description, row.Color, row.Icon, parentId, row.SortOrder);
+                            summary.Updated++;
+                        }
+
+                        nameToId[row.Name] = existingId;
+                    }
+                    else
+                    {
+                        var collection = ProductCollection.Create(row.Name, row.Description, row.Color, row.Icon, parentId, row.SortOrder);
+                        catalogDb.ProductCollections.Add(collection);
+                        nameToId[row.Name] = collection.Id;
+                        summary.Created++;
+                    }
+
+                    remainingCollections.Remove(planRow);
+                    progressedCollections = true;
+                }
+            }
+
+            foreach (var stuck in remainingCollections)
+            {
+                summary.Failed++;
+                summary.Errors.Add($"Collection '{stuck.Row.Name}': parent collection could not be resolved.");
             }
 
             await catalogDb.SaveChangesAsync(cancellationToken);

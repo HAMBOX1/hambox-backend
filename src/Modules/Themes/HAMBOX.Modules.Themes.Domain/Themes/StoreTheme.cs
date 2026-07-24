@@ -22,7 +22,8 @@ public sealed class StoreTheme : AggregateRoot, ISoftDeletable
         string slug,
         string? description,
         ThemeBaseMode baseMode,
-        bool isDefault)
+        bool isDefault,
+        bool isTemplate)
         : base(id)
     {
         Name = name;
@@ -31,6 +32,7 @@ public sealed class StoreTheme : AggregateRoot, ISoftDeletable
         BaseMode = baseMode;
         Status = StoreThemeStatus.Draft;
         IsDefault = isDefault;
+        IsTemplate = isTemplate;
         IsDeleted = false;
     }
 
@@ -40,6 +42,7 @@ public sealed class StoreTheme : AggregateRoot, ISoftDeletable
     public StoreThemeStatus Status { get; private set; }
     public ThemeBaseMode BaseMode { get; private set; }
     public bool IsDefault { get; private set; }
+    public bool IsTemplate { get; private set; }
     public Guid? PublishedVersionId { get; private set; }
     public int VersionCounter { get; private set; }
     public bool IsDeleted { get; set; }
@@ -50,12 +53,12 @@ public sealed class StoreTheme : AggregateRoot, ISoftDeletable
     public IReadOnlyCollection<ThemeAssignment> Assignments => _assignments.AsReadOnly();
     public IReadOnlyCollection<ThemeAsset> Assets => _assets.AsReadOnly();
 
-    public static StoreTheme Create(string name, string slug, string? description, ThemeBaseMode baseMode, bool isDefault = false)
+    public static StoreTheme Create(string name, string slug, string? description, ThemeBaseMode baseMode, bool isDefault = false, bool isTemplate = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
 
-        return new StoreTheme(Guid.NewGuid(), name.Trim(), NormalizeSlug(slug), description?.Trim(), baseMode, isDefault);
+        return new StoreTheme(Guid.NewGuid(), name.Trim(), NormalizeSlug(slug), description?.Trim(), baseMode, isDefault, isTemplate);
     }
 
     public ThemeVersion CreateDraftVersion(Dictionary<string, string> tokens, string? notes = null)

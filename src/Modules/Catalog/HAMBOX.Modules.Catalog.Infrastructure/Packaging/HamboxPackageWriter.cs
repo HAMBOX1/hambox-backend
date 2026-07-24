@@ -37,6 +37,7 @@ internal sealed class HamboxPackageWriter(IPackageCryptoService crypto) : IHambo
                 counts = new
                 {
                     categories = package.Categories.Count,
+                    collections = package.Collections.Count,
                     products = package.Products.Count,
                     optionGroups = package.OptionGroups.Count,
                     options = package.Options.Count,
@@ -48,6 +49,7 @@ internal sealed class HamboxPackageWriter(IPackageCryptoService crypto) : IHambo
             });
 
             WriteJsonEntry(archive, "categories.json", package.Categories);
+            WriteJsonEntry(archive, "collections.json", package.Collections);
             WriteJsonEntry(archive, "products.json", package.Products);
             WriteJsonEntry(archive, "option-groups.json", package.OptionGroups);
             WriteJsonEntry(archive, "options.json", package.Options);

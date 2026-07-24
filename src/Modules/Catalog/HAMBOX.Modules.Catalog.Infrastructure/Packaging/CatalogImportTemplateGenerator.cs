@@ -19,6 +19,7 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
         var (sheetName, columns, sampleRows) = entityType switch
         {
             CatalogImportEntityType.Categories => ("Categories", CategoryColumns, CategorySamples),
+            CatalogImportEntityType.Collections => ("Collections", CollectionColumns, CollectionSamples),
             CatalogImportEntityType.Products => ("Products", ProductColumns, ProductSamples),
             CatalogImportEntityType.Inventory => ("Inventory", InventoryColumns, InventorySamples),
             CatalogImportEntityType.Codes => ("Codes", CodeColumns, CodeSamples),
@@ -83,6 +84,22 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
         ["steam-gift-cards", "Steam Gift Cards", "بطاقات ستيم", "gift-cards", "TRUE", "1"],
     ];
 
+    private static readonly ColumnSpec[] CollectionColumns =
+    [
+        new("Name", true, "Collection name, e.g. 'Supplier Bamboo'. Internal-only — never shown to customers."),
+        new("Description", false, "Optional internal note about what this collection is for."),
+        new("Color", false, "Optional hex color for the chip, e.g. '#22C55E'."),
+        new("Icon", false, "Optional PrimeIcons class name, e.g. 'pi pi-star'."),
+        new("ParentName", false, "Name of the parent collection, if any. Must exist elsewhere in this file or already exist."),
+        new("SortOrder", false, "Integer display order among sibling collections. Defaults to 0."),
+    ];
+
+    private static readonly string[][] CollectionSamples =
+    [
+        ["Suppliers", "", "", "pi pi-truck", "", "0"],
+        ["Supplier Bamboo", "", "#22C55E", "pi pi-truck", "Suppliers", "1"],
+    ];
+
     private static readonly ColumnSpec[] ProductColumns =
     [
         new("ImportKey", false, "Any unique value used only to link this product to Inventory/Codes rows in a separate file. Defaults to NameEn."),
@@ -95,11 +112,12 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
         new("Status", false, "Draft, Active, Inactive, or Archived. Defaults to Draft."),
         new("StockQuantity", false, "Initial stock quantity. Defaults to 100."),
         new("AdditionalCategorySlugs", false, "Comma-separated slugs for cross-listing, e.g. 'sale,featured'."),
+        new("CollectionNames", false, "Comma-separated internal collection names, e.g. 'Featured,Supplier Bamboo'. Never customer-facing."),
     ];
 
     private static readonly string[][] ProductSamples =
     [
-        ["steam-50", "Steam Wallet Code $50", "", "50 USD Steam Wallet top-up", "", "50", "steam-gift-cards", "Active", "500", ""],
+        ["steam-50", "Steam Wallet Code $50", "", "50 USD Steam Wallet top-up", "", "50", "steam-gift-cards", "Active", "500", "", ""],
     ];
 
     private static readonly ColumnSpec[] InventoryColumns =

@@ -17,6 +17,7 @@ public sealed record CatalogImportPlanRow<TRow>(
 /// </summary>
 public sealed record CatalogImportPlan(
     IReadOnlyList<CatalogImportPlanRow<ParsedCategoryRow>> Categories,
+    IReadOnlyList<CatalogImportPlanRow<ParsedCollectionRow>> Collections,
     IReadOnlyList<CatalogImportPlanRow<ParsedProductRow>> Products,
     IReadOnlyList<CatalogImportPlanRow<ParsedVariantRow>> Variants,
     IReadOnlyList<CatalogImportPlanRow<ParsedCodeRow>> Codes,
@@ -88,6 +89,55 @@ public static class CatalogImportMatcher
             else
             {
                 categoryRows.Add(new(row, CatalogImportRowStatus.New, null, []));
+            }
+        }
+
+        // ---------- Collections (dedupe by Name+ParentName since collections have no slug) ----------
+        var existingCollections = await db.ProductCollections.AsNoTracking()
+            .Select(c => new { c.Id, c.Name, c.Description, c.Color, c.Icon, c.ParentId, c.SortOrder })
+            .ToListAsync(cancellationToken);
+        var collectionNameById = existingCollections.ToDictionary(c => c.Id, c => c.Name);
+        var existingCollectionByKey = existingCollections
+            .GroupBy(c => (Name: c.Name, ParentName: c.ParentId.HasValue ? collectionNameById.GetValueOrDefault(c.ParentId.Value) : null), new CollectionKeyComparer())
+            .ToDictionary(g => g.Key, g => g.First(), new CollectionKeyComparer());
+        var packageCollectionNames = package.Collections
+            .Select(c => c.Name)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var collectionRows = new List<CatalogImportPlanRow<ParsedCollectionRow>>();
+        foreach (var row in package.Collections)
+        {
+            var errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(row.Name))
+            {
+                errors.Add("Name is required.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.ParentName)
+                && !existingCollectionByKey.Keys.Any(k => string.Equals(k.Name, row.ParentName, StringComparison.OrdinalIgnoreCase))
+                && !packageCollectionNames.Contains(row.ParentName))
+            {
+                errors.Add($"Parent collection '{row.ParentName}' was not found.");
+            }
+
+            if (errors.Count > 0)
+            {
+                collectionRows.Add(new(row, CatalogImportRowStatus.Invalid, null, errors));
+                continue;
+            }
+
+            if (existingCollectionByKey.TryGetValue((row.Name, row.ParentName), out var existing))
+            {
+                var changed = !string.Equals(existing.Description ?? string.Empty, row.Description ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(existing.Color ?? string.Empty, row.Color ?? string.Empty, StringComparison.Ordinal)
+                    || !string.Equals(existing.Icon ?? string.Empty, row.Icon ?? string.Empty, StringComparison.Ordinal)
+                    || existing.SortOrder != row.SortOrder;
+                collectionRows.Add(new(row, changed ? CatalogImportRowStatus.Updated : CatalogImportRowStatus.Duplicate, existing.Id, []));
+            }
+            else
+            {
+                collectionRows.Add(new(row, CatalogImportRowStatus.New, null, []));
             }
         }
 
@@ -284,7 +334,7 @@ public static class CatalogImportMatcher
             new CatalogImportPlanRow<ParsedSupplierMappingRow>(row, CatalogImportRowStatus.New, null, [])).ToList();
 
         return new CatalogImportPlan(
-            categoryRows, productRows, variantRows, codeRows, optionGroupRows, optionRows, supplierMappingRows, warnings);
+            categoryRows, collectionRows, productRows, variantRows, codeRows, optionGroupRows, optionRows, supplierMappingRows, warnings);
     }
 
     public static CatalogImportValidationReport ToReport(
@@ -292,6 +342,7 @@ public static class CatalogImportMatcher
     {
         var rows = new List<CatalogImportRowResult>();
         rows.AddRange(plan.Categories.Select((r, i) => ToRowResult(i + 1, "Category", r.Row.Slug, r)));
+        rows.AddRange(plan.Collections.Select((r, i) => ToRowResult(i + 1, "Collection", r.Row.Name, r)));
         rows.AddRange(plan.Products.Select((r, i) => ToRowResult(i + 1, "Product", r.Row.NameEn, r)));
         rows.AddRange(plan.Variants.Select((r, i) => ToRowResult(i + 1, "Variant", r.Row.Sku, r)));
         rows.AddRange(plan.Codes.Select((r, i) => ToRowResult(i + 1, "Code", MaskCode(r.Row.Code), r)));
@@ -324,5 +375,15 @@ public static class CatalogImportMatcher
 
         public int GetHashCode((string Slug, string NameEn) obj) =>
             HashCode.Combine(obj.Slug.ToUpperInvariant(), obj.NameEn.ToUpperInvariant());
+    }
+
+    private sealed class CollectionKeyComparer : IEqualityComparer<(string Name, string? ParentName)>
+    {
+        public bool Equals((string Name, string? ParentName) x, (string Name, string? ParentName) y) =>
+            string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(x.ParentName ?? string.Empty, y.ParentName ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string Name, string? ParentName) obj) =>
+            HashCode.Combine(obj.Name.ToUpperInvariant(), (obj.ParentName ?? string.Empty).ToUpperInvariant());
     }
 }

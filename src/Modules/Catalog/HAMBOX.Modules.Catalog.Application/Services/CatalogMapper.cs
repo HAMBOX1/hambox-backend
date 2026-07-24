@@ -54,6 +54,7 @@ internal static class CatalogMapper
             product.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
             GetPrimaryImageUrl(product),
             images,
-            product.CreatedOnUtc);
+            product.CreatedOnUtc,
+            CollectionIds: product.Collections.Select(pc => pc.CollectionId).ToList());
     }
 }

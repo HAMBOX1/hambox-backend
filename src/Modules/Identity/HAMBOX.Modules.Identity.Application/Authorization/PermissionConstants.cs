@@ -32,6 +32,14 @@ public static class PermissionConstants
             public const string Export = "Catalog.Products.Export";
         }
 
+        public static class Collections
+        {
+            public const string View = "Catalog.Collections.View";
+            public const string Create = "Catalog.Collections.Create";
+            public const string Edit = "Catalog.Collections.Edit";
+            public const string Delete = "Catalog.Collections.Delete";
+        }
+
         public static class Inventory
         {
             public const string View = "Catalog.Inventory.View";

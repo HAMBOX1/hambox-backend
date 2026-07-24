@@ -16,7 +16,8 @@ internal static class ProductQueryFilters
         IQueryable<Product> query,
         string? searchTerm,
         Guid? categoryId,
-        ProductStatus? status)
+        ProductStatus? status,
+        Guid? collectionId = null)
     {
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -36,6 +37,13 @@ internal static class ProductQueryFilters
             query = query.Where(p =>
                 p.CategoryId == categoryId.Value ||
                 p.AdditionalCategories.Any(pc => pc.CategoryId == categoryId.Value));
+        }
+
+        // Collections are an internal, admin-only organization axis and are never exposed to the
+        // storefront — this filter is only ever populated from the admin product list (GetProductsQuery).
+        if (collectionId.HasValue)
+        {
+            query = query.Where(p => p.Collections.Any(pc => pc.CollectionId == collectionId.Value));
         }
 
         return query;

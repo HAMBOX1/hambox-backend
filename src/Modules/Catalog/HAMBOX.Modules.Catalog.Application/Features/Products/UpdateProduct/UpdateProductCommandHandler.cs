@@ -22,6 +22,7 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
     {
         var product = await _dbContext.Products
             .Include(p => p.AdditionalCategories)
+            .Include(p => p.Collections)
             .FirstOrDefaultAsync(p => p.Id == request.Id, cancellationToken);
 
         if (product is null)
@@ -58,6 +59,27 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
         foreach (var newAdditionalCategory in newAdditionalCategories)
         {
             _dbContext.ProductCategories.Add(newAdditionalCategory);
+        }
+
+        var collectionIds = request.CollectionIds ?? [];
+        if (collectionIds.Count > 0)
+        {
+            var existingCollectionCount = await _dbContext.ProductCollections
+                .Where(c => collectionIds.Contains(c.Id))
+                .Select(c => c.Id)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (existingCollectionCount != collectionIds.Distinct().Count())
+            {
+                return Result.Failure(CatalogErrors.CollectionNotFound);
+            }
+        }
+
+        var newCollectionItems = product.SetCollections(collectionIds);
+        foreach (var newCollectionItem in newCollectionItems)
+        {
+            _dbContext.ProductCollectionItems.Add(newCollectionItem);
         }
 
         product.Update(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn);

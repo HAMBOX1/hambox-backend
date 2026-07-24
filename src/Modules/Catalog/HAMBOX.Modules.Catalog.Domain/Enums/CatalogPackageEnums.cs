@@ -40,6 +40,7 @@ public enum CatalogImportEntityType
     Categories = 2,
     Inventory = 3,
     Codes = 4,
+    Collections = 5,
 }
 
 public enum CatalogDuplicateStrategy

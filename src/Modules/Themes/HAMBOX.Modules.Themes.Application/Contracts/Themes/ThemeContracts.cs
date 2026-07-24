@@ -9,7 +9,18 @@ public sealed record ThemeListItemDto(
     bool IsDefault,
     int VersionCount,
     DateTime? PublishedOnUtc,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    string? PreviewPrimary,
+    string? PreviewBackground,
+    string? PreviewCard,
+    string? AssignmentSummary);
+
+public sealed record ThemeTemplateDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    string BaseMode,
+    IReadOnlyDictionary<string, string> Tokens);
 
 public sealed record ThemeDetailDto(
     Guid Id,

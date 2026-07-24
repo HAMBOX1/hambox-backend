@@ -5,7 +5,12 @@ namespace HAMBOX.Modules.Themes.Application.Services;
 
 public static class ThemeMapper
 {
-    public static ThemeListItemDto ToListItem(StoreTheme theme, DateTime? publishedOnUtc, int versionCount) =>
+    public static ThemeListItemDto ToListItem(
+        StoreTheme theme,
+        DateTime? publishedOnUtc,
+        int versionCount,
+        IReadOnlyDictionary<string, string>? previewTokens = null,
+        string? assignmentSummary = null) =>
         new(
             theme.Id,
             theme.Name,
@@ -15,7 +20,11 @@ public static class ThemeMapper
             theme.IsDefault,
             versionCount,
             publishedOnUtc,
-            theme.CreatedOnUtc);
+            theme.CreatedOnUtc,
+            previewTokens?.GetValueOrDefault(ThemeSemanticTokens.Primary),
+            previewTokens?.GetValueOrDefault(ThemeSemanticTokens.Background),
+            previewTokens?.GetValueOrDefault(ThemeSemanticTokens.Card),
+            assignmentSummary);
 
     public static ThemeVersionDto ToVersionDto(ThemeVersion version)
     {

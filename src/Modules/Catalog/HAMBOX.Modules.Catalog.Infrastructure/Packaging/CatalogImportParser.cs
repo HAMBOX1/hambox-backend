@@ -33,6 +33,7 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
         return entityType switch
         {
             CatalogImportEntityType.Categories => ParsedCatalogPackage.Empty with { Categories = rows.Select((r, i) => ToCategoryRow(r, i)).ToList() },
+            CatalogImportEntityType.Collections => ParsedCatalogPackage.Empty with { Collections = rows.Select((r, i) => ToCollectionRow(r, i)).ToList() },
             CatalogImportEntityType.Products => ParsedCatalogPackage.Empty with { Products = rows.Select((r, i) => ToProductRow(r, i)).ToList() },
             CatalogImportEntityType.Inventory => ParsedCatalogPackage.Empty with { Variants = rows.Select((r, i) => ToVariantRow(r, i)).ToList() },
             CatalogImportEntityType.Codes => ParsedCatalogPackage.Empty with { Codes = rows.Select((r, i) => ToCodeRow(r, i)).ToList() },
@@ -160,6 +161,15 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
         ParseBool(Get(row, "IsActive"), true),
         ParseInt(Get(row, "SortOrder"), 0));
 
+    private static ParsedCollectionRow ToCollectionRow(Dictionary<string, string> row, int index) => new(
+        index + 1,
+        Get(row, "Name"),
+        NullIfEmpty(Get(row, "Description")),
+        NullIfEmpty(Get(row, "Color")),
+        NullIfEmpty(Get(row, "Icon")),
+        NullIfEmpty(Get(row, "ParentName")),
+        ParseInt(Get(row, "SortOrder"), 0));
+
     private static ParsedProductRow ToProductRow(Dictionary<string, string> row, int index)
     {
         var nameEn = Get(row, "NameEn");
@@ -176,7 +186,8 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             NullIfEmpty(Get(row, "Status")),
             ParseInt(Get(row, "StockQuantity"), 100),
             [],
-            SplitList(Get(row, "AdditionalCategorySlugs")));
+            SplitList(Get(row, "AdditionalCategorySlugs")),
+            SplitList(Get(row, "CollectionNames")));
     }
 
     private static ParsedVariantRow ToVariantRow(Dictionary<string, string> row, int index) => new(
