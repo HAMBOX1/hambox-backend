@@ -99,7 +99,8 @@ public sealed record StorefrontFooterDto(
     string? DiscordUrl,
     string? TelegramUrl,
     string? YouTubeUrl,
-    string? TikTokUrl);
+    string? TikTokUrl,
+    string? WhatsAppUrl);
 
 public sealed record StorefrontSeoDto(
     string DefaultMetaTitle,

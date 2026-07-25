@@ -160,7 +160,8 @@ public sealed record StorefrontFooterSettings(
     string? DiscordUrl,
     string? TelegramUrl,
     string? YouTubeUrl,
-    string? TikTokUrl);
+    string? TikTokUrl,
+    string? WhatsAppUrl);
 
 public sealed record StorefrontSeoDefaultsSettings(
     string DefaultMetaTitle,

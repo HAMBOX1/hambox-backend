@@ -93,7 +93,8 @@ internal sealed class GetStorefrontContentQueryHandler(IPlatformSettingsProvider
                 settings.Footer.DiscordUrl,
                 settings.Footer.TelegramUrl,
                 settings.Footer.YouTubeUrl,
-                settings.Footer.TikTokUrl),
+                settings.Footer.TikTokUrl,
+                settings.Footer.WhatsAppUrl),
             new StorefrontSeoDto(
                 settings.Seo.DefaultMetaTitle,
                 settings.Seo.DefaultMetaDescription,
