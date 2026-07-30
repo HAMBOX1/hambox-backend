@@ -34,6 +34,10 @@
     <ProjectReference Include="..\..\Modules\Suppliers\HAMBOX.Modules.Suppliers.Presentation\HAMBOX.Modules.Suppliers.Presentation.csproj" />
     <ProjectReference Include="..\..\Modules\Communication\HAMBOX.Modules.Communication.Infrastructure\HAMBOX.Modules.Communication.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Communication\HAMBOX.Modules.Communication.Presentation\HAMBOX.Modules.Communication.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Content\HAMBOX.Modules.Content.Infrastructure\HAMBOX.Modules.Content.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Content\HAMBOX.Modules.Content.Presentation\HAMBOX.Modules.Content.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Support\HAMBOX.Modules.Support.Infrastructure\HAMBOX.Modules.Support.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Support\HAMBOX.Modules.Support.Presentation\HAMBOX.Modules.Support.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

@@ -19,6 +19,10 @@ using HAMBOX.Modules.Communication.Application.Features.Dashboard;
 using HAMBOX.Modules.Communication.Infrastructure.Extensions;
 using HAMBOX.Modules.Communication.Infrastructure.Persistence;
 using HAMBOX.Modules.Communication.Presentation.Extensions;
+using HAMBOX.Modules.Content.Application.Features.LandingPages.GetLandingPageTemplates;
+using HAMBOX.Modules.Content.Infrastructure.Extensions;
+using HAMBOX.Modules.Content.Infrastructure.Persistence;
+using HAMBOX.Modules.Content.Presentation.Extensions;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Infrastructure.Extensions;
 using HAMBOX.Modules.Identity.Domain.Security;
@@ -33,6 +37,10 @@ using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Extensions;
 using HAMBOX.Modules.Suppliers.Infrastructure.Persistence;
 using HAMBOX.Modules.Suppliers.Presentation.Extensions;
+using HAMBOX.Modules.Support.Application.Features.Tickets.GetTickets;
+using HAMBOX.Modules.Support.Infrastructure.Extensions;
+using HAMBOX.Modules.Support.Infrastructure.Persistence;
+using HAMBOX.Modules.Support.Presentation.Extensions;
 using HAMBOX.Modules.Themes.Application.Features.Themes;
 using HAMBOX.Modules.Themes.Infrastructure.Extensions;
 using HAMBOX.Modules.Themes.Infrastructure.Persistence;
@@ -81,6 +89,8 @@ try
         config.RegisterServicesFromAssembly(typeof(GetLegalSectionsQuery).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetSuppliersQuery).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetCommunicationDashboardStatsQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetLandingPageTemplatesQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetTicketsQuery).Assembly);
         config.AddOpenBehavior(typeof(LoggingBehavior<,>));
         config.AddOpenBehavior(typeof(ValidationBehavior<,>));
         config.AddOpenBehavior(typeof(IdempotencyBehavior<,>));
@@ -100,6 +110,9 @@ try
     builder.Services.AddLegalInfrastructure(builder.Configuration);
     builder.Services.AddSuppliersInfrastructure(builder.Configuration);
     builder.Services.AddCommunicationInfrastructure(builder.Configuration);
+    builder.Services.AddContentInfrastructure(builder.Configuration);
+    builder.Services.AddSupportInfrastructure(builder.Configuration);
+    builder.Services.AddSupportRealtime();
 
     builder.Services.Configure<FormOptions>(options =>
     {
@@ -137,6 +150,8 @@ try
         await app.ApplyMigrationsAsync<LegalDbContext>();
         await app.ApplyMigrationsAsync<SuppliersDbContext>();
         await app.ApplyMigrationsAsync<CommunicationDbContext>();
+        await app.ApplyMigrationsAsync<ContentDbContext>();
+        await app.ApplyMigrationsAsync<SupportDbContext>();
         await PermissionSynchronizer.SyncAsync(app.Services);
         await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
         await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
@@ -146,6 +161,8 @@ try
         await ThemeDataSeeder.SeedAsync(app.Services);
         await LegalDataSeeder.SeedAsync(app.Services);
         await CommunicationDataSeeder.SeedAsync(app.Services);
+        await LandingPageDataSeeder.SeedAsync(app.Services);
+        await SupportDataSeeder.SeedAsync(app.Services);
         await app.SeedIdentityDevelopmentDataAsync();
         app.UseHamboxSwagger();
     }
@@ -209,6 +226,9 @@ try
     app.MapLegalEndpoints();
     app.MapSuppliersEndpoints();
     app.MapCommunicationEndpoints();
+    app.MapContentEndpoints();
+    app.MapSupportEndpoints();
+    app.MapSupportHub();
     app.MapLocalizationEndpoints();
     app.MapHealthChecks("/health");
 

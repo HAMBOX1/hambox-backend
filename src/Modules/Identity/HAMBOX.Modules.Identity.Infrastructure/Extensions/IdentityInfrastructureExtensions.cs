@@ -112,6 +112,20 @@ public static class IdentityInfrastructureExtensions
 
             options.Events = new JwtBearerEvents
             {
+                // SignalR's browser WebSocket/SSE transports can't set an Authorization header,
+                // so the client appends ?access_token=... to the hub URL instead — this is the
+                // standard ASP.NET Core SignalR JWT pattern, scoped to only the hub path prefix
+                // so it never weakens auth for ordinary HTTP API calls.
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
+
+                    return Task.CompletedTask;
+                },
                 OnTokenValidated = async context =>
                 {
                     var userIdValue = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;

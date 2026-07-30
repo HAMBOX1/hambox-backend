@@ -198,6 +198,15 @@ public static class PermissionConstants
     {
         public const string View = "Support.View";
         public const string Manage = "Support.Manage";
+        public const string Create = "Support.Create";
+        public const string Reply = "Support.Reply";
+        public const string Assign = "Support.Assign";
+        public const string Close = "Support.Close";
+        public const string Delete = "Support.Delete";
+        public const string ManageCategories = "Support.ManageCategories";
+        public const string ManageSavedReplies = "Support.ManageSavedReplies";
+        public const string ManageKnowledgeBase = "Support.ManageKnowledgeBase";
+        public const string ViewAnalytics = "Support.ViewAnalytics";
     }
 
     public static class Media
@@ -245,6 +254,13 @@ public static class PermissionConstants
         public const string Send = "Communication.Send";
         public const string ManageTemplates = "Communication.ManageTemplates";
         public const string ManageProviders = "Communication.ManageProviders";
+    }
+
+    public static class PageBuilder
+    {
+        public const string View = "PageBuilder.View";
+        public const string Edit = "PageBuilder.Edit";
+        public const string Publish = "PageBuilder.Publish";
     }
 
     /// <summary>

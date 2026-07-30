@@ -54,6 +54,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Security = new("15000000-0000-0000-0000-000000000029");
         public static readonly Guid Communication = new("15000000-0000-0000-0000-000000000030");
         public static readonly Guid Collections = new("15000000-0000-0000-0000-000000000031");
+        public static readonly Guid PageBuilder = new("15000000-0000-0000-0000-000000000032");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -89,6 +90,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Security, "Security", "Security Center", "Security", 147, "Blocked users, emails, countries, IPs, and security events"),
         new(GroupIds.Communication, "Communication", "Communication Center", "Communication", 148, "Templates, notifications, providers, and delivery history"),
         new(GroupIds.Collections, "Collections", "Collections", "Catalog", 45, "Internal, owner-only product organization (never customer-facing)"),
+        new(GroupIds.PageBuilder, "PageBuilder", "Page Builder", "Platform", 149, "Storefront homepage landing page templates and section arrangement"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -271,6 +273,22 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000254"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Create, 2),
         new(new Guid("20000000-0000-0000-0000-000000000255"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Edit, 3),
         new(new Guid("20000000-0000-0000-0000-000000000256"), GroupIds.Collections, PermissionConstants.Catalog.Collections.Delete, 4),
+
+        // Page Builder (257-259) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000257"), GroupIds.PageBuilder, PermissionConstants.PageBuilder.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000258"), GroupIds.PageBuilder, PermissionConstants.PageBuilder.Edit, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000259"), GroupIds.PageBuilder, PermissionConstants.PageBuilder.Publish, 3),
+
+        // Support module granular permissions (260-268) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000260"), GroupIds.Support, PermissionConstants.Support.Create, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000261"), GroupIds.Support, PermissionConstants.Support.Reply, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000262"), GroupIds.Support, PermissionConstants.Support.Assign, 5),
+        new(new Guid("20000000-0000-0000-0000-000000000263"), GroupIds.Support, PermissionConstants.Support.Close, 6),
+        new(new Guid("20000000-0000-0000-0000-000000000264"), GroupIds.Support, PermissionConstants.Support.Delete, 7),
+        new(new Guid("20000000-0000-0000-0000-000000000265"), GroupIds.Support, PermissionConstants.Support.ManageCategories, 8),
+        new(new Guid("20000000-0000-0000-0000-000000000266"), GroupIds.Support, PermissionConstants.Support.ManageSavedReplies, 9),
+        new(new Guid("20000000-0000-0000-0000-000000000267"), GroupIds.Support, PermissionConstants.Support.ManageKnowledgeBase, 10),
+        new(new Guid("20000000-0000-0000-0000-000000000268"), GroupIds.Support, PermissionConstants.Support.ViewAnalytics, 11),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>
