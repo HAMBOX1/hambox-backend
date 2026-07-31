@@ -23,7 +23,8 @@ internal sealed class ExportCatalogJobHandler(
     ISuppliersDbContext suppliersDb,
     IFileStorage fileStorage,
     IHamboxPackageWriter packageWriter,
-    IPackageCryptoService crypto)
+    IPackageCryptoService crypto,
+    ICatalogPackageSecretProtector secretProtector)
     : BackgroundJobHandlerBase<ExportCatalogJobPayload>(serializer)
 {
     public override string JobType => CatalogJobTypes.ExportPackage;
@@ -36,6 +37,10 @@ internal sealed class ExportCatalogJobHandler(
 
         try
         {
+            var packagePassword = string.IsNullOrEmpty(payload.PackagePassword)
+                ? payload.PackagePassword
+                : secretProtector.Unprotect(payload.PackagePassword);
+
             var package = await BuildPackageAsync(payload, cancellationToken);
             await ReportProgress(job, context, 40, cancellationToken);
 
@@ -47,7 +52,7 @@ internal sealed class ExportCatalogJobHandler(
             {
                 case CatalogPackageFormat.Hambox:
                     await using (var stream = await packageWriter.WriteAsync(
-                        package, payload.EncryptCodes, payload.PackagePassword, cancellationToken))
+                        package, payload.EncryptCodes, packagePassword, cancellationToken))
                     {
                         using var buffer = new MemoryStream();
                         await stream.CopyToAsync(buffer, cancellationToken);
@@ -56,7 +61,7 @@ internal sealed class ExportCatalogJobHandler(
 
                     if (payload.PasswordProtectPackage)
                     {
-                        var encrypted = crypto.Encrypt(fileBytes, payload.PackagePassword!);
+                        var encrypted = crypto.Encrypt(fileBytes, packagePassword!);
                         fileBytes = [.. PackageMagic.WholePackage, .. encrypted];
                     }
 
@@ -377,5 +382,7 @@ internal sealed class ExportCatalogJobHandler(
     }
 
     private static string Escape(string value) =>
-        value.Contains(',') || value.Contains('"') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+        value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
+            ? $"\"{value.Replace("\"", "\"\"")}\""
+            : value;
 }

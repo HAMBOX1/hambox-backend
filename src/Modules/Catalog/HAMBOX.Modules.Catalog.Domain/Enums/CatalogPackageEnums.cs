@@ -58,3 +58,17 @@ public enum CatalogImportRowStatus
     Duplicate = 2,
     Invalid = 3,
 }
+
+/// <summary>
+/// How a variant row's SKU is decided when a Products import runs. <see cref="UseImportedSku"/>
+/// (default) requires the file to supply one, exactly as today. <see cref="AutoGenerate"/> ignores
+/// any value the file supplies and always generates one at Execute time via
+/// <c>VariantCombinationHelper.BuildSku</c>. <see cref="GenerateMissingOnly"/> uses the file's SKU
+/// when present and generates one only for blank cells.
+/// </summary>
+public enum CatalogSkuStrategy
+{
+    UseImportedSku = 0,
+    AutoGenerate = 1,
+    GenerateMissingOnly = 2,
+}

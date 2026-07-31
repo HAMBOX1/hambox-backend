@@ -34,13 +34,15 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
         var category = await _dbContext.Categories
             .AsNoTracking()
             .Where(c => c.Id == product.CategoryId)
-            .Select(c => new { c.NameEn, c.NameAr })
+            .Select(c => new { c.NameEn, c.NameAr, c.ImageUrl, c.EffectiveImageUrl })
             .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(CatalogMapper.ToProductDto(
             product,
             category?.NameEn ?? string.Empty,
             category?.NameAr ?? string.Empty,
-            includeImages: true));
+            includeImages: true,
+            categoryOwnImageUrl: category?.ImageUrl,
+            categoryEffectiveImageUrl: category?.EffectiveImageUrl));
     }
 }

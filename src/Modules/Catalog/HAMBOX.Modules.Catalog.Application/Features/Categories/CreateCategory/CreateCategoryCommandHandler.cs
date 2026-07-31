@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -43,6 +44,8 @@ internal sealed class CreateCategoryCommandHandler : IRequestHandler<CreateCateg
 
         var category = Category.Create(request.NameAr, request.NameEn, request.Slug, request.ParentId);
         category.SetSortOrder(siblingCount);
+        category.SetEffectiveImageUrl(
+            await CategoryImageResolution.ResolveParentEffectiveImageAsync(_dbContext, request.ParentId, cancellationToken));
         _dbContext.Categories.Add(category);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

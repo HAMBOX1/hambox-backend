@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +43,14 @@ internal sealed class UpdateCategoryCommandHandler : IRequestHandler<UpdateCateg
             return parentError;
         }
 
+        var parentChanged = category.ParentId != request.ParentId;
+
         category.Update(request.NameAr, request.NameEn, request.Slug, request.ParentId);
+
+        if (parentChanged)
+        {
+            await CategoryImageResolution.ApplyAndPropagateAsync(_dbContext, category, cancellationToken);
+        }
 
         if (request.IsActive && !category.IsActive)
         {

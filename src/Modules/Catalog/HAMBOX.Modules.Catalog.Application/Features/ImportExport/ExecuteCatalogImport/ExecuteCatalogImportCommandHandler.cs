@@ -11,7 +11,8 @@ namespace HAMBOX.Modules.Catalog.Application.Features.ImportExport.ExecuteCatalo
 
 internal sealed class ExecuteCatalogImportCommandHandler(
     ICatalogDbContext dbContext,
-    IBackgroundJobScheduler jobScheduler)
+    IBackgroundJobScheduler jobScheduler,
+    ICatalogPackageSecretProtector secretProtector)
     : IRequestHandler<ExecuteCatalogImportCommand, Result<Guid>>
 {
     public async Task<Result<Guid>> Handle(ExecuteCatalogImportCommand request, CancellationToken cancellationToken)
@@ -29,7 +30,13 @@ internal sealed class ExecuteCatalogImportCommandHandler(
             return Result.Failure<Guid>(CatalogErrors.PackageAlreadyExecuted);
         }
 
-        var payload = new ExecuteCatalogImportJobPayload(job.Id, request.Strategy, request.Options, request.PackagePassword);
+        var protectedPassword = string.IsNullOrEmpty(request.PackagePassword)
+            ? request.PackagePassword
+            : secretProtector.Protect(request.PackagePassword);
+
+        var payload = new ExecuteCatalogImportJobPayload(
+            job.Id, request.Strategy, request.Options, protectedPassword,
+            request.SkuStrategy, request.Corrections, request.RowOverrides);
 
         var backgroundJobId = await jobScheduler.EnqueueAsync(
             CatalogJobTypes.ImportPackage,

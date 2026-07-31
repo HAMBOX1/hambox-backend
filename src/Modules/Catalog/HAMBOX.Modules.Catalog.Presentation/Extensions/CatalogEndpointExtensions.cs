@@ -24,6 +24,7 @@ public static class CatalogEndpointExtensions
             .Build();
 
         app.MapCategoryEndpoints(apiVersionSet);
+        app.MapCategoryImageEndpoints(apiVersionSet);
         app.MapCollectionEndpoints(apiVersionSet);
         app.MapProductEndpoints(apiVersionSet);
         app.MapProductImageEndpoints(apiVersionSet);

@@ -8,8 +8,14 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Packaging;
 
 /// <summary>
 /// Parses an uploaded file into the shared <see cref="ParsedCatalogPackage"/> shape.
-/// <c>.hambox</c> delegates to <see cref="IHamboxPackageReader"/>. <c>.xlsx</c>/<c>.csv</c> always
-/// describe exactly one <see cref="CatalogImportEntityType"/> — rows are read by column header name
+/// <c>.hambox</c> delegates to <see cref="IHamboxPackageReader"/>. <c>.csv</c> always describes
+/// exactly one <see cref="CatalogImportEntityType"/>. <c>.xlsx</c> is read by sheet name (case-
+/// insensitive, matching <see cref="CatalogImportTemplateGenerator"/>'s sheet names) rather than
+/// always the first sheet — this is what lets the <see cref="CatalogImportEntityType.Products"/>
+/// template be one workbook with five tabs (Products/Variant Groups/Variant Options/Variants/
+/// Inventory Codes) instead of five separate files, while an old single-sheet "Products" export
+/// (sheet name "Products", no other tabs) still parses exactly as it did before — the extra sheets
+/// are optional and default to empty lists when absent. Rows are read by column header name
 /// (case-insensitive) so column order in a hand-edited template never matters.
 /// </summary>
 internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : ICatalogImportParser
@@ -26,28 +32,74 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             return await hamboxReader.ReadAsync(fileStream, packagePassword, cancellationToken);
         }
 
-        var rows = format == CatalogPackageFormat.Xlsx
-            ? ReadXlsxRows(fileStream)
-            : ReadCsvRows(fileStream);
-
-        return entityType switch
+        if (format == CatalogPackageFormat.Csv)
         {
-            CatalogImportEntityType.Categories => ParsedCatalogPackage.Empty with { Categories = rows.Select((r, i) => ToCategoryRow(r, i)).ToList() },
-            CatalogImportEntityType.Collections => ParsedCatalogPackage.Empty with { Collections = rows.Select((r, i) => ToCollectionRow(r, i)).ToList() },
-            CatalogImportEntityType.Products => ParsedCatalogPackage.Empty with { Products = rows.Select((r, i) => ToProductRow(r, i)).ToList() },
-            CatalogImportEntityType.Inventory => ParsedCatalogPackage.Empty with { Variants = rows.Select((r, i) => ToVariantRow(r, i)).ToList() },
-            CatalogImportEntityType.Codes => ParsedCatalogPackage.Empty with { Codes = rows.Select((r, i) => ToCodeRow(r, i)).ToList() },
-            _ => throw new InvalidDataException($"'{format}' uploads must specify a single entity type."),
-        };
+            var csvRows = ReadCsvRows(fileStream);
+            return ToPackage(entityType, csvRows, [], [], [], []);
+        }
+
+        using var workbook = new XLWorkbook(fileStream);
+
+        if (entityType == CatalogImportEntityType.Products)
+        {
+            // Variants and Inventory Codes are deliberately not read here even if present in an
+            // older-style workbook — variants are generated afterward via "Generate Variants",
+            // and codes are added per-variant in the catalog admin UI, not bundled with a product import.
+            var productsSheet = FindSheet(workbook, "Products") ?? workbook.Worksheets.FirstOrDefault();
+            return ToPackage(
+                entityType,
+                ReadSheetRows(productsSheet),
+                ReadSheetRows(FindSheet(workbook, "Variant Groups")),
+                ReadSheetRows(FindSheet(workbook, "Variant Options")),
+                [],
+                []);
+        }
+
+        var sheet = FindSheet(workbook, entityType.ToString()) ?? workbook.Worksheets.FirstOrDefault();
+        return ToPackage(entityType, ReadSheetRows(sheet), [], [], [], []);
     }
+
+    private static ParsedCatalogPackage ToPackage(
+        CatalogImportEntityType entityType,
+        List<Dictionary<string, string>> primaryRows,
+        List<Dictionary<string, string>> optionGroupRows,
+        List<Dictionary<string, string>> optionRows,
+        List<Dictionary<string, string>> variantRows,
+        List<Dictionary<string, string>> codeRows) => entityType switch
+    {
+        CatalogImportEntityType.Categories => ParsedCatalogPackage.Empty with { Categories = primaryRows.Select((r, i) => ToCategoryRow(r, i)).ToList() },
+        CatalogImportEntityType.Collections => ParsedCatalogPackage.Empty with { Collections = primaryRows.Select((r, i) => ToCollectionRow(r, i)).ToList() },
+        CatalogImportEntityType.Products => ParsedCatalogPackage.Empty with
+        {
+            Products = primaryRows.Select((r, i) => ToProductRow(r, i)).ToList(),
+            OptionGroups = optionGroupRows.Select((r, i) => ToOptionGroupRow(r, i)).ToList(),
+            Options = optionRows.Select((r, i) => ToOptionRow(r, i)).ToList(),
+            Variants = variantRows.Select((r, i) => ToVariantRow(r, i)).ToList(),
+            Codes = codeRows.Select((r, i) => ToCodeRow(r, i)).ToList(),
+        },
+        CatalogImportEntityType.Inventory => ParsedCatalogPackage.Empty with { Variants = primaryRows.Select((r, i) => ToVariantRow(r, i)).ToList() },
+        CatalogImportEntityType.Codes => ParsedCatalogPackage.Empty with { Codes = primaryRows.Select((r, i) => ToCodeRow(r, i)).ToList() },
+        _ => throw new InvalidDataException($"'{entityType}' uploads must specify a single entity type."),
+    };
 
     // ---------- tabular readers ----------
 
-    private static List<Dictionary<string, string>> ReadXlsxRows(Stream stream)
+    private static IXLWorksheet? FindSheet(XLWorkbook workbook, string name) =>
+        workbook.Worksheets.TryGetWorksheet(name, out var worksheet) ? worksheet : null;
+
+    private static List<Dictionary<string, string>> ReadSheetRows(IXLWorksheet? worksheet)
     {
-        using var workbook = new XLWorkbook(stream);
-        var worksheet = workbook.Worksheets.First();
-        var headerRow = worksheet.FirstRowUsed() ?? throw new InvalidDataException("The sheet has no header row.");
+        if (worksheet is null)
+        {
+            return [];
+        }
+
+        var headerRow = worksheet.FirstRowUsed();
+        if (headerRow is null)
+        {
+            return [];
+        }
+
         var headers = headerRow.CellsUsed().Select(c => c.GetString().Trim()).ToList();
 
         var rows = new List<Dictionary<string, string>>();
@@ -190,9 +242,26 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             SplitList(Get(row, "CollectionNames")));
     }
 
+    private static ParsedOptionGroupRow ToOptionGroupRow(Dictionary<string, string> row, int index) => new(
+        Get(row, "ProductImportKey"),
+        Get(row, "GroupKey"),
+        Get(row, "DisplayName"),
+        NullIfEmpty(Get(row, "ParentGroupKey")),
+        ParseInt(Get(row, "SortOrder"), 0),
+        ParseBool(Get(row, "IsRequired"), false),
+        index + 1);
+
+    private static ParsedOptionRow ToOptionRow(Dictionary<string, string> row, int index) => new(
+        Get(row, "ProductImportKey"),
+        Get(row, "GroupKey"),
+        Get(row, "Value"),
+        Get(row, "Label"),
+        ParseInt(Get(row, "SortOrder"), 0),
+        index + 1);
+
     private static ParsedVariantRow ToVariantRow(Dictionary<string, string> row, int index) => new(
         index + 1,
-        Get(row, "Sku"),
+        NullIfEmpty(Get(row, "Sku")),
         Get(row, "ProductImportKey"),
         ParseNullableDecimal(Get(row, "PriceOverride")),
         ParseNullableDecimal(Get(row, "ComparePrice")),

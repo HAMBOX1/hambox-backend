@@ -2,7 +2,7 @@ using HAMBOX.Modules.Catalog.Domain.Inventory;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Inventory;
 
-internal static class VariantCombinationHelper
+public static class VariantCombinationHelper
 {
     /// <summary>
     /// Recursively expands a product's option-group tree into variant paths. Root-level groups

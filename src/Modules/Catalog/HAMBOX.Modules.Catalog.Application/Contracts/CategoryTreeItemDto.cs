@@ -13,4 +13,5 @@ public sealed record CategoryTreeItemDto(
     Guid? ParentId,
     int SortOrder,
     int ChildrenCount,
-    int ProductCount);
+    int ProductCount,
+    string? ImageUrl = null);

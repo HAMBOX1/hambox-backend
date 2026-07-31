@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
+using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetImportLookups;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 
 namespace HAMBOX.Modules.Catalog.Application.Abstractions;
@@ -52,10 +53,30 @@ public interface ICatalogImportParser
         CancellationToken cancellationToken);
 }
 
-/// <summary>Generates a blank xlsx template (header + sample rows + an Instructions sheet) for one entity type.</summary>
+/// <summary>
+/// Generates a template workbook for one entity type — header + sample rows + dropdown-validated
+/// lookup columns + an Instructions sheet. <see cref="CatalogImportEntityType.Products"/> generates
+/// a five-tab workbook (Products/Variant Groups/Variant Options/Variants/Inventory Codes); every
+/// other entity type stays a single sheet. <paramref name="lookups"/> is what makes the dropdowns
+/// reflect the current database rather than a hardcoded list.
+/// </summary>
 public interface IImportTemplateGenerator
 {
-    byte[] Generate(CatalogImportEntityType entityType);
+    byte[] Generate(CatalogImportEntityType entityType, CatalogImportLookups lookups);
+}
+
+/// <summary>
+/// Protects a caller-supplied package password before it is persisted in an enqueued background
+/// job's payload (<c>commerce.OperationalJobs.PayloadJson</c>), and reverses that at job-execution
+/// time. Same ASP.NET Core Data Protection technique/pattern as Identity's
+/// <c>PlatformSettingsSecretProtector</c> (used for the SMTP password) — scoped to Catalog with its
+/// own purpose string since that protector is internal to Identity.Infrastructure.
+/// </summary>
+public interface ICatalogPackageSecretProtector
+{
+    string Protect(string plainText);
+
+    string Unprotect(string cipherText);
 }
 
 /// <summary>

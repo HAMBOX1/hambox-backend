@@ -14,7 +14,8 @@ public sealed record CartItemDto(
     string? Platform = null,
     string? Region = null,
     string? Edition = null,
-    string? VariantSummary = null);
+    string? VariantSummary = null,
+    string? ImageUrl = null);
 
 /// <summary>
 /// Represents calculated cart totals.

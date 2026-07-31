@@ -10,7 +10,8 @@ public sealed record OrderItemDto(
     string ProductNameEn,
     int Quantity,
     decimal UnitPrice,
-    decimal LineTotal);
+    decimal LineTotal,
+    string? ImageUrl = null);
 
 /// <summary>
 /// Represents an order response.

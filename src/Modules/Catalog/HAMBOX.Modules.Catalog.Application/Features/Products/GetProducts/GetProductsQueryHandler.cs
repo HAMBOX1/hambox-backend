@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
@@ -41,28 +42,58 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var products = await query
+        var rows = await query
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(p => new ProductDto(
+            .Select(p => new
+            {
                 p.Id,
                 p.NameAr,
                 p.NameEn,
                 p.DescriptionAr,
                 p.DescriptionEn,
                 p.Price,
-                p.Status.ToString(),
+                Status = p.Status.ToString(),
                 p.CategoryId,
-                _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn,
-                _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameAr,
-                p.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
-                p.Images.FirstOrDefault(i => i.IsPrimary)!.Url
+                CategoryName = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameEn,
+                CategoryNameAr = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.NameAr,
+                AdditionalCategoryIds = p.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
+                ProductImageUrl = p.Images.FirstOrDefault(i => i.IsPrimary)!.Url
                     ?? p.Images.OrderBy(i => i.DisplayOrder).Select(i => i.Url).FirstOrDefault(),
-                null,
+                CategoryOwnImageUrl = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.ImageUrl,
+                CategoryEffectiveImageUrl = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.EffectiveImageUrl,
                 p.CreatedOnUtc,
-                0,
-                p.Collections.Select(pc => pc.CollectionId).ToList()))
+                CollectionIds = p.Collections.Select(pc => pc.CollectionId).ToList(),
+            })
             .ToListAsync(cancellationToken);
+
+        var products = rows
+            .Select(r =>
+            {
+                var displayImage = ProductDisplayImageResolver.Resolve(
+                    r.ProductImageUrl, r.CategoryOwnImageUrl, r.CategoryEffectiveImageUrl);
+
+                return new ProductDto(
+                    r.Id,
+                    r.NameAr,
+                    r.NameEn,
+                    r.DescriptionAr,
+                    r.DescriptionEn,
+                    r.Price,
+                    r.Status,
+                    r.CategoryId,
+                    r.CategoryName,
+                    r.CategoryNameAr,
+                    r.AdditionalCategoryIds,
+                    r.ProductImageUrl,
+                    null,
+                    r.CreatedOnUtc,
+                    0,
+                    r.CollectionIds,
+                    displayImage.Url,
+                    displayImage.Source);
+            })
+            .ToList();
 
         var productIds = products.Select(p => p.Id).ToList();
         var stockByProduct = await _dbContext.ProductVariants

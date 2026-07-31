@@ -15,5 +15,8 @@ internal static class CatalogPackageJobMapper
         job.FileName.Length == 0 ? null : job.FileName,
         job.ResultFileName,
         job.SummaryJson is null ? null : JsonSerializer.Deserialize<CatalogPackageSummary>(job.SummaryJson),
-        job.ErrorMessage);
+        job.ErrorMessage,
+        job.CreatedOnUtc,
+        job.CreatedBy,
+        job.ModifiedOnUtc);
 }

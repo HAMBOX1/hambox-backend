@@ -4,6 +4,8 @@ using HAMBOX.Modules.Catalog.Application.Features.ImportExport.ExecuteCatalogImp
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.ExportCatalog;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetCatalogPackageDownload;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetCatalogPackageJob;
+using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetCatalogPackageJobs;
+using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetImportLookups;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetImportTemplate;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.UploadCatalogImport;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.ValidateCatalogImport;
@@ -83,16 +85,38 @@ internal static class CatalogImportExportEndpoints
         group.MapPost("/import/{uploadId:guid}/validate", async (
             Guid uploadId,
             [FromBody] ValidateCatalogImportRequest? body,
-            ISender sender) => await Send(sender, new ValidateCatalogImportQuery(uploadId, body?.PackagePassword)))
+            ISender sender) => await Send(sender, new ValidateCatalogImportQuery(
+                uploadId,
+                body?.PackagePassword,
+                body?.SkuStrategy ?? CatalogSkuStrategy.UseImportedSku,
+                body?.Corrections)))
             .WithName("ValidateCatalogImport")
             .RequirePermission(PermissionConstants.Catalog.Products.Import);
 
         group.MapPost("/import/{uploadId:guid}/execute", async (
             Guid uploadId,
             [FromBody] ExecuteCatalogImportRequest body,
-            ISender sender) => await Send(sender, new ExecuteCatalogImportCommand(uploadId, body.Strategy, body.Options, body.PackagePassword)))
+            ISender sender) => await Send(sender, new ExecuteCatalogImportCommand(
+                uploadId, body.Strategy, body.Options, body.PackagePassword,
+                body.SkuStrategy, body.Corrections, body.RowOverrides)))
             .WithName("ExecuteCatalogImport")
             .RequirePermission(PermissionConstants.Catalog.Products.Import);
+
+        group.MapGet("/import/lookups", async (ISender sender) =>
+            await Send(sender, new GetCatalogImportLookupsQuery()))
+            .WithName("GetCatalogImportLookups")
+            .RequirePermission(PermissionConstants.Catalog.Products.Import);
+
+        group.MapGet("/import-export/jobs", async (
+            [FromQuery] CatalogPackageDirection? direction,
+            [FromQuery] CatalogPackageJobStatus? status,
+            [FromQuery] string? search,
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            [FromQuery] string? sort,
+            ISender sender) => await Send(sender, new GetCatalogPackageJobsQuery(direction, status, search, page, pageSize, sort)))
+            .WithName("GetCatalogPackageJobs")
+            .RequirePermission(PermissionConstants.Catalog.Products.View);
 
         group.MapGet("/import-export/jobs/{jobId:guid}", async (
             Guid jobId,
@@ -141,7 +165,15 @@ internal sealed record ExportCatalogRequest(
     bool PasswordProtectPackage,
     string? PackagePassword);
 
-internal sealed record ValidateCatalogImportRequest(string? PackagePassword);
+internal sealed record ValidateCatalogImportRequest(
+    string? PackagePassword,
+    CatalogSkuStrategy SkuStrategy = CatalogSkuStrategy.UseImportedSku,
+    IReadOnlyList<CatalogImportCorrection>? Corrections = null);
 
 internal sealed record ExecuteCatalogImportRequest(
-    CatalogDuplicateStrategy Strategy, CatalogPackageOptions Options, string? PackagePassword);
+    CatalogDuplicateStrategy Strategy,
+    CatalogPackageOptions Options,
+    string? PackagePassword,
+    CatalogSkuStrategy SkuStrategy = CatalogSkuStrategy.UseImportedSku,
+    IReadOnlyList<CatalogImportCorrection>? Corrections = null,
+    IReadOnlyList<CatalogImportRowOverride>? RowOverrides = null);

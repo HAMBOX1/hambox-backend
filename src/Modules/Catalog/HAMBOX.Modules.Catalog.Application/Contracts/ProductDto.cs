@@ -19,6 +19,13 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="Images">The ordered product images. Populated on detail reads.</param>
 /// <param name="CreatedOnUtc">When the product was created.</param>
 /// <param name="AvailableStock">Total available inventory code count across all variants. Populated on list reads.</param>
+/// <param name="CollectionIds">The identifiers of the internal, owner-only collections this product is organized under.</param>
+/// <param name="DisplayImageUrl">
+/// The image to render for this product: its own image, else its category's image, else the
+/// nearest ancestor category's image, else a placeholder — always non-null. Resolved server-side
+/// via <see cref="Services.ProductDisplayImageResolver"/>; the frontend should never re-derive this.
+/// </param>
+/// <param name="DisplayImageSource">Where <see cref="DisplayImageUrl"/> came from — see <see cref="Services.ProductDisplayImageSource"/>.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -35,4 +42,6 @@ public sealed record ProductDto(
     IReadOnlyList<ProductImageDto>? Images,
     DateTimeOffset CreatedOnUtc,
     int AvailableStock = 0,
-    IReadOnlyList<Guid>? CollectionIds = null);
+    IReadOnlyList<Guid>? CollectionIds = null,
+    string DisplayImageUrl = Services.ProductDisplayImageResolver.PlaceholderImageUrl,
+    string DisplayImageSource = Services.ProductDisplayImageSource.Placeholder);

@@ -56,19 +56,23 @@ public sealed record ParsedProductRow(
     IReadOnlyList<string>? CollectionNames = null);
 
 public sealed record ParsedOptionGroupRow(
-    string ProductImportKey, string Key, string DisplayName, string? ParentKey, int SortOrder, bool IsRequired);
+    string ProductImportKey, string Key, string DisplayName, string? ParentKey, int SortOrder, bool IsRequired,
+    int RowNumber = 0);
 
 public sealed record ParsedOptionRow(
-    string ProductImportKey, string GroupKey, string Value, string Label, int SortOrder);
+    string ProductImportKey, string GroupKey, string Value, string Label, int SortOrder, int RowNumber = 0);
 
 /// <summary>
 /// <see cref="MembershipPlanId"/> is carried through as informational metadata only — membership
 /// plan ids are Commerce-owned and will not exist (or will mean something else) on a different
 /// HAMBOX installation, so it is never auto-relinked on import; imported variants land with no
 /// membership plan and a validation warning telling the admin to reassign it manually.
+/// <see cref="Sku"/> is nullable — a blank cell is only an error when <see cref="CatalogSkuStrategy"/>
+/// is <see cref="CatalogSkuStrategy.UseImportedSku"/>; otherwise Execute generates one via
+/// <c>VariantCombinationHelper.BuildSku</c>.
 /// </summary>
 public sealed record ParsedVariantRow(
-    int RowNumber, string Sku, string ProductImportKey, decimal? PriceOverride, decimal? ComparePrice,
+    int RowNumber, string? Sku, string ProductImportKey, decimal? PriceOverride, decimal? ComparePrice,
     string? Status, int LowStockThreshold, Guid? MembershipPlanId, IReadOnlyList<string> SelectedOptionValues);
 
 public sealed record ParsedCodeRow(
@@ -98,12 +102,38 @@ public sealed record ParsedCatalogPackage(
 
 // ---------- Validation report (Step 2 of the wizard) ----------
 
+/// <summary>
+/// A structured companion to <see cref="CatalogImportRowResult.Errors"/> so the frontend can bind an
+/// inline correction control (a dropdown of existing values, or "create new") to the exact bad cell
+/// instead of parsing the human-readable error string. <see cref="IssueType"/> is one of:
+/// <c>UnknownCategory</c>, <c>UnknownCollection</c>, <c>UnknownSupplier</c>, <c>UnknownProduct</c>,
+/// <c>UnknownVariantGroup</c>, <c>UnknownVariantOption</c>, <c>DuplicateSku</c>.
+/// </summary>
+public sealed record CatalogImportFieldIssue(string Column, string Value, string IssueType);
+
 public sealed record CatalogImportRowResult(
     int RowNumber,
     string EntityType,
     string Label,
     CatalogImportRowStatus Status,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<CatalogImportFieldIssue> FieldIssues);
+
+/// <summary>
+/// A value substitution applied across every row of the given entity/column before matching —
+/// "Apply to all N occurrences" of a bulk correction (e.g. rename a mistyped category slug).
+/// <see cref="CreateNew"/> additionally injects a brand-new Category/Collection row (named
+/// <see cref="ToValue"/>) into the package for the (Category/Collection)-owning column pairs — see
+/// <see cref="CatalogImportCorrectionApplier"/> — so the owner can create a missing category or
+/// collection from the validation screen without touching Excel. Ignored for every other column.
+/// </summary>
+public sealed record CatalogImportCorrection(string EntityType, string Column, string FromValue, string ToValue, bool CreateNew = false);
+
+/// <summary>
+/// Per-row override of the global <see cref="CatalogDuplicateStrategy"/>, for the "Duplicate SKU →
+/// Update Existing / Generate New / Skip" inline correction. <c>Rename</c> is "Generate New".
+/// </summary>
+public sealed record CatalogImportRowOverride(int RowNumber, string EntityType, CatalogDuplicateStrategy Strategy);
 
 public sealed record CatalogImportValidationReport(
     Guid UploadId,
@@ -135,7 +165,10 @@ public sealed record CatalogPackageJobDto(
     string? FileName,
     string? ResultFileName,
     CatalogPackageSummary? Summary,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    DateTimeOffset CreatedOnUtc,
+    string? CreatedBy,
+    DateTimeOffset? ModifiedOnUtc);
 
 /// <summary>
 /// The keys used to decide "new vs. duplicate" against what's already in the destination

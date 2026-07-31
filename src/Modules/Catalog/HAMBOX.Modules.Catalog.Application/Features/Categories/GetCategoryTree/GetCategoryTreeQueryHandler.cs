@@ -17,7 +17,7 @@ internal sealed class GetCategoryTreeQueryHandler(ICatalogDbContext dbContext)
             .AsNoTracking()
             .OrderBy(c => c.ParentId)
             .ThenBy(c => c.SortOrder)
-            .Select(c => new { c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId, c.SortOrder })
+            .Select(c => new { c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId, c.SortOrder, c.ImageUrl })
             .ToListAsync(cancellationToken);
 
         var childrenCounts = await dbContext.Categories
@@ -55,7 +55,8 @@ internal sealed class GetCategoryTreeQueryHandler(ICatalogDbContext dbContext)
                 c.ParentId,
                 c.SortOrder,
                 childrenCounts.GetValueOrDefault(c.Id),
-                productCounts.GetValueOrDefault(c.Id)))
+                productCounts.GetValueOrDefault(c.Id),
+                c.ImageUrl))
             .ToList();
 
         return Result.Success<IReadOnlyList<CategoryTreeItemDto>>(items);

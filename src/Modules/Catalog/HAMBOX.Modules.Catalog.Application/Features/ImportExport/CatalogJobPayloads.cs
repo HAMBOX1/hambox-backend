@@ -17,4 +17,7 @@ public sealed record ExecuteCatalogImportJobPayload(
     Guid PackageJobId,
     CatalogDuplicateStrategy Strategy,
     CatalogPackageOptions Options,
-    string? PackagePassword);
+    string? PackagePassword,
+    CatalogSkuStrategy SkuStrategy = CatalogSkuStrategy.UseImportedSku,
+    IReadOnlyList<CatalogImportCorrection>? Corrections = null,
+    IReadOnlyList<CatalogImportRowOverride>? RowOverrides = null);

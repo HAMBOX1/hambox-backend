@@ -18,7 +18,8 @@ internal static class CommerceMapper
         IReadOnlyDictionary<Guid, Product> products,
         IReadOnlyDictionary<Guid, ProductVariant> variants,
         PromotionEvaluationResult evaluation,
-        IReadOnlyDictionary<Guid, (string? Platform, string? Edition, string? Region, string? Summary)>? variantAttributes = null)
+        IReadOnlyDictionary<Guid, (string? Platform, string? Edition, string? Region, string? Summary)>? variantAttributes = null,
+        IReadOnlyDictionary<Guid, string?>? imageUrls = null)
     {
         var items = cart.Items
             .Select(item =>
@@ -48,6 +49,10 @@ internal static class CommerceMapper
                     }
                 }
 
+                var imageUrl = imageUrls is not null && imageUrls.TryGetValue(item.ProductId, out var resolvedImageUrl)
+                    ? resolvedImageUrl
+                    : null;
+
                 return new CartItemDto(
                     item.ProductId,
                     item.ProductVariantId,
@@ -59,7 +64,8 @@ internal static class CommerceMapper
                     platform,
                     region,
                     edition,
-                    variantSummary);
+                    variantSummary,
+                    imageUrl);
             })
             .ToList();
 
@@ -96,7 +102,9 @@ internal static class CommerceMapper
             [],
             new CartTotalsDto(0m, 0m, 0m, 0m, 0, [], [], null));
 
-    public static OrderDto ToOrderDto(Domain.Orders.Order order) =>
+    public static OrderDto ToOrderDto(
+        Domain.Orders.Order order,
+        IReadOnlyDictionary<Guid, string?>? imageUrls = null) =>
         new(
             order.Id,
             order.OrderNumber,
@@ -120,7 +128,10 @@ internal static class CommerceMapper
                 i.ProductNameEn,
                 i.Quantity,
                 i.UnitPrice,
-                i.LineTotal)).ToList(),
+                i.LineTotal,
+                i.ProductId is Guid productId && imageUrls is not null && imageUrls.TryGetValue(productId, out var imageUrl)
+                    ? imageUrl
+                    : null)).ToList(),
             order.CreatedOnUtc);
 
     public static OrderDetailDto ToOrderDetailDto(
@@ -128,7 +139,8 @@ internal static class CommerceMapper
         IReadOnlyList<Domain.Account.OrderLicenseKey> licenseKeys,
         IReadOnlyDictionary<Guid, Domain.Account.ProductReview> reviewsByProductId,
         string? invoiceUrl,
-        string? supportUrl) =>
+        string? supportUrl,
+        IReadOnlyDictionary<Guid, string?>? imageUrls = null) =>
         new(
             order.Id,
             order.OrderNumber,
@@ -147,7 +159,10 @@ internal static class CommerceMapper
                 i.ProductNameEn,
                 i.Quantity,
                 i.UnitPrice,
-                i.LineTotal)).ToList(),
+                i.LineTotal,
+                i.ProductId is Guid productId && imageUrls is not null && imageUrls.TryGetValue(productId, out var imageUrl)
+                    ? imageUrl
+                    : null)).ToList(),
             AccountMapper.BuildOrderTimeline(order),
             licenseKeys.Select(k =>
             {

@@ -173,6 +173,20 @@ public static class CatalogErrors
         "Categories.Cycle",
         "The parent assignment would create a category cycle.");
 
+    /// <summary>
+    /// Gets the error for when an uploaded category image is invalid.
+    /// </summary>
+    public static readonly Error InvalidCategoryImage = new(
+        "Categories.InvalidImage",
+        "The uploaded image is invalid.");
+
+    /// <summary>
+    /// Gets the error for when a category has no image to remove.
+    /// </summary>
+    public static readonly Error CategoryImageNotFound = new(
+        "Categories.ImageNotFound",
+        "The category does not have an image to remove.");
+
     public static readonly Error CollectionNotFound = new(
         "Collections.NotFound",
         "The collection with the specified identifier was not found.");

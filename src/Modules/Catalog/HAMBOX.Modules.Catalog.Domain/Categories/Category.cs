@@ -68,6 +68,28 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public int SortOrder { get; private set; }
 
+    /// <summary>
+    /// Gets the URL of this category's own uploaded image, if any.
+    /// </summary>
+    public string? ImageUrl { get; private set; }
+
+    /// <summary>
+    /// Gets the storage provider key for the image file, used to delete it from storage.
+    /// </summary>
+    public string? ImageStorageKey { get; private set; }
+
+    /// <summary>
+    /// Gets the resolved "nearest self-or-ancestor" image URL: this category's own
+    /// <see cref="ImageUrl"/> when set, otherwise the value inherited from the closest
+    /// ancestor that has one, otherwise <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Denormalized and kept in sync by <c>CategoryImageResolution</c> whenever this
+    /// category's own image or parent changes, so that resolving a product's display
+    /// image never has to walk the category tree at read time.
+    /// </remarks>
+    public string? EffectiveImageUrl { get; private set; }
+
     /// <inheritdoc />
     public string? CreatedBy { get; private set; }
 
@@ -163,6 +185,40 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public void SetSortOrder(int sortOrder)
     {
         SortOrder = sortOrder;
+    }
+
+    /// <summary>
+    /// Sets this category's own image, replacing any previous one.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="url"/> or <paramref name="storageKey"/> is null or whitespace.</exception>
+    public void SetImage(string url, string storageKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
+
+        ImageUrl = url;
+        ImageStorageKey = storageKey;
+    }
+
+    /// <summary>
+    /// Removes this category's own image.
+    /// </summary>
+    /// <returns>The storage key of the removed image, or <see langword="null"/> if there was none.</returns>
+    public string? RemoveImage()
+    {
+        var storageKey = ImageStorageKey;
+        ImageUrl = null;
+        ImageStorageKey = null;
+        return storageKey;
+    }
+
+    /// <summary>
+    /// Sets the denormalized <see cref="EffectiveImageUrl"/>.
+    /// </summary>
+    /// <remarks>Called only by <c>CategoryImageResolution</c> when recomputing/cascading image inheritance.</remarks>
+    public void SetEffectiveImageUrl(string? effectiveImageUrl)
+    {
+        EffectiveImageUrl = effectiveImageUrl;
     }
 
     /// <summary>

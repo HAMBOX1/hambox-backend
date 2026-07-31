@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Services;
@@ -11,13 +12,16 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Orders.GetOrderById;
 internal sealed class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQuery, Result<Contracts.Account.OrderDetailDto>>
 {
     private readonly ICommerceDbContext _commerceDbContext;
+    private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
 
     public GetOrderByIdQueryHandler(
         ICommerceDbContext commerceDbContext,
+        ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService)
     {
         _commerceDbContext = commerceDbContext;
+        _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
     }
 
@@ -49,6 +53,10 @@ internal sealed class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQue
         var reviews = await _commerceDbContext.ProductReviews
             .Where(r => r.UserId == _currentUserService.UserId && productIds.Contains(r.ProductId))
             .ToDictionaryAsync(r => r.ProductId, cancellationToken);
+        var imageUrls = await ProductPrimaryImageResolver.GetPrimaryImageUrlsAsync(
+            _catalogDbContext,
+            productIds.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList(),
+            cancellationToken);
 
         string? invoiceUrl = null;
         var supportUrl = $"/support/orders/{order.OrderNumber}";
@@ -58,6 +66,7 @@ internal sealed class GetOrderByIdQueryHandler : IRequestHandler<GetOrderByIdQue
             licenseKeys,
             reviews,
             invoiceUrl,
-            supportUrl));
+            supportUrl,
+            imageUrls));
     }
 }

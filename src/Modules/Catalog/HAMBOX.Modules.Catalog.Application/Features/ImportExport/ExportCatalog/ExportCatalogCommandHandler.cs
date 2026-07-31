@@ -11,7 +11,8 @@ namespace HAMBOX.Modules.Catalog.Application.Features.ImportExport.ExportCatalog
 
 internal sealed class ExportCatalogCommandHandler(
     ICatalogDbContext dbContext,
-    IBackgroundJobScheduler jobScheduler)
+    IBackgroundJobScheduler jobScheduler,
+    ICatalogPackageSecretProtector secretProtector)
     : IRequestHandler<ExportCatalogCommand, Result<Guid>>
 {
     public async Task<Result<Guid>> Handle(ExportCatalogCommand request, CancellationToken cancellationToken)
@@ -49,9 +50,13 @@ internal sealed class ExportCatalogCommandHandler(
         dbContext.CatalogPackageJobs.Add(packageJob);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var protectedPassword = string.IsNullOrEmpty(request.PackagePassword)
+            ? request.PackagePassword
+            : secretProtector.Protect(request.PackagePassword);
+
         var payload = new ExportCatalogJobPayload(
             packageJob.Id, productIds, request.Format, request.Options, request.EncryptCodes,
-            request.PasswordProtectPackage, request.PackagePassword);
+            request.PasswordProtectPackage, protectedPassword);
 
         var backgroundJobId = await jobScheduler.EnqueueAsync(
             CatalogJobTypes.ExportPackage,

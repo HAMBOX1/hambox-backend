@@ -36,9 +36,13 @@ internal static class CatalogMapper
         Product product,
         string categoryName,
         string categoryNameAr,
-        bool includeImages)
+        bool includeImages,
+        string? categoryOwnImageUrl = null,
+        string? categoryEffectiveImageUrl = null)
     {
         var images = includeImages ? ToProductImageDtos(product.Images) : null;
+        var primaryImageUrl = GetPrimaryImageUrl(product);
+        var displayImage = ProductDisplayImageResolver.Resolve(primaryImageUrl, categoryOwnImageUrl, categoryEffectiveImageUrl);
 
         return new ProductDto(
             product.Id,
@@ -52,9 +56,11 @@ internal static class CatalogMapper
             categoryName,
             categoryNameAr,
             product.AdditionalCategories.Select(pc => pc.CategoryId).ToList(),
-            GetPrimaryImageUrl(product),
+            primaryImageUrl,
             images,
             product.CreatedOnUtc,
-            CollectionIds: product.Collections.Select(pc => pc.CollectionId).ToList());
+            CollectionIds: product.Collections.Select(pc => pc.CollectionId).ToList(),
+            DisplayImageUrl: displayImage.Url,
+            DisplayImageSource: displayImage.Source);
     }
 }

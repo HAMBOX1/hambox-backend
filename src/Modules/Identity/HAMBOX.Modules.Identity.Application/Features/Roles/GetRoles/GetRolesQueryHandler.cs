@@ -38,6 +38,8 @@ internal sealed class GetRolesQueryHandler(IIdentityDbContext dbContext)
                 r.IsSystem,
                 r.IsDefault,
                 r.PriorityLevel,
+                r.CreatedOnUtc,
+                r.ModifiedOnUtc,
             })
             .ToListAsync(cancellationToken);
 
@@ -63,7 +65,9 @@ internal sealed class GetRolesQueryHandler(IIdentityDbContext dbContext)
             r.IsDefault,
             r.PriorityLevel,
             userCounts.GetValueOrDefault(r.Id),
-            permissionCounts.GetValueOrDefault(r.Id))).ToList();
+            permissionCounts.GetValueOrDefault(r.Id),
+            r.CreatedOnUtc,
+            r.ModifiedOnUtc)).ToList();
 
         return Result.Success(new PagedResult<RoleListItemDto>(
             items,

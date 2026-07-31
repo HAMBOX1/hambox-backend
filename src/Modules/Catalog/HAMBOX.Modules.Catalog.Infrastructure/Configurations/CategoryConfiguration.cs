@@ -39,6 +39,15 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(c => c.ImageUrl)
+            .HasMaxLength(500);
+
+        builder.Property(c => c.ImageStorageKey)
+            .HasMaxLength(500);
+
+        builder.Property(c => c.EffectiveImageUrl)
+            .HasMaxLength(500);
+
         builder.HasIndex(c => c.ParentId)
             .HasDatabaseName("IX_Categories_ParentId");
 

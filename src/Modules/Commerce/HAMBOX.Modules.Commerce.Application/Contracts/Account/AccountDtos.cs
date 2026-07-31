@@ -132,7 +132,8 @@ public sealed record OrderSummaryDto(
     string Status,
     decimal TotalAmount,
     int ItemCount,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    string? ImageUrl = null);
 
 /// <summary>
 /// Represents a timeline event on an order.

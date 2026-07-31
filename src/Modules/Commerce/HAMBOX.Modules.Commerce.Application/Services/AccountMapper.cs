@@ -59,14 +59,15 @@ internal static class AccountMapper
         new("Gold", 1000, ReferralPointsPerSuccessfulReferral)
     ];
 
-    public static Contracts.Account.OrderSummaryDto ToOrderSummaryDto(Order order) =>
+    public static Contracts.Account.OrderSummaryDto ToOrderSummaryDto(Order order, string? imageUrl = null) =>
         new(
             order.Id,
             order.OrderNumber,
             order.Status.ToString(),
             order.TotalAmount,
             order.Items.Count,
-            order.CreatedOnUtc);
+            order.CreatedOnUtc,
+            imageUrl);
 
     public static IReadOnlyList<Contracts.Account.OrderTimelineEventDto> BuildOrderTimeline(Order order)
     {

@@ -25,6 +25,8 @@ internal sealed class GetRoleByIdQueryHandler(IIdentityDbContext dbContext)
                 r.IsSystem,
                 r.IsDefault,
                 r.PriorityLevel,
+                r.CreatedOnUtc,
+                r.ModifiedOnUtc,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -49,6 +51,8 @@ internal sealed class GetRoleByIdQueryHandler(IIdentityDbContext dbContext)
             role.IsDefault,
             role.PriorityLevel,
             userCount,
-            permissionIds));
+            permissionIds,
+            role.CreatedOnUtc,
+            role.ModifiedOnUtc));
     }
 }

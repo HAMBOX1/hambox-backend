@@ -47,6 +47,8 @@ internal sealed class CartResponseBuilder
         var products = await LoadProductsAsync(cart, cancellationToken);
         var variants = await LoadVariantsAsync(cart, cancellationToken);
         var attributes = await LoadVariantAttributesAsync(cart, variants, cancellationToken);
+        var imageUrls = await ProductPrimaryImageResolver.GetPrimaryImageUrlsAsync(
+            _catalogDbContext, cart.Items.Select(i => i.ProductId).Distinct().ToList(), cancellationToken);
         var context = await PromotionContextFactory.CreateAsync(
             _commerceDbContext,
             _membershipEngine,
@@ -58,7 +60,7 @@ internal sealed class CartResponseBuilder
             cancellationToken);
 
         var evaluation = await _promotionEngine.EvaluateAsync(context, cancellationToken);
-        return CommerceMapper.ToCartDto(cart, guestSessionId, products, variants, evaluation, attributes);
+        return CommerceMapper.ToCartDto(cart, guestSessionId, products, variants, evaluation, attributes, imageUrls);
     }
 
     public async Task<(decimal Subtotal, decimal DiscountAmount, decimal TaxAmount, decimal TotalAmount, PromotionEvaluationResult Evaluation)>

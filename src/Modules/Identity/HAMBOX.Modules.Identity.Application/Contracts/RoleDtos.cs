@@ -11,7 +11,9 @@ public sealed record RoleListItemDto(
     bool IsDefault,
     int PriorityLevel,
     int UserCount,
-    int PermissionCount);
+    int PermissionCount,
+    DateTimeOffset CreatedOnUtc,
+    DateTimeOffset? ModifiedOnUtc);
 
 /// <summary>
 /// Detailed role information including assigned permissions.
@@ -24,7 +26,9 @@ public sealed record RoleDetailDto(
     bool IsDefault,
     int PriorityLevel,
     int UserCount,
-    IReadOnlyCollection<Guid> PermissionIds);
+    IReadOnlyCollection<Guid> PermissionIds,
+    DateTimeOffset CreatedOnUtc,
+    DateTimeOffset? ModifiedOnUtc);
 
 /// <summary>
 /// A permission group with its child permissions for matrix display.

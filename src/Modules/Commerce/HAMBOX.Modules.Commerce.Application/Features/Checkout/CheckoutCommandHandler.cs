@@ -369,7 +369,12 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             RelatedEntityId: createdOrder.Id.ToString(),
             ActionUrl: $"/account/library?orderId={createdOrder.Id}"), cancellationToken);
 
-        return Result.Success(CommerceMapper.ToOrderDto(createdOrder));
+        var imageUrls = await ProductPrimaryImageResolver.GetPrimaryImageUrlsAsync(
+            _catalogDbContext,
+            createdOrder.Items.Where(i => i.ProductId is not null).Select(i => i.ProductId!.Value).Distinct().ToList(),
+            cancellationToken);
+
+        return Result.Success(CommerceMapper.ToOrderDto(createdOrder, imageUrls));
     }
 
     private static bool IsInventoryFailure(InvalidOperationException ex)

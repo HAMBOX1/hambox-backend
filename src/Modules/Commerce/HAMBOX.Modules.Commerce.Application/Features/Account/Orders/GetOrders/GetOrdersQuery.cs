@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Services;
@@ -14,13 +15,16 @@ public sealed record GetOrdersQuery(int PageNumber, int PageSize) : IRequest<Res
 internal sealed class GetOrdersQueryHandler : IRequestHandler<GetOrdersQuery, Result<PagedResult<Contracts.Account.OrderSummaryDto>>>
 {
     private readonly ICommerceDbContext _commerceDbContext;
+    private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
 
     public GetOrdersQueryHandler(
         ICommerceDbContext commerceDbContext,
+        ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService)
     {
         _commerceDbContext = commerceDbContext;
+        _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
     }
 
@@ -48,7 +52,24 @@ internal sealed class GetOrdersQueryHandler : IRequestHandler<GetOrdersQuery, Re
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var summaries = orders.Select(AccountMapper.ToOrderSummaryDto).ToList();
+        // One representative image per order (its first line item) — a single batch lookup
+        // covers every order on the page, not one query per order.
+        var firstProductIdByOrder = orders.ToDictionary(
+            o => o.Id,
+            o => o.Items.Select(i => i.ProductId).FirstOrDefault(id => id.HasValue));
+        var imageUrls = await ProductPrimaryImageResolver.GetPrimaryImageUrlsAsync(
+            _catalogDbContext,
+            firstProductIdByOrder.Values.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList(),
+            cancellationToken);
+
+        var summaries = orders
+            .Select(order =>
+            {
+                var firstProductId = firstProductIdByOrder[order.Id];
+                var imageUrl = firstProductId.HasValue ? imageUrls.GetValueOrDefault(firstProductId.Value) : null;
+                return AccountMapper.ToOrderSummaryDto(order, imageUrl);
+            })
+            .ToList();
 
         return Result.Success(new PagedResult<Contracts.Account.OrderSummaryDto>(
             summaries,

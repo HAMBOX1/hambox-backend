@@ -50,7 +50,10 @@ internal sealed class ValidateCatalogImportQueryHandler(
             return Result.Failure<CatalogImportValidationReport>(CatalogErrors.PackageParsingFailed);
         }
 
-        var plan = await CatalogImportMatcher.BuildPlanAsync(package, dbContext, cancellationToken);
+        package = CatalogImportCorrectionApplier.Apply(package, request.Corrections);
+        package = await CatalogImportLookupResolver.ResolveAsync(package, dbContext, cancellationToken);
+
+        var plan = await CatalogImportMatcher.BuildPlanAsync(package, dbContext, request.SkuStrategy, cancellationToken);
         var report = CatalogImportMatcher.ToReport(job.Id, job.Format, job.EntityType, plan);
 
         return Result.Success(report);

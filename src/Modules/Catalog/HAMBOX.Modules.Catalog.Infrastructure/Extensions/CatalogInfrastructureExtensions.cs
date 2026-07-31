@@ -44,6 +44,7 @@ public static class CatalogInfrastructureExtensions
         services.AddScoped<ProductionDemoDataSeeder>();
 
         // Catalog import/export
+        services.AddSingleton<ICatalogPackageSecretProtector, CatalogPackageSecretProtector>();
         services.AddSingleton<IPackageCryptoService, PackageCryptoService>();
         services.AddScoped<IHamboxPackageWriter, HamboxPackageWriter>();
         services.AddScoped<IHamboxPackageReader, HamboxPackageReader>();
