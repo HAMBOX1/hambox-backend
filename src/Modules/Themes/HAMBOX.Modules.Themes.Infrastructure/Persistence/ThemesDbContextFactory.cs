@@ -1,7 +1,7 @@
+using HAMBOX.Infrastructure.Persistence;
 using HAMBOX.Modules.Themes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 
 namespace HAMBOX.Modules.Themes.Infrastructure.Persistence;
 
@@ -9,15 +9,11 @@ public sealed class ThemesDbContextFactory : IDesignTimeDbContextFactory<ThemesD
 {
     public ThemesDbContext CreateDbContext(string[] args)
     {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "API", "HAMBOX.API"))
-            .AddJsonFile("appsettings.json")
-            .AddJsonFile("appsettings.Development.json", optional: true)
-            .Build();
+        var configuration = DesignTimeConfigurationFactory.Build();
 
         var optionsBuilder = new DbContextOptionsBuilder<ThemesDbContext>();
         optionsBuilder.UseSqlServer(
-            configuration.GetConnectionString("Database"),
+            DesignTimeConfigurationFactory.GetRequiredConnectionString(configuration),
             o => o.MigrationsHistoryTable("__EFMigrationsHistory", "platform"));
 
         return new ThemesDbContext(optionsBuilder.Options);

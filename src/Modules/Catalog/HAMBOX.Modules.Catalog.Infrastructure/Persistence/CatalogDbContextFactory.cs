@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Infrastructure.Persistence;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Infrastructure.Services;
 
@@ -16,32 +16,8 @@ public sealed class CatalogDbContextFactory : IDesignTimeDbContextFactory<Catalo
     /// <inheritdoc />
     public CatalogDbContext CreateDbContext(string[] args)
     {
-        var basePath = Directory.GetCurrentDirectory();
-
-        // Navigate to locate the startup API project directory containing appsettings.json
-        var root = basePath;
-        while (root != null && !Directory.Exists(Path.Combine(root, "src")) && !File.Exists(Path.Combine(root, "HAMBOX.slnx")))
-        {
-            root = Directory.GetParent(root)?.FullName;
-        }
-
-        var apiPath = Path.Combine(root ?? basePath, "src", "API", "HAMBOX.API");
-        if (!Directory.Exists(apiPath))
-        {
-            apiPath = Path.Combine(basePath, "..", "..", "API", "HAMBOX.API");
-        }
-
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(apiPath)
-            .AddJsonFile("appsettings.json", optional: false)
-            .AddJsonFile("appsettings.Development.json", optional: true)
-            .Build();
-
-        var connectionString = configuration.GetConnectionString("Database");
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("Could not find the database connection string 'Database' in appsettings.json.");
-        }
+        var configuration = DesignTimeConfigurationFactory.Build();
+        var connectionString = DesignTimeConfigurationFactory.GetRequiredConnectionString(configuration);
 
         var optionsBuilder = new DbContextOptionsBuilder<CatalogDbContext>();
         optionsBuilder.UseSqlServer(connectionString,

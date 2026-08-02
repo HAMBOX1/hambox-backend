@@ -1,6 +1,6 @@
+using HAMBOX.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 
 namespace HAMBOX.Modules.Communication.Infrastructure.Persistence;
 
@@ -8,15 +8,11 @@ public sealed class CommunicationDbContextFactory : IDesignTimeDbContextFactory<
 {
     public CommunicationDbContext CreateDbContext(string[] args)
     {
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "API", "HAMBOX.API"))
-            .AddJsonFile("appsettings.json")
-            .AddJsonFile("appsettings.Development.json", optional: true)
-            .Build();
+        var configuration = DesignTimeConfigurationFactory.Build();
 
         var optionsBuilder = new DbContextOptionsBuilder<CommunicationDbContext>();
         optionsBuilder.UseSqlServer(
-            configuration.GetConnectionString("Database"),
+            DesignTimeConfigurationFactory.GetRequiredConnectionString(configuration),
             o => o.MigrationsHistoryTable("__EFMigrationsHistory", "communication"));
 
         return new CommunicationDbContext(optionsBuilder.Options);
