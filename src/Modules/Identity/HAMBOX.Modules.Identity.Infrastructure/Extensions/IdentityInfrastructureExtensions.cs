@@ -218,7 +218,20 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IUserAuthorizationInvalidationService, UserAuthorizationInvalidationService>();
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
         services.AddScoped<ISecurityBlocklistService, SecurityBlocklistService>();
-        services.AddScoped<ICountryResolver, NullCountryResolver>();
+        services.AddSingleton<ILoginRiskScorer, LoginRiskScorer>();
+        services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
+        services.AddScoped<ISecurityAlertRecipientResolver, SecurityAlertRecipientResolver>();
+
+        var geoIpDatabasePath = configuration["GeoIp:DatabasePath"];
+        if (!string.IsNullOrWhiteSpace(geoIpDatabasePath) && File.Exists(geoIpDatabasePath))
+        {
+            services.AddSingleton(_ => new MaxMind.GeoIP2.DatabaseReader(geoIpDatabasePath));
+            services.AddScoped<ICountryResolver, MaxMindGeoLocationResolver>();
+        }
+        else
+        {
+            services.AddScoped<ICountryResolver, NullCountryResolver>();
+        }
         services.AddScoped<IBackgroundJobHandler, InvalidateUserSessionsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, CleanupExpiredUserBlocksJobHandler>();
         services.AddScoped<IBackgroundJobHandler, CleanupExpiredIpBansJobHandler>();

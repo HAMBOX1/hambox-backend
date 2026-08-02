@@ -21,8 +21,7 @@ public sealed class UserSession : Entity
         string ipAddress,
         string userAgent,
         string authContext,
-        string? browserName,
-        string? deviceName,
+        LoginContext? context,
         DateTimeOffset startedOnUtc)
         : base(id)
     {
@@ -30,8 +29,12 @@ public sealed class UserSession : Entity
         IpAddress = ipAddress;
         UserAgent = userAgent;
         AuthContext = authContext;
-        BrowserName = browserName;
-        DeviceName = deviceName;
+        BrowserName = context?.BrowserName;
+        OsName = context?.OsName;
+        DeviceName = context?.DeviceType;
+        CountryCode = context?.CountryCode;
+        City = context?.City;
+        Fingerprint = context?.Fingerprint;
         StartedOnUtc = startedOnUtc;
         LastActivityOnUtc = startedOnUtc;
     }
@@ -67,9 +70,32 @@ public sealed class UserSession : Entity
     public string? BrowserName { get; private set; }
 
     /// <summary>
+    /// Gets a parsed operating system name from the user agent.
+    /// </summary>
+    public string? OsName { get; private set; }
+
+    /// <summary>
     /// Gets a parsed device description from the user agent.
     /// </summary>
     public string? DeviceName { get; private set; }
+
+    /// <summary>
+    /// Gets the resolved ISO-3166 alpha-2 country code the session originated from, when a
+    /// geolocation resolver is configured.
+    /// </summary>
+    public string? CountryCode { get; private set; }
+
+    /// <summary>
+    /// Gets the resolved city the session originated from, when a city-level geolocation
+    /// resolver is configured.
+    /// </summary>
+    public string? City { get; private set; }
+
+    /// <summary>
+    /// Gets the device fingerprint (see <see cref="DeviceFingerprint"/>), used to correlate this
+    /// session with a <see cref="TrustedDevice"/>.
+    /// </summary>
+    public string? Fingerprint { get; private set; }
 
     /// <summary>
     /// Gets the date and time, in UTC, when the session was started.
@@ -98,6 +124,8 @@ public sealed class UserSession : Entity
     /// <param name="userId">The identifier of the user.</param>
     /// <param name="ipAddress">The client IP address.</param>
     /// <param name="userAgent">The client user agent string.</param>
+    /// <param name="authContext">The auth context (customer or admin).</param>
+    /// <param name="context">The resolved geolocation/device enrichment signals, if any.</param>
     /// <returns>A new <see cref="UserSession"/> instance.</returns>
     /// <exception cref="ArgumentException">Thrown when any required parameter is invalid.</exception>
     public static UserSession Create(
@@ -105,8 +133,7 @@ public sealed class UserSession : Entity
         string ipAddress,
         string userAgent,
         string authContext,
-        string? browserName = null,
-        string? deviceName = null)
+        LoginContext? context = null)
     {
         if (userId == Guid.Empty)
         {
@@ -123,8 +150,7 @@ public sealed class UserSession : Entity
             ipAddress,
             userAgent,
             authContext,
-            browserName,
-            deviceName,
+            context,
             DateTimeOffset.UtcNow);
     }
 

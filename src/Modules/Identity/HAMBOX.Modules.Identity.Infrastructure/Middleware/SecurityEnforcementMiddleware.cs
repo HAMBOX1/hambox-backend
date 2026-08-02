@@ -48,8 +48,8 @@ public sealed class SecurityEnforcementMiddleware(RequestDelegate next)
             return;
         }
 
-        var countryCode = context.Items.TryGetValue(CountryResolutionMiddleware.CountryItemKey, out var countryValue)
-            ? countryValue as string
+        var countryCode = context.Items.TryGetValue(CountryResolutionMiddleware.CountryItemKey, out var geoValue)
+            ? (geoValue as GeoLocationResult)?.CountryCode
             : null;
 
         if (!string.IsNullOrEmpty(countryCode))

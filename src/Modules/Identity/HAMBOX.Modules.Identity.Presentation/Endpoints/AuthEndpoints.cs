@@ -1,4 +1,5 @@
 using HAMBOX.Infrastructure.Localization;
+using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
@@ -70,12 +71,15 @@ public static class AuthEndpoints
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var geoLocation = GetGeoLocation(httpContext);
 
             var command = new LoginCommand(
                 request.Email,
                 request.Password,
                 ipAddress,
-                userAgent);
+                userAgent,
+                geoLocation?.CountryCode,
+                geoLocation?.City);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -104,12 +108,15 @@ public static class AuthEndpoints
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var geoLocation = GetGeoLocation(httpContext);
 
             var command = new AdminLoginCommand(
                 request.Email,
                 request.Password,
                 ipAddress,
-                userAgent);
+                userAgent,
+                geoLocation?.CountryCode,
+                geoLocation?.City);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -283,6 +290,11 @@ public static class AuthEndpoints
 
         return group;
     }
+
+    private static GeoLocationResult? GetGeoLocation(HttpContext httpContext) =>
+        httpContext.Items.TryGetValue(GeoLocationHttpContextKeys.ResolvedGeoLocation, out var value)
+            ? value as GeoLocationResult
+            : null;
 }
 
 /// <summary>

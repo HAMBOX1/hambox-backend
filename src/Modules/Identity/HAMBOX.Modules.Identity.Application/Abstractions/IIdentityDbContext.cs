@@ -121,6 +121,11 @@ public interface IIdentityDbContext
     DbSet<SecurityEventLog> SecurityEventLogs { get; }
 
     /// <summary>
+    /// Gets the trusted/recognized devices database set.
+    /// </summary>
+    DbSet<TrustedDevice> TrustedDevices { get; }
+
+    /// <summary>
     /// Saves all changes made in this context to the database.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>

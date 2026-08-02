@@ -14,5 +14,6 @@ public enum SecurityEventType
     ManualBan = 6,
     PermissionDenied = 7,
     AdminUnlock = 8,
-    AdminBlock = 9
+    AdminBlock = 9,
+    DeviceBlock = 10
 }

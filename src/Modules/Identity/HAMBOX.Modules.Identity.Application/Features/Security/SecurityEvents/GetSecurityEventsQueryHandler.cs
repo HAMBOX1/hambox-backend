@@ -46,6 +46,19 @@ internal sealed class GetSecurityEventsQueryHandler(IIdentityDbContext dbContext
                 (e.IpAddress != null && e.IpAddress.Contains(term)));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.Status) &&
+            Enum.TryParse<SecurityEventStatus>(request.Status, ignoreCase: true, out var status))
+        {
+            query = query.Where(e => e.Status == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.MinSeverity) &&
+            Enum.TryParse<SecurityEventSeverity>(request.MinSeverity, ignoreCase: true, out var minSeverity))
+        {
+            var severities = SecuritySeverityFilter.AtOrAbove(minSeverity);
+            query = query.Where(e => severities.Contains(e.Severity));
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         var events = await query
@@ -78,9 +91,16 @@ internal sealed class GetSecurityEventsQueryHandler(IIdentityDbContext dbContext
             e.TargetUserId.HasValue ? emailsByUserId.GetValueOrDefault(e.TargetUserId.Value) : null,
             e.IpAddress,
             e.Country,
+            e.City,
             e.UserAgent,
             e.CorrelationId,
-            e.OccurredOnUtc)).ToList();
+            e.OccurredOnUtc,
+            e.Status.ToString(),
+            e.AcknowledgedByUserId,
+            e.AcknowledgedOnUtc,
+            e.ResolvedByUserId,
+            e.ResolvedOnUtc,
+            e.ResolutionNotes)).ToList();
 
         return Result.Success(new PagedResult<SecurityEventDto>(items, request.PageNumber, request.PageSize, totalCount));
     }

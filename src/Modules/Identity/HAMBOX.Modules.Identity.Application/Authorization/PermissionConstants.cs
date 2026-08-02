@@ -245,6 +245,8 @@ public static class PermissionConstants
         public const string ManageCountries = "Security.ManageCountries";
         public const string ManageIPs = "Security.ManageIPs";
         public const string ViewEvents = "Security.ViewEvents";
+        public const string ManageAlerts = "Security.ManageAlerts";
+        public const string ManageDevices = "Security.ManageDevices";
     }
 
     public static class Communication

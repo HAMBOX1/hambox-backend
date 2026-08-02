@@ -14,30 +14,64 @@ internal sealed class GetSecurityDashboardQueryHandler(IIdentityDbContext dbCont
         GetSecurityDashboardQuery request,
         CancellationToken cancellationToken)
     {
-        var todayStartUtc = DateTimeOffset.UtcNow.Date;
+        var now = DateTimeOffset.UtcNow;
+        var last24h = now.AddHours(-24);
+        var previous48hStart = now.AddHours(-48);
+        var last7Days = now.AddDays(-7);
+        var last14Days = now.AddDays(-14).Date;
 
-        var blockedUsers = await dbContext.Users.AsNoTracking()
-            .CountAsync(u => u.Status == UserStatus.Blocked || u.Status == UserStatus.Banned, cancellationToken);
-        var suspendedUsers = await dbContext.Users.AsNoTracking()
-            .CountAsync(u => u.Status == UserStatus.Suspended, cancellationToken);
-        var blockedEmails = await dbContext.BlockedEmails.AsNoTracking()
-            .CountAsync(b => !b.Pattern.StartsWith("*@"), cancellationToken);
-        var blockedDomains = await dbContext.BlockedEmails.AsNoTracking()
-            .CountAsync(b => b.Pattern.StartsWith("*@"), cancellationToken);
-        var blockedCountries = await dbContext.CountryRestrictions.AsNoTracking()
-            .CountAsync(c => c.Status != CountryRestrictionStatus.Allowed, cancellationToken);
-        var blockedIps = await dbContext.BlockedIps.AsNoTracking().CountAsync(cancellationToken);
-        var securityEventsToday = await dbContext.SecurityEventLogs.AsNoTracking()
-            .CountAsync(e => e.OccurredOnUtc >= todayStartUtc, cancellationToken);
-        var failedLoginsToday = await dbContext.SecurityEventLogs.AsNoTracking()
-            .CountAsync(e => e.OccurredOnUtc >= todayStartUtc && e.EventType == SecurityEventType.FailedLogin, cancellationToken);
+        var alertSeverities = SecuritySeverityFilter.AtOrAbove(SecurityEventSeverity.High);
 
-        var recentEvents = await dbContext.SecurityEventLogs.AsNoTracking()
-            .OrderByDescending(e => e.OccurredOnUtc)
-            .Take(10)
+        var openAlerts = await dbContext.SecurityEventLogs.AsNoTracking()
+            .CountAsync(e => e.Status == SecurityEventStatus.Open && alertSeverities.Contains(e.Severity), cancellationToken);
+
+        var failedLoginsLast24h = await dbContext.LoginHistory.AsNoTracking()
+            .CountAsync(h => !h.IsSuccessful && h.CreatedOnUtc >= last24h, cancellationToken);
+
+        var failedLoginsPrevious24h = await dbContext.LoginHistory.AsNoTracking()
+            .CountAsync(h => !h.IsSuccessful && h.CreatedOnUtc >= previous48hStart && h.CreatedOnUtc < last24h, cancellationToken);
+
+        var activeSessions = await dbContext.UserSessions.AsNoTracking()
+            .CountAsync(s => s.EndedOnUtc == null, cancellationToken);
+
+        var newDevicesLast7Days = await dbContext.TrustedDevices.AsNoTracking()
+            .CountAsync(d => d.FirstSeenUtc >= last7Days, cancellationToken);
+
+        var loginTrend = await dbContext.LoginHistory.AsNoTracking()
+            .Where(h => h.CreatedOnUtc >= last14Days)
+            .GroupBy(h => h.CreatedOnUtc.Date)
+            .Select(g => new
+            {
+                Date = g.Key,
+                Successful = g.Count(h => h.IsSuccessful),
+                Failed = g.Count(h => !h.IsSuccessful),
+            })
+            .OrderBy(g => g.Date)
             .ToListAsync(cancellationToken);
 
-        var userIds = recentEvents
+        var loginTrendDtos = loginTrend
+            .Select(g => new LoginTrendPointDto(DateOnly.FromDateTime(g.Date), g.Successful, g.Failed))
+            .ToList();
+
+        var topFailureCountriesRaw = await dbContext.LoginHistory.AsNoTracking()
+            .Where(h => !h.IsSuccessful && h.CountryCode != null && h.CreatedOnUtc >= last7Days)
+            .GroupBy(h => h.CountryCode)
+            .Select(g => new { CountryCode = g.Key, FailedLogins = g.Count() })
+            .OrderByDescending(g => g.FailedLogins)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        var topFailureCountries = topFailureCountriesRaw
+            .Select(g => new CountryFailureCountDto(g.CountryCode!, g.FailedLogins))
+            .ToList();
+
+        var alertEvents = await dbContext.SecurityEventLogs.AsNoTracking()
+            .Where(e => e.Status == SecurityEventStatus.Open && alertSeverities.Contains(e.Severity))
+            .OrderByDescending(e => e.OccurredOnUtc)
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        var userIds = alertEvents
             .SelectMany(e => new[] { e.ActorUserId, e.TargetUserId })
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
@@ -49,7 +83,7 @@ internal sealed class GetSecurityDashboardQueryHandler(IIdentityDbContext dbCont
             .Select(u => new { u.Id, u.Email })
             .ToDictionaryAsync(u => u.Id, u => u.Email, cancellationToken);
 
-        var recentEventDtos = recentEvents.Select(e => new SecurityEventDto(
+        var alertPreviewDtos = alertEvents.Select(e => new SecurityEventDto(
             e.Id,
             e.EventType.ToString(),
             e.Severity.ToString(),
@@ -60,19 +94,25 @@ internal sealed class GetSecurityDashboardQueryHandler(IIdentityDbContext dbCont
             e.TargetUserId.HasValue ? emailsByUserId.GetValueOrDefault(e.TargetUserId.Value) : null,
             e.IpAddress,
             e.Country,
+            e.City,
             e.UserAgent,
             e.CorrelationId,
-            e.OccurredOnUtc)).ToList();
+            e.OccurredOnUtc,
+            e.Status.ToString(),
+            e.AcknowledgedByUserId,
+            e.AcknowledgedOnUtc,
+            e.ResolvedByUserId,
+            e.ResolvedOnUtc,
+            e.ResolutionNotes)).ToList();
 
         return Result.Success(new SecurityDashboardDto(
-            blockedUsers,
-            suspendedUsers,
-            blockedEmails,
-            blockedDomains,
-            blockedCountries,
-            blockedIps,
-            securityEventsToday,
-            failedLoginsToday,
-            recentEventDtos));
+            openAlerts,
+            failedLoginsLast24h,
+            failedLoginsPrevious24h,
+            activeSessions,
+            newDevicesLast7Days,
+            loginTrendDtos,
+            topFailureCountries,
+            alertPreviewDtos));
     }
 }

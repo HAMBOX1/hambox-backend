@@ -5,5 +5,5 @@ namespace HAMBOX.Modules.Identity.Application.Abstractions;
 /// </summary>
 public interface IClientInfoParser
 {
-    (string? BrowserName, string? DeviceName) ParseUserAgent(string userAgent);
+    (string? BrowserName, string? OsName, string? DeviceName) ParseUserAgent(string userAgent);
 }

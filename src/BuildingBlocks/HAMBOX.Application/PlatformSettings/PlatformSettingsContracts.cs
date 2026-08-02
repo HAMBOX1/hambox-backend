@@ -227,7 +227,10 @@ public sealed record SecuritySettingsPayload(
     int MaxFailedAccessAttempts,
     int LockoutDurationMinutes,
     bool RequireEmailVerification,
-    bool EnforceHttps);
+    bool EnforceHttps,
+    bool SecurityAlertsEnabled = true,
+    string SecurityAlertMinSeverity = "High",
+    int SecurityAlertThrottleMinutes = 15);
 
 public sealed record OtpSettingsPayload(
     int CodeLength,

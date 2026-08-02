@@ -18,5 +18,6 @@ public interface ISecurityEventLogger
         string? country = null,
         string? userAgent = null,
         string? correlationId = null,
+        string? city = null,
         CancellationToken cancellationToken = default);
 }

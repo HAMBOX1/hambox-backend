@@ -13,10 +13,10 @@ namespace HAMBOX.Modules.Identity.Application.Abstractions;
 public interface ICountryResolver
 {
     /// <summary>
-    /// Resolves the ISO-3166 alpha-2 country code for the given request signals, or null if it
-    /// cannot be determined.
+    /// Resolves the ISO-3166 alpha-2 country (and, where the source supports it, the city) the
+    /// given request signals originate from, or null if it cannot be determined.
     /// </summary>
-    Task<string?> ResolveCountryAsync(CountryResolutionRequest request, CancellationToken cancellationToken = default);
+    Task<GeoLocationResult?> ResolveCountryAsync(CountryResolutionRequest request, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -25,3 +25,21 @@ public interface ICountryResolver
 /// provider uses without requiring an interface change.
 /// </summary>
 public sealed record CountryResolutionRequest(string? IpAddress, IReadOnlyDictionary<string, string> Headers);
+
+/// <summary>
+/// The geolocation signals resolved for a request. <see cref="City"/> is only populated by
+/// resolvers backed by a city-level database (e.g. MaxMind GeoLite2-City) — header-based
+/// resolvers typically only ever populate <see cref="CountryCode"/>.
+/// </summary>
+public sealed record GeoLocationResult(string? CountryCode, string? CountryName, string? City);
+
+/// <summary>
+/// The <see cref="Microsoft.AspNetCore.Http.HttpContext"/> item keys the Infrastructure-layer
+/// country-resolution middleware stashes its result under, so Presentation-layer endpoints can
+/// read the already-resolved <see cref="GeoLocationResult"/> without a Presentation → Infrastructure
+/// project reference (or a second, duplicate resolution).
+/// </summary>
+public static class GeoLocationHttpContextKeys
+{
+    public const string ResolvedGeoLocation = "Security.ResolvedGeoLocation";
+}

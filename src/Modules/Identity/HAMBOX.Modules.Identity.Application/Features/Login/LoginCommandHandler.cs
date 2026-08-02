@@ -23,11 +23,18 @@ internal sealed class LoginCommandHandler(
     IAuthTokenIssuer authTokenIssuer,
     IPlatformSettingsProvider platformSettings,
     ISecurityBlocklistService blocklistService,
-    ISecurityEventLogger securityEventLogger) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
+    ISecurityEventLogger securityEventLogger,
+    IClientInfoParser clientInfoParser,
+    ITrustedDeviceService trustedDeviceService,
+    ILoginRiskScorer riskScorer) : IRequestHandler<LoginCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
     public async Task<Result<AuthTokenResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        var (browserName, osName, deviceType) = clientInfoParser.ParseUserAgent(request.UserAgent);
+        var fingerprint = DeviceFingerprint.Compute(request.UserAgent);
+        var context = new LoginContext(request.CountryCode, request.City, browserName, osName, deviceType, fingerprint);
+
         var normalizedEmail = request.Email.ToUpperInvariant();
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
@@ -39,7 +46,8 @@ internal sealed class LoginCommandHandler(
 
         if (await blocklistService.IsEmailBlockedAsync(user.Email, cancellationToken))
         {
-            var blockedFailure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email address is blocked");
+            var blockedFailure = LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, "Email address is blocked", context, SecurityEventSeverity.High);
             dbContext.LoginHistory.Add(blockedFailure);
             await dbContext.SaveChangesAsync(cancellationToken);
             await securityEventLogger.LogAsync(
@@ -49,13 +57,34 @@ internal sealed class LoginCommandHandler(
                 targetUserId: user.Id,
                 ipAddress: request.IpAddress,
                 userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
+                cancellationToken: cancellationToken);
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+        }
+
+        if (await trustedDeviceService.IsDeviceBlockedAsync(user.Id, fingerprint, cancellationToken))
+        {
+            var deviceBlockedFailure = LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, "Device is blocked", context, SecurityEventSeverity.High);
+            dbContext.LoginHistory.Add(deviceBlockedFailure);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await securityEventLogger.LogAsync(
+                SecurityEventType.DeviceBlock,
+                SecurityEventSeverity.High,
+                $"Login rejected for {user.Email}: device is blocked.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
                 cancellationToken: cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (!user.EmailConfirmed)
         {
-            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email not confirmed");
+            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email not confirmed", context);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.EmailNotConfirmed);
@@ -63,11 +92,14 @@ internal sealed class LoginCommandHandler(
 
         if (user.Status != UserStatus.Active)
         {
-            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account not active");
+            var isBlockedStatus = user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended;
+            var failure = LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, "Account not active", context,
+                isBlockedStatus ? SecurityEventSeverity.Medium : null);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            if (user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended)
+            if (isBlockedStatus)
             {
                 await securityEventLogger.LogAsync(
                     SecurityEventType.BlockedLogin,
@@ -76,6 +108,8 @@ internal sealed class LoginCommandHandler(
                     targetUserId: user.Id,
                     ipAddress: request.IpAddress,
                     userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
                     cancellationToken: cancellationToken);
             }
 
@@ -84,7 +118,7 @@ internal sealed class LoginCommandHandler(
 
         if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
         {
-            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked");
+            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked", context);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountLocked);
@@ -98,17 +132,21 @@ internal sealed class LoginCommandHandler(
                 security.MaxFailedAccessAttempts,
                 TimeSpan.FromMinutes(security.LockoutDurationMinutes));
 
-            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Invalid credentials");
+            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
+
+            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Invalid credentials", context, risk);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
 
             await securityEventLogger.LogAsync(
                 SecurityEventType.FailedLogin,
-                SecurityEventSeverity.Low,
+                risk,
                 $"Failed login attempt for {user.Email}: invalid credentials.",
                 targetUserId: user.Id,
                 ipAddress: request.IpAddress,
                 userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
                 cancellationToken: cancellationToken);
 
             if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
@@ -125,7 +163,8 @@ internal sealed class LoginCommandHandler(
                 user.Id,
                 request.IpAddress,
                 request.UserAgent,
-                "Admin account must use admin portal login");
+                "Admin account must use admin portal login",
+                context);
             dbContext.LoginHistory.Add(adminFailure);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AdminMustUseAdminPortal);
@@ -133,7 +172,12 @@ internal sealed class LoginCommandHandler(
 
         user.ResetAccessFailedCount();
 
-        var successHistory = LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent);
+        var isNewCountry = !string.IsNullOrEmpty(request.CountryCode) && !await dbContext.LoginHistory.AnyAsync(
+            h => h.UserId == user.Id && h.IsSuccessful && h.CountryCode == request.CountryCode, cancellationToken);
+        var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
+        var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
+
+        var successHistory = LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent, context, successRisk);
         dbContext.LoginHistory.Add(successHistory);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -143,6 +187,7 @@ internal sealed class LoginCommandHandler(
             otpVerified: false,
             request.IpAddress,
             request.UserAgent,
+            context,
             cancellationToken);
     }
 }

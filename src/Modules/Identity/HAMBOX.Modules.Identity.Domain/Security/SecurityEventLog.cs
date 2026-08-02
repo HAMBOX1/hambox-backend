@@ -25,7 +25,8 @@ public sealed class SecurityEventLog : Entity
         string? ipAddress,
         string? country,
         string? userAgent,
-        string? correlationId)
+        string? correlationId,
+        string? city)
         : base(id)
     {
         EventType = eventType;
@@ -35,9 +36,11 @@ public sealed class SecurityEventLog : Entity
         TargetUserId = targetUserId;
         IpAddress = ipAddress;
         Country = country;
+        City = city;
         UserAgent = userAgent;
         CorrelationId = correlationId;
         OccurredOnUtc = DateTimeOffset.UtcNow;
+        Status = SecurityEventStatus.Open;
     }
 
     public SecurityEventType EventType { get; private set; }
@@ -61,11 +64,32 @@ public sealed class SecurityEventLog : Entity
 
     public string? Country { get; private set; }
 
+    /// <summary>
+    /// Gets the resolved city, when the configured <see cref="Application.Abstractions.ICountryResolver"/>
+    /// supports city-level resolution (e.g. MaxMind GeoLite2-City).
+    /// </summary>
+    public string? City { get; private set; }
+
     public string? UserAgent { get; private set; }
 
     public string? CorrelationId { get; private set; }
 
     public DateTimeOffset OccurredOnUtc { get; private set; }
+
+    /// <summary>
+    /// Gets the investigation workflow state of this event.
+    /// </summary>
+    public SecurityEventStatus Status { get; private set; }
+
+    public Guid? AcknowledgedByUserId { get; private set; }
+
+    public DateTimeOffset? AcknowledgedOnUtc { get; private set; }
+
+    public Guid? ResolvedByUserId { get; private set; }
+
+    public DateTimeOffset? ResolvedOnUtc { get; private set; }
+
+    public string? ResolutionNotes { get; private set; }
 
     public static SecurityEventLog Record(
         SecurityEventType eventType,
@@ -76,7 +100,8 @@ public sealed class SecurityEventLog : Entity
         string? ipAddress = null,
         string? country = null,
         string? userAgent = null,
-        string? correlationId = null)
+        string? correlationId = null,
+        string? city = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
@@ -90,6 +115,41 @@ public sealed class SecurityEventLog : Entity
             ipAddress,
             country,
             userAgent,
-            correlationId);
+            correlationId,
+            city);
+    }
+
+    /// <summary>
+    /// Marks this event as acknowledged by an admin — "I've seen this," without necessarily
+    /// having resolved the underlying concern.
+    /// </summary>
+    public void Acknowledge(Guid acknowledgedByUserId)
+    {
+        Status = SecurityEventStatus.Acknowledged;
+        AcknowledgedByUserId = acknowledgedByUserId;
+        AcknowledgedOnUtc = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Marks this event as dismissed — reviewed and judged not actionable (e.g. a known false
+    /// positive), distinct from <see cref="Resolve"/> which implies a genuine issue was handled.
+    /// </summary>
+    public void Dismiss(Guid dismissedByUserId, string? notes = null)
+    {
+        Status = SecurityEventStatus.Dismissed;
+        AcknowledgedByUserId = dismissedByUserId;
+        AcknowledgedOnUtc = DateTimeOffset.UtcNow;
+        ResolutionNotes = notes;
+    }
+
+    /// <summary>
+    /// Marks this event as resolved — the underlying concern was investigated and handled.
+    /// </summary>
+    public void Resolve(Guid resolvedByUserId, string? notes = null)
+    {
+        Status = SecurityEventStatus.Resolved;
+        ResolvedByUserId = resolvedByUserId;
+        ResolvedOnUtc = DateTimeOffset.UtcNow;
+        ResolutionNotes = notes;
     }
 }

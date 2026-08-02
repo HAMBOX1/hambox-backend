@@ -16,7 +16,6 @@ internal sealed class AuthTokenIssuer(
     IJwtTokenService jwtTokenService,
     ITokenGenerator tokenGenerator,
     IUserClaimsService userClaimsService,
-    IClientInfoParser clientInfoParser,
     IOptions<JwtSettings> jwtSettings) : IAuthTokenIssuer
 {
     public async Task<Result<AuthTokenResponse>> IssueAsync(
@@ -25,16 +24,15 @@ internal sealed class AuthTokenIssuer(
         bool otpVerified,
         string ipAddress,
         string userAgent,
+        LoginContext? context = null,
         CancellationToken cancellationToken = default)
     {
-        var (browserName, deviceName) = clientInfoParser.ParseUserAgent(userAgent);
         var session = UserSession.Create(
             user.Id,
             ipAddress,
             userAgent,
             authContext,
-            browserName,
-            deviceName);
+            context);
 
         var roleAndPermissionClaims = await userClaimsService.GetClaimsAsync(user.Id, cancellationToken);
         var claims = new List<Claim>(roleAndPermissionClaims)

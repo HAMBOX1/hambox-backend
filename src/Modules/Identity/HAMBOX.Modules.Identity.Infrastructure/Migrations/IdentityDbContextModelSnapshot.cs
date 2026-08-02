@@ -1323,6 +1323,24 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Name = "Support.ViewAnalytics",
                             NormalizedName = "SUPPORT.VIEWANALYTICS",
                             SortOrder = 11
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000269"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageAlerts",
+                            NormalizedName = "SECURITY.MANAGEALERTS",
+                            SortOrder = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000270"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000029"),
+                            Name = "Security.ManageDevices",
+                            NormalizedName = "SECURITY.MANAGEDEVICES",
+                            SortOrder = 8
                         });
                 });
 
@@ -2722,6 +2740,20 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             PermissionId = new Guid("20000000-0000-0000-0000-000000000268"),
                             RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000129"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000269"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000130"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000270"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
                         });
                 });
 
@@ -2950,8 +2982,18 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AcknowledgedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("CorrelationId")
                         .HasMaxLength(64)
@@ -2984,10 +3026,27 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("ResolutionNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ResolvedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Severity")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Open");
 
                     b.Property<Guid?>("TargetUserId")
                         .HasColumnType("uniqueidentifier");
@@ -3007,6 +3066,9 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.HasIndex("TargetUserId")
                         .HasDatabaseName("IX_SecurityEventLogs_TargetUserId");
 
+                    b.HasIndex("Status", "Severity")
+                        .HasDatabaseName("IX_SecurityEventLogs_Status_Severity");
+
                     b.ToTable("SecurityEventLogs", "identity");
                 });
 
@@ -3016,12 +3078,32 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BrowserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeviceType")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<string>("FailureReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("IpAddress")
                         .IsRequired()
@@ -3034,6 +3116,14 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("OsName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("RiskLevel")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("UserAgent")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -3043,6 +3133,9 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Fingerprint")
+                        .HasDatabaseName("IX_LoginHistory_Fingerprint");
 
                     b.HasIndex("IpAddress")
                         .HasDatabaseName("IX_LoginHistory_IpAddress");
@@ -3054,6 +3147,98 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         .HasDatabaseName("IX_LoginHistory_UserId_CreatedOnUtc");
 
                     b.ToTable("LoginHistory", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Sessions.TrustedDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BlockReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("BlockedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("BlockedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("BrowserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DeviceType")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("FirstSeenUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsBlocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsTrusted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LastCity")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("LastCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("LastIpAddress")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<DateTimeOffset>("LastSeenUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("LoginCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OsName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid?>("TrustedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("TrustedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fingerprint")
+                        .HasDatabaseName("IX_TrustedDevices_Fingerprint");
+
+                    b.HasIndex("UserId", "Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("IX_TrustedDevices_UserId_Fingerprint");
+
+                    b.ToTable("TrustedDevices", "identity");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Sessions.UserSession", b =>
@@ -3073,6 +3258,14 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("City")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -3082,6 +3275,10 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("EndedOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("IpAddress")
                         .IsRequired()
@@ -3093,6 +3290,10 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OsName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<Guid?>("RefreshTokenId")
                         .HasColumnType("uniqueidentifier");
@@ -3503,6 +3704,15 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Sessions.LoginHistory", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Sessions.TrustedDevice", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
                         .WithMany()

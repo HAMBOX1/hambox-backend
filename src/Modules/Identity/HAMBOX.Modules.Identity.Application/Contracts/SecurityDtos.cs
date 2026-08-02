@@ -63,23 +63,41 @@ public sealed record SecurityEventDto(
     string? TargetEmail,
     string? IpAddress,
     string? Country,
+    string? City,
     string? UserAgent,
     string? CorrelationId,
-    DateTimeOffset OccurredOnUtc);
+    DateTimeOffset OccurredOnUtc,
+    string Status,
+    Guid? AcknowledgedByUserId,
+    DateTimeOffset? AcknowledgedOnUtc,
+    Guid? ResolvedByUserId,
+    DateTimeOffset? ResolvedOnUtc,
+    string? ResolutionNotes);
 
 /// <summary>
-/// Aggregate counts and recent activity for the Security Center overview dashboard.
+/// A single point in the "logins over time" chart series.
+/// </summary>
+public sealed record LoginTrendPointDto(DateOnly Date, int SuccessfulLogins, int FailedLogins);
+
+/// <summary>
+/// A country ranked by its failed-login count, for the "top countries" chart.
+/// </summary>
+public sealed record CountryFailureCountDto(string CountryCode, int FailedLogins);
+
+/// <summary>
+/// Meaningful, decision-oriented metrics for the Security Center overview — deliberately not a
+/// flat list of table-row counts (see the old <c>BlockedUsers</c>/<c>BlockedEmails</c>/... shape
+/// this replaced): every field here is something an owner would act on.
 /// </summary>
 public sealed record SecurityDashboardDto(
-    int BlockedUsers,
-    int SuspendedUsers,
-    int BlockedEmails,
-    int BlockedDomains,
-    int BlockedCountries,
-    int BlockedIps,
-    int SecurityEventsToday,
-    int FailedLoginsToday,
-    IReadOnlyCollection<SecurityEventDto> RecentEvents);
+    int OpenAlerts,
+    int FailedLoginsLast24h,
+    int FailedLoginsPrevious24h,
+    int ActiveSessions,
+    int NewDevicesLast7Days,
+    IReadOnlyCollection<LoginTrendPointDto> LoginTrend,
+    IReadOnlyCollection<CountryFailureCountDto> TopFailureCountries,
+    IReadOnlyCollection<SecurityEventDto> OpenAlertsPreview);
 
 public sealed record BlockUserRequest(string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
 
@@ -92,3 +110,7 @@ public sealed record CreateBlockedEmailRequest(string Pattern, string Reason, st
 public sealed record CreateBlockedIpRequest(string CidrOrAddress, string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
 
 public sealed record SetCountryRestrictionRequest(string Status, string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
+
+public sealed record UpdateSecurityEventStatusRequest(string Status, string? Notes);
+
+public sealed record BlockDeviceRequest(string? Reason);

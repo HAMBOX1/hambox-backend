@@ -6,7 +6,10 @@ using HAMBOX.Modules.Identity.Application.Features.Security.BlockedEmails;
 using HAMBOX.Modules.Identity.Application.Features.Security.BlockedIps;
 using HAMBOX.Modules.Identity.Application.Features.Security.BlockedUsers;
 using HAMBOX.Modules.Identity.Application.Features.Security.CountryRestrictions;
+using HAMBOX.Modules.Identity.Application.Features.Security.Devices;
+using HAMBOX.Modules.Identity.Application.Features.Security.LoginHistory;
 using HAMBOX.Modules.Identity.Application.Features.Security.SecurityEvents;
+using HAMBOX.Modules.Identity.Application.Features.Security.Sessions;
 using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Errors;
@@ -51,6 +54,8 @@ internal static class SecurityEndpoints
             [FromQuery] DateTimeOffset? fromUtc,
             [FromQuery] DateTimeOffset? toUtc,
             [FromQuery] string? searchTerm,
+            [FromQuery] string? status,
+            [FromQuery] string? minSeverity,
             ISender sender,
             CancellationToken ct) =>
         {
@@ -58,11 +63,112 @@ internal static class SecurityEndpoints
             pageSize = pageSize <= 0 ? 20 : pageSize;
 
             var result = await sender.Send(
-                new GetSecurityEventsQuery(pageNumber, pageSize, eventType, severity, fromUtc, toUtc, searchTerm), ct);
+                new GetSecurityEventsQuery(pageNumber, pageSize, eventType, severity, fromUtc, toUtc, searchTerm, status, minSeverity), ct);
             return MapResult(result);
         })
         .WithName("GetSecurityEvents")
         .RequirePermission(PermissionConstants.Security.ViewEvents);
+
+        group.MapPut("events/{id:guid}/status", async Task<IResult> (
+            Guid id,
+            [FromBody] UpdateSecurityEventStatusRequest request,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            if (!Enum.TryParse<SecurityEventStatus>(request.Status, ignoreCase: true, out var status))
+            {
+                status = SecurityEventStatus.Open;
+            }
+
+            var result = await sender.Send(new UpdateSecurityEventStatusCommand(id, status, request.Notes), ct);
+            return MapResult(result);
+        })
+        .WithName("UpdateSecurityEventStatus")
+        .RequirePermission(PermissionConstants.Security.ManageAlerts);
+
+        // ──── Login History ─────────────────────────────────────────────
+        group.MapGet("login-history", async Task<IResult> (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] Guid? userId,
+            [FromQuery] bool? isSuccessful,
+            [FromQuery] string? countryCode,
+            [FromQuery] string? riskLevel,
+            [FromQuery] string? fingerprint,
+            [FromQuery] DateTimeOffset? fromUtc,
+            [FromQuery] DateTimeOffset? toUtc,
+            [FromQuery] string? searchTerm,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            pageNumber = pageNumber <= 0 ? 1 : pageNumber;
+            pageSize = pageSize <= 0 ? 20 : pageSize;
+
+            var result = await sender.Send(
+                new GetLoginHistoryQuery(pageNumber, pageSize, userId, isSuccessful, countryCode, riskLevel, fingerprint, fromUtc, toUtc, searchTerm),
+                ct);
+            return MapResult(result);
+        })
+        .WithName("GetLoginHistory")
+        .RequirePermission(PermissionConstants.Security.ViewEvents);
+
+        // ──── Trusted Devices ────────────────────────────────────────────
+        group.MapGet("devices", async Task<IResult> (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] Guid? userId,
+            [FromQuery] bool? isTrusted,
+            [FromQuery] bool? isBlocked,
+            [FromQuery] string? searchTerm,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            pageNumber = pageNumber <= 0 ? 1 : pageNumber;
+            pageSize = pageSize <= 0 ? 20 : pageSize;
+
+            var result = await sender.Send(
+                new GetTrustedDevicesQuery(pageNumber, pageSize, userId, isTrusted, isBlocked, searchTerm), ct);
+            return MapResult(result);
+        })
+        .WithName("GetTrustedDevices")
+        .RequirePermission(PermissionConstants.Security.ManageDevices);
+
+        group.MapPost("devices/{id:guid}/trust", async Task<IResult> (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new TrustDeviceCommand(id), ct);
+            return MapResult(result);
+        })
+        .WithName("TrustDevice")
+        .RequirePermission(PermissionConstants.Security.ManageDevices);
+
+        group.MapPost("devices/{id:guid}/untrust", async Task<IResult> (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new UntrustDeviceCommand(id), ct);
+            return MapResult(result);
+        })
+        .WithName("UntrustDevice")
+        .RequirePermission(PermissionConstants.Security.ManageDevices);
+
+        group.MapPost("devices/{id:guid}/block", async Task<IResult> (
+            Guid id,
+            [FromBody] BlockDeviceRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new BlockDeviceCommand(id, request.Reason, GetIpAddress(httpContext)), ct);
+            return MapResult(result);
+        })
+        .WithName("BlockDevice")
+        .RequirePermission(PermissionConstants.Security.ManageDevices);
+
+        group.MapPost("devices/{id:guid}/unblock", async Task<IResult> (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new UnblockDeviceCommand(id), ct);
+            return MapResult(result);
+        })
+        .WithName("UnblockDevice")
+        .RequirePermission(PermissionConstants.Security.ManageDevices);
 
         // ──── Blocked Users ──────────────────────────────────────────────
         group.MapGet("users", async Task<IResult> (
@@ -134,6 +240,32 @@ internal static class SecurityEndpoints
             return MapResult(result);
         })
         .WithName("UnblockUser")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        // ──── User Sessions (admin) ──────────────────────────────────────
+        group.MapGet("users/{userId:guid}/sessions", async Task<IResult> (Guid userId, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GetUserSessionsQuery(userId), ct);
+            return MapResult(result);
+        })
+        .WithName("GetUserSessions")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        group.MapPost("users/{userId:guid}/sessions/revoke-all", async Task<IResult> (Guid userId, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new RevokeAllUserSessionsCommand(userId), ct);
+            return MapResult(result);
+        })
+        .WithName("RevokeAllUserSessions")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        group.MapDelete("users/{userId:guid}/sessions/{sessionId:guid}", async Task<IResult> (
+            Guid userId, Guid sessionId, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new RevokeUserSessionCommand(userId, sessionId), ct);
+            return MapResult(result);
+        })
+        .WithName("RevokeUserSession")
         .RequirePermission(PermissionConstants.Security.ManageUsers);
 
         // ──── Blocked Emails ─────────────────────────────────────────────
@@ -298,7 +430,10 @@ internal static class SecurityEndpoints
         _ when error == IdentityErrors.UserNotFound ||
                error == IdentityErrors.CountryRestrictionNotFound ||
                error == IdentityErrors.BlockedEmailNotFound ||
-               error == IdentityErrors.BlockedIpNotFound => StatusCodes.Status404NotFound,
+               error == IdentityErrors.BlockedIpNotFound ||
+               error == IdentityErrors.SessionNotFound ||
+               error == IdentityErrors.TrustedDeviceNotFound ||
+               error == IdentityErrors.SecurityEventNotFound => StatusCodes.Status404NotFound,
         _ when error == IdentityErrors.CannotRestrictOwner ||
                error == IdentityErrors.PermissionDenied => StatusCodes.Status403Forbidden,
         _ when error == IdentityErrors.AuthenticationRequired => StatusCodes.Status401Unauthorized,

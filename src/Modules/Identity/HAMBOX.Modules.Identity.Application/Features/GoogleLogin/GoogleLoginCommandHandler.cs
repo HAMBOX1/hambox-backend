@@ -62,7 +62,7 @@ internal sealed class GoogleLoginCommandHandler(
             otpVerified: false,
             request.IpAddress,
             request.UserAgent,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     private async Task<ApplicationUser?> CreateUserAsync(GoogleTokenPayload payload, CancellationToken cancellationToken)

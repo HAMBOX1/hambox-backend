@@ -9,6 +9,6 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Services;
 /// </summary>
 internal sealed class NullCountryResolver : ICountryResolver
 {
-    public Task<string?> ResolveCountryAsync(CountryResolutionRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult<string?>(null);
+    public Task<GeoLocationResult?> ResolveCountryAsync(CountryResolutionRequest request, CancellationToken cancellationToken = default) =>
+        Task.FromResult<GeoLocationResult?>(null);
 }

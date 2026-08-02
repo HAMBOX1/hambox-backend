@@ -36,6 +36,14 @@ internal sealed class LoginHistoryConfiguration : IEntityTypeConfiguration<Login
         builder.Property(h => h.FailureReason)
             .HasMaxLength(500);
 
+        builder.Property(h => h.CountryCode).HasMaxLength(2);
+        builder.Property(h => h.City).HasMaxLength(128);
+        builder.Property(h => h.BrowserName).HasMaxLength(128);
+        builder.Property(h => h.OsName).HasMaxLength(128);
+        builder.Property(h => h.DeviceType).HasMaxLength(32);
+        builder.Property(h => h.Fingerprint).HasMaxLength(64);
+        builder.Property(h => h.RiskLevel).HasConversion<string>().HasMaxLength(20);
+
         // Base entity properties
         builder.Property(h => h.CreatedOnUtc)
             .IsRequired();
@@ -57,5 +65,8 @@ internal sealed class LoginHistoryConfiguration : IEntityTypeConfiguration<Login
 
         builder.HasIndex(h => h.IpAddress)
             .HasDatabaseName("IX_LoginHistory_IpAddress");
+
+        builder.HasIndex(h => h.Fingerprint)
+            .HasDatabaseName("IX_LoginHistory_Fingerprint");
     }
 }

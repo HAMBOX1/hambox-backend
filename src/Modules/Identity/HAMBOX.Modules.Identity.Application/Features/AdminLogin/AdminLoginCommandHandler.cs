@@ -24,12 +24,19 @@ internal sealed class AdminLoginCommandHandler(
     IAuthTokenIssuer authTokenIssuer,
     IPlatformSettingsProvider platformSettings,
     ISecurityBlocklistService blocklistService,
-    ISecurityEventLogger securityEventLogger) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
+    ISecurityEventLogger securityEventLogger,
+    IClientInfoParser clientInfoParser,
+    ITrustedDeviceService trustedDeviceService,
+    ILoginRiskScorer riskScorer) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
 {
     public async Task<Result<AdminLoginChallengeResponse>> Handle(
         AdminLoginCommand request,
         CancellationToken cancellationToken)
     {
+        var (browserName, osName, deviceType) = clientInfoParser.ParseUserAgent(request.UserAgent);
+        var fingerprint = DeviceFingerprint.Compute(request.UserAgent);
+        var context = new LoginContext(request.CountryCode, request.City, browserName, osName, deviceType, fingerprint);
+
         var otp = await platformSettings.GetOtpAsync(cancellationToken);
         var security = await platformSettings.GetSecurityAsync(cancellationToken);
         var authentication = await platformSettings.GetAuthenticationAsync(cancellationToken);
@@ -44,7 +51,7 @@ internal sealed class AdminLoginCommandHandler(
 
         if (await blocklistService.IsEmailBlockedAsync(user.Email, cancellationToken))
         {
-            await RecordFailureAsync(user.Id, request, "Email address is blocked", cancellationToken);
+            await RecordFailureAsync(user.Id, request, "Email address is blocked", context, SecurityEventSeverity.High, cancellationToken);
             await securityEventLogger.LogAsync(
                 SecurityEventType.BlockedLogin,
                 SecurityEventSeverity.High,
@@ -52,21 +59,42 @@ internal sealed class AdminLoginCommandHandler(
                 targetUserId: user.Id,
                 ipAddress: request.IpAddress,
                 userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
+                cancellationToken: cancellationToken);
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
+        }
+
+        if (await trustedDeviceService.IsDeviceBlockedAsync(user.Id, fingerprint, cancellationToken))
+        {
+            await RecordFailureAsync(user.Id, request, "Device is blocked", context, SecurityEventSeverity.High, cancellationToken);
+            await securityEventLogger.LogAsync(
+                SecurityEventType.DeviceBlock,
+                SecurityEventSeverity.High,
+                $"Admin login rejected for {user.Email}: device is blocked.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
                 cancellationToken: cancellationToken);
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (!user.EmailConfirmed)
         {
-            await RecordFailureAsync(user.Id, request, "Email not confirmed", cancellationToken);
+            await RecordFailureAsync(user.Id, request, "Email not confirmed", context, null, cancellationToken);
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.EmailNotConfirmed);
         }
 
         if (user.Status != UserStatus.Active)
         {
-            await RecordFailureAsync(user.Id, request, "Account not active", cancellationToken);
+            var isBlockedStatus = user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended;
+            await RecordFailureAsync(
+                user.Id, request, "Account not active", context,
+                isBlockedStatus ? SecurityEventSeverity.Medium : null, cancellationToken);
 
-            if (user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended)
+            if (isBlockedStatus)
             {
                 await securityEventLogger.LogAsync(
                     SecurityEventType.BlockedLogin,
@@ -75,6 +103,8 @@ internal sealed class AdminLoginCommandHandler(
                     targetUserId: user.Id,
                     ipAddress: request.IpAddress,
                     userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
                     cancellationToken: cancellationToken);
             }
 
@@ -83,7 +113,7 @@ internal sealed class AdminLoginCommandHandler(
 
         if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
         {
-            await RecordFailureAsync(user.Id, request, "Account locked", cancellationToken);
+            await RecordFailureAsync(user.Id, request, "Account locked", context, null, cancellationToken);
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AccountLocked);
         }
 
@@ -93,7 +123,8 @@ internal sealed class AdminLoginCommandHandler(
                 security.MaxFailedAccessAttempts,
                 TimeSpan.FromMinutes(security.LockoutDurationMinutes));
 
-            await RecordFailureAsync(user.Id, request, "Invalid credentials", cancellationToken);
+            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
+            await RecordFailureAsync(user.Id, request, "Invalid credentials", context, risk, cancellationToken);
 
             if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
             {
@@ -105,11 +136,16 @@ internal sealed class AdminLoginCommandHandler(
 
         if (!await adminAccessResolver.HasAdminPortalAccessAsync(user.Id, cancellationToken))
         {
-            await RecordFailureAsync(user.Id, request, "Admin portal access denied", cancellationToken);
+            await RecordFailureAsync(user.Id, request, "Admin portal access denied", context, null, cancellationToken);
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AdminPortalAccessDenied);
         }
 
         user.ResetAccessFailedCount();
+
+        var isNewCountry = !string.IsNullOrEmpty(request.CountryCode) && !await dbContext.LoginHistory.AnyAsync(
+            h => h.UserId == user.Id && h.IsSuccessful && h.CountryCode == request.CountryCode, cancellationToken);
+        var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
+        var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
 
         if (!authentication.AdminOtpEnabled)
         {
@@ -118,7 +154,7 @@ internal sealed class AdminLoginCommandHandler(
                 request.IpAddress,
                 user.Id,
                 details: "Admin OTP disabled via Platform Settings (Authentication.AdminOtpEnabled=false)"));
-            dbContext.LoginHistory.Add(LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent));
+            dbContext.LoginHistory.Add(LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent, context, successRisk));
             await dbContext.SaveChangesAsync(cancellationToken);
 
             var tokenResult = await authTokenIssuer.IssueAsync(
@@ -127,6 +163,7 @@ internal sealed class AdminLoginCommandHandler(
                 otpVerified: true,
                 request.IpAddress,
                 request.UserAgent,
+                context,
                 cancellationToken);
 
             if (tokenResult.IsFailure)
@@ -194,13 +231,17 @@ internal sealed class AdminLoginCommandHandler(
         Guid userId,
         AdminLoginCommand request,
         string reason,
+        LoginContext context,
+        SecurityEventSeverity? riskLevel,
         CancellationToken cancellationToken)
     {
         dbContext.LoginHistory.Add(LoginHistory.RecordFailure(
             userId,
             request.IpAddress,
             request.UserAgent,
-            reason));
+            reason,
+            context,
+            riskLevel));
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

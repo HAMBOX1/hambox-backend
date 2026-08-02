@@ -123,6 +123,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// </summary>
     public DbSet<SecurityEventLog> SecurityEventLogs => Set<SecurityEventLog>();
 
+    /// <summary>
+    /// Gets or sets the trusted/recognized devices table.
+    /// </summary>
+    public DbSet<TrustedDevice> TrustedDevices => Set<TrustedDevice>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

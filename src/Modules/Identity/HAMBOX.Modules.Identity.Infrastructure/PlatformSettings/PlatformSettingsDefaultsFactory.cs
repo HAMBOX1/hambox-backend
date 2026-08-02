@@ -250,7 +250,10 @@ internal static class PlatformSettingsDefaultsFactory
             lockout.MaxFailedAccessAttempts,
             lockout.LockoutDurationMinutes,
             RequireEmailVerification: true,
-            EnforceHttps: true);
+            EnforceHttps: true,
+            SecurityAlertsEnabled: true,
+            SecurityAlertMinSeverity: "High",
+            SecurityAlertThrottleMinutes: 15);
     }
 
     private static OtpSettingsPayload CreateOtp(IConfiguration configuration)

@@ -48,8 +48,20 @@ internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSe
         builder.Property(s => s.BrowserName)
             .HasMaxLength(128);
 
+        builder.Property(s => s.OsName)
+            .HasMaxLength(128);
+
         builder.Property(s => s.DeviceName)
             .HasMaxLength(128);
+
+        builder.Property(s => s.CountryCode)
+            .HasMaxLength(2);
+
+        builder.Property(s => s.City)
+            .HasMaxLength(128);
+
+        builder.Property(s => s.Fingerprint)
+            .HasMaxLength(64);
 
         // Base entity properties
         builder.Property(s => s.CreatedOnUtc)

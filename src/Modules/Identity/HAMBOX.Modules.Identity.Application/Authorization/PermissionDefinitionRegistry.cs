@@ -289,6 +289,10 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000266"), GroupIds.Support, PermissionConstants.Support.ManageSavedReplies, 9),
         new(new Guid("20000000-0000-0000-0000-000000000267"), GroupIds.Support, PermissionConstants.Support.ManageKnowledgeBase, 10),
         new(new Guid("20000000-0000-0000-0000-000000000268"), GroupIds.Support, PermissionConstants.Support.ViewAnalytics, 11),
+
+        // Security Center redesign (269-270) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000269"), GroupIds.Security, PermissionConstants.Security.ManageAlerts, 7),
+        new(new Guid("20000000-0000-0000-0000-000000000270"), GroupIds.Security, PermissionConstants.Security.ManageDevices, 8),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

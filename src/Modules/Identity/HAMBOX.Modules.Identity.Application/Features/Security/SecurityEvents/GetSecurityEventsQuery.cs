@@ -11,4 +11,6 @@ public sealed record GetSecurityEventsQuery(
     string? Severity,
     DateTimeOffset? FromUtc,
     DateTimeOffset? ToUtc,
-    string? SearchTerm) : IRequest<Result<PagedResult<SecurityEventDto>>>;
+    string? SearchTerm,
+    string? Status = null,
+    string? MinSeverity = null) : IRequest<Result<PagedResult<SecurityEventDto>>>;

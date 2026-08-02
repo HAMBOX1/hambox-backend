@@ -13,10 +13,10 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Middleware;
 public sealed class CountryResolutionMiddleware(RequestDelegate next)
 {
     /// <summary>
-    /// The <see cref="HttpContext.Items"/> key the resolved ISO-3166 alpha-2 country code (or
+    /// The <see cref="HttpContext.Items"/> key the resolved <see cref="GeoLocationResult"/> (or
     /// null) is stored under.
     /// </summary>
-    public const string CountryItemKey = "Security.ResolvedCountryCode";
+    public const string CountryItemKey = GeoLocationHttpContextKeys.ResolvedGeoLocation;
 
     public async Task InvokeAsync(HttpContext context, ICountryResolver countryResolver)
     {
@@ -26,11 +26,11 @@ public sealed class CountryResolutionMiddleware(RequestDelegate next)
             StringComparer.OrdinalIgnoreCase);
         var ipAddress = context.Connection.RemoteIpAddress?.ToString();
 
-        var country = await countryResolver.ResolveCountryAsync(
+        var geoLocation = await countryResolver.ResolveCountryAsync(
             new CountryResolutionRequest(ipAddress, headers),
             context.RequestAborted);
 
-        context.Items[CountryItemKey] = country;
+        context.Items[CountryItemKey] = geoLocation;
 
         await next(context);
     }

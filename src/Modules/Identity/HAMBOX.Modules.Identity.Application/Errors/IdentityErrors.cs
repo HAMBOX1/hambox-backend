@@ -162,4 +162,16 @@ public static class IdentityErrors
     public static readonly Error BlockedIpAlreadyExists = new(
         "Identity.BlockedIpAlreadyExists",
         "This IP address or range is already blocked.");
+
+    public static readonly Error SessionNotFound = new(
+        "Identity.SessionNotFound",
+        "The session was not found.");
+
+    public static readonly Error TrustedDeviceNotFound = new(
+        "Identity.TrustedDeviceNotFound",
+        "The device was not found.");
+
+    public static readonly Error SecurityEventNotFound = new(
+        "Identity.SecurityEventNotFound",
+        "The security event was not found.");
 }

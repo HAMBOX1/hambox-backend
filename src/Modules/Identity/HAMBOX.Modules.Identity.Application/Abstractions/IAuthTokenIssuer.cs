@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Identity.Application.Contracts;
+using HAMBOX.Modules.Identity.Domain.Sessions;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.SharedKernel.Results;
 
@@ -18,5 +19,6 @@ public interface IAuthTokenIssuer
         bool otpVerified,
         string ipAddress,
         string userAgent,
+        LoginContext? context = null,
         CancellationToken cancellationToken = default);
 }

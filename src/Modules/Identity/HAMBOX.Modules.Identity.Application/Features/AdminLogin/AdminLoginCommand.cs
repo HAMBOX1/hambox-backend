@@ -8,4 +8,6 @@ public sealed record AdminLoginCommand(
     string Email,
     string Password,
     string IpAddress,
-    string UserAgent) : IRequest<Result<AdminLoginChallengeResponse>>;
+    string UserAgent,
+    string? CountryCode = null,
+    string? City = null) : IRequest<Result<AdminLoginChallengeResponse>>;
