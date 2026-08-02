@@ -1,3 +1,5 @@
+using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Promotions.Models;
 using HAMBOX.Modules.Commerce.Domain.Promotions;
@@ -11,11 +13,16 @@ internal sealed class PromotionEngine : IPromotionEngine
 
     private readonly ICommerceDbContext _dbContext;
     private readonly IReadOnlyDictionary<PromotionType, IPromotionTypeEvaluator> _evaluators;
+    private readonly IPlatformSettingsProvider _platformSettings;
 
-    public PromotionEngine(ICommerceDbContext dbContext, IEnumerable<IPromotionTypeEvaluator> evaluators)
+    public PromotionEngine(
+        ICommerceDbContext dbContext,
+        IEnumerable<IPromotionTypeEvaluator> evaluators,
+        IPlatformSettingsProvider platformSettings)
     {
         _dbContext = dbContext;
         _evaluators = evaluators.ToDictionary(e => e.PromotionType);
+        _platformSettings = platformSettings;
     }
 
     public async Task<PromotionEvaluationResult> EvaluateAsync(
@@ -107,6 +114,19 @@ internal sealed class PromotionEngine : IPromotionEngine
         }
 
         TryAddMembershipPlanDiscount(context, subtotal, automaticCandidates);
+
+        if (couponCandidate is not null)
+        {
+            var promotionsSettings = await _platformSettings.GetAsync<PromotionsSettingsPayload>(
+                PlatformSettingsCategoryKeys.Promotions, cancellationToken);
+
+            if (!promotionsSettings.StackCouponsAllowed)
+            {
+                // Coupon stacking disabled: the coupon wins exclusively for this cart rather
+                // than combining with automatic/membership/referral discounts.
+                automaticCandidates.Clear();
+            }
+        }
 
         var applied = automaticCandidates
             .Select(c => ToDto(c))

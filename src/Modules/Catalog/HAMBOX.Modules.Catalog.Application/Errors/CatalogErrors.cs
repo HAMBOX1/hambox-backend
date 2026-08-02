@@ -217,7 +217,7 @@ public static class CatalogErrors
 
     public static readonly Error UnsupportedPackageFormat = new(
         "ImportExport.UnsupportedFormat",
-        "Only .hambox, .xlsx, and .csv files are supported.");
+        "Only .hambox, .xlsx, .xlsm, and .csv files are supported.");
 
     public static readonly Error PackagePasswordRequired = new(
         "ImportExport.PasswordRequired",

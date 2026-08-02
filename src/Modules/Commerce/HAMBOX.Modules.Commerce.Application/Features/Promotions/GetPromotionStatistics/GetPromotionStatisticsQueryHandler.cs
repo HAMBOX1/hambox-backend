@@ -20,7 +20,11 @@ internal sealed class GetPromotionStatisticsQueryHandler
         GetPromotionStatisticsQuery request,
         CancellationToken cancellationToken)
     {
-        var promotionExists = await _dbContext.Promotions.AnyAsync(p => p.Id == request.Id, cancellationToken);
+        // IgnoreQueryFilters: statistics for a soft-deleted promotion must remain viewable —
+        // redemption/order history must never become unreachable just because the promotion was deleted.
+        var promotionExists = await _dbContext.Promotions
+            .IgnoreQueryFilters()
+            .AnyAsync(p => p.Id == request.Id, cancellationToken);
         if (!promotionExists)
         {
             return Result.Failure<PromotionStatisticsDto>(CommerceErrors.PromotionNotFound);

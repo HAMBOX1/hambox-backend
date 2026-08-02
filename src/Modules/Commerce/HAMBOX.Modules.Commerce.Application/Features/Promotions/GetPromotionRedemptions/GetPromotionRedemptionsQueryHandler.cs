@@ -22,7 +22,11 @@ internal sealed class GetPromotionRedemptionsQueryHandler
         GetPromotionRedemptionsQuery request,
         CancellationToken cancellationToken)
     {
-        var promotionExists = await _dbContext.Promotions.AnyAsync(p => p.Id == request.Id, cancellationToken);
+        // IgnoreQueryFilters: redemption history for a soft-deleted promotion must remain viewable —
+        // it must never become unreachable just because the promotion was deleted.
+        var promotionExists = await _dbContext.Promotions
+            .IgnoreQueryFilters()
+            .AnyAsync(p => p.Id == request.Id, cancellationToken);
         if (!promotionExists)
         {
             return Result.Failure<PagedResult<PromotionRedemptionDto>>(CommerceErrors.PromotionNotFound);

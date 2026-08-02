@@ -45,12 +45,6 @@ internal sealed class GenerateCouponsCommandHandler : IRequestHandler<GenerateCo
         }
 
         var request = command.Request;
-        if (request.Count is < 1 or > 500)
-        {
-            return Result.Failure<IReadOnlyList<CouponCodeDto>>(
-                new HAMBOX.SharedKernel.Errors.Error("Coupons.InvalidCount", "Count must be between 1 and 500."));
-        }
-
         var created = new List<CouponCodeDto>();
         var existingCodes = await _dbContext.CouponCodes.Select(c => c.Code).ToListAsync(cancellationToken);
         var existingSet = existingCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);

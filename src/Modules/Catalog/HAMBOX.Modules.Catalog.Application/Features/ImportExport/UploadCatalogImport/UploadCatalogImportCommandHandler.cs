@@ -63,12 +63,16 @@ internal sealed class UploadCatalogImportCommandHandler(
         return extension switch
         {
             ".hambox" => CatalogPackageFormat.Hambox,
-            ".xlsx" => CatalogPackageFormat.Xlsx,
+            // .xlsm is the macro-enabled OOXML variant of .xlsx — same zip/worksheet structure,
+            // so it's parsed by the exact same ClosedXML path. ClosedXML never executes the
+            // embedded VBA project, it just doesn't read it, so macros are inert on import.
+            ".xlsx" or ".xlsm" => CatalogPackageFormat.Xlsx,
             ".csv" => CatalogPackageFormat.Csv,
             _ => contentType switch
             {
                 "application/zip" or "application/x-zip-compressed" => CatalogPackageFormat.Hambox,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => CatalogPackageFormat.Xlsx,
+                "application/vnd.ms-excel.sheet.macroEnabled.12" => CatalogPackageFormat.Xlsx,
                 "text/csv" => CatalogPackageFormat.Csv,
                 _ => null,
             },

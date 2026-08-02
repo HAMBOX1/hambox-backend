@@ -250,15 +250,56 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                         applied.Name));
 
                     var promotion = await _commerceDbContext.Promotions
-                        .Include(p => p.CouponCodes)
+                        .Include(p => p.Conditions)
                         .FirstOrDefaultAsync(p => p.Id == applied.PromotionId, ct);
 
-                    promotion?.RecordRedemption();
+                    if (promotion is not null)
+                    {
+                        var promotionId = promotion.Id;
+                        var usageLimit = promotion.GetConditionInt(PromotionConditionType.UsageLimit);
+                        var perUserLimit = promotion.GetConditionInt(PromotionConditionType.PerUserLimit);
+                        var redeemingUserId = _currentUserService.UserId!;
+
+                        // Same atomic, condition-guarded UPDATE pattern as coupon redemption below:
+                        // the row lock on the matched Promotion row serializes concurrent checkouts
+                        // against it, so a redemption that would exceed UsageLimit/PerUserLimit blocks
+                        // until the earlier transaction commits, then re-evaluates the WHERE clause
+                        // and affects 0 rows instead of over-redeeming.
+                        var promotionUpdated = await _commerceDbContext.Promotions
+                            .Where(p => p.Id == promotionId
+                                && (usageLimit == null || p.TotalRedemptions < usageLimit.Value)
+                                && (perUserLimit == null || _commerceDbContext.PromotionRedemptions
+                                    .Count(r => r.PromotionId == promotionId && r.UserId == redeemingUserId) < perUserLimit.Value))
+                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalRedemptions, p => p.TotalRedemptions + 1), ct);
+
+                        if (promotionUpdated == 0)
+                        {
+                            throw new InvalidOperationException("Promotion usage limit reached.");
+                        }
+                    }
 
                     if (applied.CouponCodeId is not null)
                     {
-                        var coupon = promotion?.CouponCodes.FirstOrDefault(c => c.Id == applied.CouponCodeId);
-                        coupon?.RecordUse();
+                        var couponId = applied.CouponCodeId.Value;
+                        var userId = _currentUserService.UserId!;
+
+                        // Atomic, condition-guarded UPDATE: SQL Server's row lock on the matched
+                        // row serializes concurrent checkouts, so a second redemption that would
+                        // exceed MaxUses/IsSingleUse/PerUserMaxUses blocks until the first commits,
+                        // then re-evaluates the WHERE clause and affects 0 rows instead of over-redeeming.
+                        var couponUpdated = await _commerceDbContext.CouponCodes
+                            .Where(c => c.Id == couponId
+                                && c.IsActive
+                                && (c.MaxUses == null || c.UsedCount < c.MaxUses.Value)
+                                && (!c.IsSingleUse || c.UsedCount == 0)
+                                && (c.PerUserMaxUses == null || _commerceDbContext.PromotionRedemptions
+                                    .Count(r => r.CouponCodeId == couponId && r.UserId == userId) < c.PerUserMaxUses.Value))
+                            .ExecuteUpdateAsync(s => s.SetProperty(c => c.UsedCount, c => c.UsedCount + 1), ct);
+
+                        if (couponUpdated == 0)
+                        {
+                            throw new InvalidOperationException("Coupon usage limit reached.");
+                        }
 
                         _commerceDbContext.PromotionAuditLogs.Add(PromotionAuditLog.Create(
                             applied.PromotionId,
@@ -344,6 +385,18 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             if (IsInventoryFailure(ex))
             {
                 return Result.Failure<Contracts.OrderDto>(CatalogErrors.InsufficientInventory);
+            }
+
+            if (ex.Message.Contains("coupon usage limit", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<Contracts.OrderDto>(
+                    CommerceErrors.InvalidCoupon("This coupon has reached its usage limit."));
+            }
+
+            if (ex.Message.Contains("promotion usage limit", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<Contracts.OrderDto>(
+                    CommerceErrors.InvalidCoupon("This promotion has reached its usage limit."));
             }
 
             if (ex.Message.Contains("payment", StringComparison.OrdinalIgnoreCase))

@@ -45,6 +45,17 @@ public static class CommunicationDataSeeder
                 "<p>{{CodeCount}} digital product code(s) for order <strong>{{OrderNumber}}</strong> were resent. Open your library to view them.</p>");
         }
 
+        // Seeded separately (not gated by the "any template exists" check above) since it was
+        // added after the initial seed and must still land in databases that already have rows.
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "SecurityAlert"))
+        {
+            SeedTemplate(db, "SecurityAlert", CommunicationChannels.InApp, CommunicationCategory.Security,
+                "Security alert: {{EventType}}", "{{Description}}");
+            SeedTemplate(db, "SecurityAlert", CommunicationChannels.Email, CommunicationCategory.Security,
+                "HAMBOX security alert: {{EventType}}",
+                "<p><strong>{{Severity}}</strong> security event at {{OccurredOnUtc}} UTC:</p><p>{{Description}}</p><p>IP address: {{IpAddress}}</p>");
+        }
+
         await db.SaveChangesAsync();
     }
 

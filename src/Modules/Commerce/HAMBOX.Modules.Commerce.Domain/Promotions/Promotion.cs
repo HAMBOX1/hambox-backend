@@ -5,7 +5,7 @@ namespace HAMBOX.Modules.Commerce.Domain.Promotions;
 /// <summary>
 /// Aggregate root for a marketing promotion.
 /// </summary>
-public sealed class Promotion : AggregateRoot
+public sealed class Promotion : AggregateRoot, ISoftDeletable
 {
     private readonly List<PromotionCondition> _conditions = [];
     private readonly List<PromotionTarget> _targets = [];
@@ -49,6 +49,12 @@ public sealed class Promotion : AggregateRoot
     public DateTime? StartDateUtc { get; private set; }
     public DateTime? EndDateUtc { get; private set; }
     public int TotalRedemptions { get; private set; }
+
+    /// <inheritdoc />
+    public bool IsDeleted { get; private set; }
+
+    /// <inheritdoc />
+    public DateTimeOffset? DeletedOnUtc { get; private set; }
 
     public IReadOnlyCollection<PromotionCondition> Conditions => _conditions.AsReadOnly();
     public IReadOnlyCollection<PromotionTarget> Targets => _targets.AsReadOnly();
