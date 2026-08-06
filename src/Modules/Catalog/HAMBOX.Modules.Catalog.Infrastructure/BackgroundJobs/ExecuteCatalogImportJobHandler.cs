@@ -90,7 +90,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 }
             }
 
-            var resultSummary = new CatalogPackageSummary(summary.Created, summary.Updated, summary.Skipped, summary.Failed, summary.Errors);
+            var resultSummary = new CatalogPackageSummary(
+                summary.Created, summary.Updated, summary.Skipped, summary.Failed, summary.Errors, summary.NewVariantGroups);
             job.MarkCompleted(null, null, JsonSerializer.Serialize(resultSummary));
             await catalogDb.SaveChangesAsync(cancellationToken);
             await context.ReportProgressAsync(100, cancellationToken);
@@ -339,13 +340,15 @@ internal sealed class ExecuteCatalogImportJobHandler(
         // must be resolved before Variants, since a variant's SelectedOptionValues reference them
         // by name; ProductOptionGroups/ProductOptions were previously matched/reported but never
         // actually persisted here, even for .hambox imports). ----------
+        // Keyed by normalized GroupKey (trimmed + uppercased) so a re-typed or differently-cased
+        // GroupKey reuses the same Variant Group instead of creating a near-duplicate.
         var groupKeyToId = new Dictionary<(Guid ProductId, string Key), Guid>();
         var optionValueToId = new Dictionary<(Guid ProductId, string Value), Guid>();
 
         if (options.IncludeVariants)
         {
             (await catalogDb.ProductOptionGroups.AsNoTracking().Select(g => new { g.Id, g.ProductId, g.Key }).ToListAsync(cancellationToken))
-                .ForEach(g => groupKeyToId[(g.ProductId, g.Key)] = g.Id);
+                .ForEach(g => groupKeyToId[(g.ProductId, NormalizeGroupKey(g.Key))] = g.Id);
             (await catalogDb.ProductOptions.AsNoTracking()
                 .Join(catalogDb.ProductOptionGroups.AsNoTracking(), o => o.OptionGroupId, g => g.Id, (o, g) => new { o.Id, o.Value, g.ProductId })
                 .ToListAsync(cancellationToken))
@@ -364,19 +367,20 @@ internal sealed class ExecuteCatalogImportJobHandler(
                         continue; // product not resolved yet (or never will be) — reported as stuck below
                     }
 
-                    if (!string.IsNullOrEmpty(row.ParentKey) && !groupKeyToId.ContainsKey((productId, row.ParentKey)))
+                    if (!string.IsNullOrEmpty(row.ParentKey) && !groupKeyToId.ContainsKey((productId, NormalizeGroupKey(row.ParentKey))))
                     {
                         continue; // parent group not resolved yet — retry next pass
                     }
 
-                    Guid? parentGroupId = string.IsNullOrEmpty(row.ParentKey) ? null : groupKeyToId[(productId, row.ParentKey)];
+                    Guid? parentGroupId = string.IsNullOrEmpty(row.ParentKey) ? null : groupKeyToId[(productId, NormalizeGroupKey(row.ParentKey))];
 
-                    if (!groupKeyToId.ContainsKey((productId, row.Key)))
+                    if (!groupKeyToId.ContainsKey((productId, NormalizeGroupKey(row.Key))))
                     {
                         var group = ProductOptionGroup.Create(productId, row.Key, row.DisplayName, row.SortOrder, row.IsRequired, parentGroupId);
                         catalogDb.ProductOptionGroups.Add(group);
-                        groupKeyToId[(productId, row.Key)] = group.Id;
+                        groupKeyToId[(productId, NormalizeGroupKey(row.Key))] = group.Id;
                         summary.Created++;
+                        summary.NewVariantGroups.Add($"{row.DisplayName} ({row.Key})");
                     }
 
                     remainingGroups.Remove(planRow);
@@ -403,7 +407,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 }
 
                 if (!productKeyToId.TryGetValue(row.ProductImportKey, out var productId)
-                    || !groupKeyToId.TryGetValue((productId, row.GroupKey), out var groupId))
+                    || !groupKeyToId.TryGetValue((productId, NormalizeGroupKey(row.GroupKey)), out var groupId))
                 {
                     summary.Failed++;
                     summary.Errors.Add($"Variant option '{row.Value}': variant group '{row.GroupKey}' could not be resolved.");
@@ -600,6 +604,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
         }
     }
 
+    private static string NormalizeGroupKey(string key) => key.Trim().ToUpperInvariant();
+
     private static string MakeUnique(string baseValue, HashSet<string> taken)
     {
         var candidate = $"{baseValue}-imported";
@@ -619,5 +625,6 @@ internal sealed class ExecuteCatalogImportJobHandler(
         public int Skipped { get; set; }
         public int Failed { get; set; }
         public List<string> Errors { get; } = [];
+        public List<string> NewVariantGroups { get; } = [];
     }
 }

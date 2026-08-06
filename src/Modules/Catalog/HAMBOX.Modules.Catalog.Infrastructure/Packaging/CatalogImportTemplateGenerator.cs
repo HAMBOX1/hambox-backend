@@ -137,7 +137,11 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
                     ApplyMultiValueList(range, CollectionListName);
                     break;
                 case DropdownKind.VariantGroup when lookups.VariantGroups.Count > 0:
-                    range.SetDataValidation().List(VariantGroupListName, true);
+                    // Advisory only (see ApplyMultiValueList) — GroupKey must allow any value so a
+                    // brand-new group can be typed and auto-created at import time; a hard List
+                    // validation would block exactly that, and would also block referencing a
+                    // just-typed (not-yet-in-DB) key from ParentGroupKey/Options.GroupKey.
+                    ApplyMultiValueList(range, VariantGroupListName);
                     break;
                 case DropdownKind.ProductStatus:
                     range.SetDataValidation().List(QuotedList(lookups.ProductStatuses), true);
@@ -348,7 +352,7 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
     private static readonly ColumnSpec[] VariantGroupColumns =
     [
         new("ProductImportKey", true, "The owning product's ImportKey or NameEn (see the Products sheet)."),
-        new("GroupKey", true, "Unique slug for this option group within the product, e.g. 'platform'. Pick an existing group name from the dropdown to stay consistent across products, or type a new one.", DropdownKind.VariantGroup),
+        new("GroupKey", true, "Unique slug for this option group within the product, e.g. 'platform'. Any value is allowed — pick an existing one from the dropdown to reuse it, or type a brand-new one and it will be created automatically during import.", DropdownKind.VariantGroup),
         new("DisplayName", true, "Customer-facing label, e.g. 'Platform'."),
         new("ParentGroupKey", false, "GroupKey of a parent group, if this group only applies once another option is chosen (e.g. 'region' under 'platform').", DropdownKind.VariantGroup),
         new("SortOrder", false, "Integer display order. Defaults to 0."),

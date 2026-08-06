@@ -153,7 +153,8 @@ public sealed record CatalogPackageSummary(
     int UpdatedCount,
     int SkippedCount,
     int FailedCount,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<string>? NewVariantGroups = null);
 
 public sealed record CatalogPackageJobDto(
     Guid Id,
