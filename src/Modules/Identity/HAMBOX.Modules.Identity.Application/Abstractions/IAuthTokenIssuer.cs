@@ -19,6 +19,7 @@ public interface IAuthTokenIssuer
         bool otpVerified,
         string ipAddress,
         string userAgent,
+        bool rememberMe = false,
         LoginContext? context = null,
         CancellationToken cancellationToken = default);
 }

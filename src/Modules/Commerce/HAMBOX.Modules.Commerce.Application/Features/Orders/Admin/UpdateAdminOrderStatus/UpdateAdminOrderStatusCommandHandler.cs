@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.SharedKernel.Results;
@@ -17,16 +18,22 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
     : IRequestHandler<UpdateAdminOrderStatusCommand, Result<AdminOrderDetailDto>>
 {
     private readonly ICommerceDbContext _dbContext;
+    private readonly ICommerceTransactionService _transactionService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly OrderInventoryReleaseService _inventoryReleaseService;
     private readonly ISender _sender;
 
     public UpdateAdminOrderStatusCommandHandler(
         ICommerceDbContext dbContext,
+        ICommerceTransactionService transactionService,
         ICurrentUserService currentUserService,
+        OrderInventoryReleaseService inventoryReleaseService,
         ISender sender)
     {
         _dbContext = dbContext;
+        _transactionService = transactionService;
         _currentUserService = currentUserService;
+        _inventoryReleaseService = inventoryReleaseService;
         _sender = sender;
     }
 
@@ -34,41 +41,61 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
         UpdateAdminOrderStatusCommand command,
         CancellationToken cancellationToken)
     {
-        var order = await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken);
-
-        if (order is null)
-        {
-            return Result.Failure<AdminOrderDetailDto>(CommerceErrors.OrderNotFound);
-        }
-
-        if (!TryParseStatus(command.Request.Status, out var status))
-        {
-            return Result.Failure<AdminOrderDetailDto>(CommerceErrors.InvalidOrderStatus(command.Request.Status));
-        }
+        Order? order = null;
 
         try
         {
-            order.SetAdminStatus(status);
+            await _transactionService.ExecuteAsync(async ct =>
+            {
+                order = await _dbContext.Orders
+                    .Include(o => o.Items)
+                    .FirstOrDefaultAsync(o => o.Id == command.OrderId, ct);
+
+                if (order is null)
+                {
+                    throw new InvalidOperationException(CommerceErrors.OrderNotFound.Description);
+                }
+
+                if (!TryParseStatus(command.Request.Status, out var status))
+                {
+                    throw new InvalidOperationException(CommerceErrors.InvalidOrderStatus(command.Request.Status).Description);
+                }
+
+                var wasAlreadyReleased = order.Status is OrderStatus.Cancelled or OrderStatus.Refunded;
+
+                order.SetAdminStatus(status);
+
+                var actorId = _currentUserService.UserId ?? "system";
+                _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
+                    order.Id,
+                    "StatusChanged",
+                    $"Order status changed to {command.Request.Status}.",
+                    actorId,
+                    actorId));
+
+                await _dbContext.SaveChangesAsync(ct);
+
+                if (!wasAlreadyReleased && status is OrderStatus.Cancelled or OrderStatus.Refunded)
+                {
+                    await _inventoryReleaseService.ReleaseAsync(order, actorId, ct);
+                }
+            }, cancellationToken);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == CommerceErrors.OrderNotFound.Description)
+        {
+            return Result.Failure<AdminOrderDetailDto>(CommerceErrors.OrderNotFound);
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == CommerceErrors.InvalidOrderStatus(command.Request.Status).Description)
+        {
+            return Result.Failure<AdminOrderDetailDto>(CommerceErrors.InvalidOrderStatus(command.Request.Status));
         }
         catch (InvalidOperationException ex)
         {
             return Result.Failure<AdminOrderDetailDto>(CommerceErrors.OrderStatusTransitionFailed(ex.Message));
         }
 
-        var actorId = _currentUserService.UserId ?? "system";
-        var actorName = actorId;
-
-        _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
-            order.Id,
-            "StatusChanged",
-            $"Order status changed to {command.Request.Status}.",
-            actorId,
-            actorName));
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return await _sender.Send(new GetAdminOrderById.GetAdminOrderByIdQuery(order.Id), cancellationToken);
+        return await _sender.Send(new GetAdminOrderById.GetAdminOrderByIdQuery(order!.Id), cancellationToken);
     }
 
     private static bool TryParseStatus(string status, out OrderStatus parsed)

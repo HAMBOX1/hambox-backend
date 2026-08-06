@@ -270,6 +270,21 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     }
 
     /// <summary>
+    /// Restores previously committed stock, e.g. when the order that sold it is cancelled or refunded.
+    /// </summary>
+    /// <param name="quantity">The quantity to restore.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the quantity is not positive.</exception>
+    public void RestoreStock(int quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than zero.");
+        }
+
+        StockQuantity += quantity;
+    }
+
+    /// <summary>
     /// Updates the product details.
     /// </summary>
     /// <param name="nameAr">The new product name in Arabic.</param>

@@ -56,6 +56,11 @@ internal sealed class CreateCouponCommandHandler : IRequestHandler<CreateCouponC
             command.Request.PerUserMaxUses,
             command.Request.ExpiresOnUtc);
 
+        // Promotion is tracked as Unchanged (loaded via Include); EF only discovers this new
+        // CouponCode by graph traversal, and since its Guid key is already set it would otherwise
+        // be tracked as Modified (UPDATE against a non-existent row) instead of Added.
+        _dbContext.CouponCodes.Add(coupon);
+
         PromotionAuditWriter.Write(
             _dbContext,
             promotion.Id,

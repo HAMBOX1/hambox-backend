@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Contracts;
@@ -16,6 +17,7 @@ internal sealed class AuthTokenIssuer(
     IJwtTokenService jwtTokenService,
     ITokenGenerator tokenGenerator,
     IUserClaimsService userClaimsService,
+    IPlatformSettingsProvider platformSettings,
     IOptions<JwtSettings> jwtSettings) : IAuthTokenIssuer
 {
     public async Task<Result<AuthTokenResponse>> IssueAsync(
@@ -24,6 +26,7 @@ internal sealed class AuthTokenIssuer(
         bool otpVerified,
         string ipAddress,
         string userAgent,
+        bool rememberMe = false,
         LoginContext? context = null,
         CancellationToken cancellationToken = default)
     {
@@ -45,13 +48,14 @@ internal sealed class AuthTokenIssuer(
         var (accessToken, expiresAt) = jwtTokenService.GenerateAccessToken(user, claims);
 
         var refreshTokenValue = tokenGenerator.GenerateSecureToken();
-        var refreshExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
+        var refreshExpiresAt = await ResolveRefreshExpirationAsync(rememberMe, cancellationToken);
         var (refreshToken, _) = DomainRefreshToken.Issue(
             user.Id,
             refreshTokenValue,
             refreshExpiresAt,
             authContext,
-            session.Id);
+            session.Id,
+            rememberMe);
 
         session.LinkRefreshToken(refreshToken.Id);
 
@@ -61,5 +65,20 @@ internal sealed class AuthTokenIssuer(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AuthTokenResponse(accessToken, refreshTokenValue, expiresAt));
+    }
+
+    private async Task<DateTimeOffset> ResolveRefreshExpirationAsync(bool rememberMe, CancellationToken cancellationToken)
+    {
+        if (!rememberMe)
+        {
+            return DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
+        }
+
+        var auth = await platformSettings.GetAuthenticationAsync(cancellationToken);
+        var rememberMeDays = auth.RememberMeDurationDays > 0
+            ? auth.RememberMeDurationDays
+            : jwtSettings.Value.RefreshTokenExpirationDays;
+
+        return DateTimeOffset.UtcNow.AddDays(rememberMeDays);
     }
 }

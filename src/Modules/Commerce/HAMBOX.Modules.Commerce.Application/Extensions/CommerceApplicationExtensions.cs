@@ -18,6 +18,7 @@ public static class CommerceApplicationExtensions
         services.AddScoped<MembershipOperationsService>();
         services.AddScoped<ReferralRewardService>();
         services.AddScoped<OrderFulfillmentService>();
+        services.AddScoped<OrderInventoryReleaseService>();
         services.AddScoped<IPromotionTypeEvaluator, AutomaticPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, MembershipPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, CategoryPromotionEvaluator>();

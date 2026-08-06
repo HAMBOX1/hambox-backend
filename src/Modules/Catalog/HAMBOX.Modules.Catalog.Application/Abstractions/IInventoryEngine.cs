@@ -28,6 +28,16 @@ public interface IInventoryEngine
 
     Task<int> ExpireStaleReservationsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns every sold code tied to <paramref name="orderId"/> back to the available pool, e.g. when
+    /// the order is cancelled or refunded. Codes not currently <c>Sold</c> (already released, disabled, etc.)
+    /// are left untouched, so this is safe to call more than once for the same order.
+    /// </summary>
+    Task<int> ReleaseSoldCodesForOrderAsync(
+        Guid orderId,
+        string? performedByUserId,
+        CancellationToken cancellationToken = default);
+
     Task<InventoryStatisticsSnapshot> GetStatisticsAsync(
         Guid? productId = null,
         Guid? variantId = null,

@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
@@ -8,6 +10,7 @@ using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Features.Register;
 using HAMBOX.Modules.Identity.Application.Options;
+using HAMBOX.Modules.Identity.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.Modules.Identity.Infrastructure.Authentication;
 using HAMBOX.Modules.Identity.Infrastructure.BackgroundJobs;
@@ -20,7 +23,10 @@ using HamboxSecurityStampValidator = HAMBOX.Modules.Identity.Infrastructure.Auth
 using IHamboxSecurityStampValidator = HAMBOX.Modules.Identity.Application.Abstractions.ISecurityStampValidator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,6 +68,29 @@ public static class IdentityInfrastructureExtensions
         services.Configure<LockoutSettings>(configuration.GetSection(LockoutSettings.SectionName));
         services.Configure<AdminOtpSettings>(configuration.GetSection(AdminOtpSettings.SectionName));
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
+
+        // 2b. Rate limiting for brute-force/abuse-prone auth endpoints (per-client-IP, fixed window).
+        // Complements the existing per-account lockout — this is a per-IP defense-in-depth layer.
+        var rateLimitingSettings = configuration.GetSection(RateLimitingSettings.SectionName).Get<RateLimitingSettings>()
+            ?? new RateLimitingSettings();
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, cancellationToken) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+                }
+
+                return ValueTask.CompletedTask;
+            };
+
+            AddFixedWindowPolicy(options, RateLimitPolicies.Login, rateLimitingSettings.Login);
+            AddFixedWindowPolicy(options, RateLimitPolicies.AccountActions, rateLimitingSettings.AccountActions);
+        });
 
         var emailSettingsSection = configuration.GetSection(EmailSettings.SectionName);
         services.Configure<EmailSettings>(emailSettingsSection);
@@ -180,7 +209,7 @@ public static class IdentityInfrastructureExtensions
                     PermissionConstants.Roles.View)));
 
             options.AddPolicy(AuthorizationPolicies.CustomerContext, policy =>
-                policy.AddRequirements(new CustomerContextRequirement()));
+                policy.RequireAuthenticatedUser().AddRequirements(new CustomerContextRequirement()));
         });
 
         // 3. Register Core Services
@@ -242,4 +271,15 @@ public static class IdentityInfrastructureExtensions
 
         return services;
     }
+
+    private static void AddFixedWindowPolicy(RateLimiterOptions options, string policyName, RateLimitPolicySettings settings) =>
+        options.AddPolicy(policyName, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = settings.PermitLimit,
+                Window = TimeSpan.FromSeconds(settings.WindowSeconds),
+                QueueLimit = settings.QueueLimit,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
 }

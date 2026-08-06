@@ -163,6 +163,7 @@ internal sealed class AdminLoginCommandHandler(
                 otpVerified: true,
                 request.IpAddress,
                 request.UserAgent,
+                rememberMe: false,
                 context,
                 cancellationToken);
 

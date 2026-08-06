@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Contracts;
@@ -22,6 +23,7 @@ internal sealed class RefreshTokenCommandHandler(
     IJwtTokenService jwtTokenService,
     ITokenGenerator tokenGenerator,
     IUserClaimsService userClaimsService,
+    IPlatformSettingsProvider platformSettings,
     IOptions<JwtSettings> jwtSettings) : IRequestHandler<RefreshTokenCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
@@ -69,13 +71,14 @@ internal sealed class RefreshTokenCommandHandler(
         }
 
         var newRefreshTokenValue = tokenGenerator.GenerateSecureToken();
-        var refreshExpiresAt = DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
+        var refreshExpiresAt = await ResolveRefreshExpirationAsync(existingToken.IsPersistent, cancellationToken);
         var (newRefreshToken, _) = DomainRefreshToken.Issue(
             user.Id,
             newRefreshTokenValue,
             refreshExpiresAt,
             existingToken.AuthContext,
-            existingToken.SessionId);
+            existingToken.SessionId,
+            existingToken.IsPersistent);
 
         existingToken.MarkReplacedBy(newRefreshTokenValue);
         existingToken.Revoke();
@@ -125,5 +128,20 @@ internal sealed class RefreshTokenCommandHandler(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<DateTimeOffset> ResolveRefreshExpirationAsync(bool isPersistent, CancellationToken cancellationToken)
+    {
+        if (!isPersistent)
+        {
+            return DateTimeOffset.UtcNow.AddDays(jwtSettings.Value.RefreshTokenExpirationDays);
+        }
+
+        var auth = await platformSettings.GetAuthenticationAsync(cancellationToken);
+        var rememberMeDays = auth.RememberMeDurationDays > 0
+            ? auth.RememberMeDurationDays
+            : jwtSettings.Value.RefreshTokenExpirationDays;
+
+        return DateTimeOffset.UtcNow.AddDays(rememberMeDays);
     }
 }

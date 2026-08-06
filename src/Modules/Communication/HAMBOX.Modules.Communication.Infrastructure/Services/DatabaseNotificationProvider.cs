@@ -1,8 +1,10 @@
 using System.Text.Json;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
+using HAMBOX.Modules.Commerce.Application.Contracts.Account;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Communication.Application.Abstractions;
 using HAMBOX.Modules.Communication.Domain.Communication;
+using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Communication.Infrastructure.Services;
 
@@ -13,7 +15,9 @@ namespace HAMBOX.Modules.Communication.Infrastructure.Services;
 /// creates <see cref="UserNotification"/> rows; business modules call <c>ICommunicationService</c> instead
 /// of inserting one directly.
 /// </summary>
-internal sealed class DatabaseNotificationProvider(ICommerceDbContext commerceDb) : ICommunicationProvider
+internal sealed class DatabaseNotificationProvider(
+    ICommerceDbContext commerceDb,
+    IUserNotificationRealtimeNotifier realtimeNotifier) : ICommunicationProvider
 {
     public const string Key = CommunicationChannels.InApp;
 
@@ -30,6 +34,19 @@ internal sealed class DatabaseNotificationProvider(ICommerceDbContext commerceDb
 
         commerceDb.UserNotifications.Add(notification);
         await commerceDb.SaveChangesAsync(cancellationToken);
+
+        var unreadCount = await commerceDb.UserNotifications
+            .CountAsync(n => n.UserId == context.UserId && !n.IsRead, cancellationToken);
+        var dto = new UserNotificationDto(
+            notification.Id,
+            notification.Title,
+            notification.Body,
+            notification.Category,
+            notification.IsRead,
+            notification.CreatedOnUtc,
+            notification.ActionUrl,
+            notification.IsArchived);
+        await realtimeNotifier.NotifyNotificationCreatedAsync(context.UserId, dto, unreadCount, cancellationToken);
 
         return CommunicationDeliveryResult.Ok();
     }

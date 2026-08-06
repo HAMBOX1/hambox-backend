@@ -129,6 +129,22 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
         OrderItemId = orderItemId;
     }
 
+    /// <summary>
+    /// Returns a sold code to the available pool, e.g. when the order it was sold on is cancelled or refunded.
+    /// </summary>
+    public void ReturnToStock()
+    {
+        if (Status != InventoryCodeStatus.Sold)
+        {
+            throw new InvalidOperationException("Only sold codes can be returned to stock.");
+        }
+
+        Status = InventoryCodeStatus.Available;
+        SoldOnUtc = null;
+        OrderId = null;
+        OrderItemId = null;
+    }
+
     public void Disable()
     {
         Status = InventoryCodeStatus.Disabled;

@@ -23,7 +23,8 @@ public sealed class RefreshToken : Entity
         string tokenHash,
         DateTimeOffset expiresOnUtc,
         string authContext,
-        Guid sessionId)
+        Guid sessionId,
+        bool isPersistent)
         : base(id)
     {
         UserId = userId;
@@ -31,6 +32,7 @@ public sealed class RefreshToken : Entity
         ExpiresOnUtc = expiresOnUtc;
         AuthContext = authContext;
         SessionId = sessionId;
+        IsPersistent = isPersistent;
     }
 
     /// <summary>
@@ -70,6 +72,12 @@ public sealed class RefreshToken : Entity
     public string? ReplacedByTokenHash { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether this token was issued under "Remember Me"
+    /// and should keep using the extended lifetime on each rotation.
+    /// </summary>
+    public bool IsPersistent { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether the token has expired.
     /// </summary>
     public bool IsExpired => DateTimeOffset.UtcNow >= ExpiresOnUtc;
@@ -100,7 +108,8 @@ public sealed class RefreshToken : Entity
         string plaintextToken,
         DateTimeOffset expiresOnUtc,
         string authContext,
-        Guid sessionId)
+        Guid sessionId,
+        bool isPersistent = false)
     {
         if (userId == Guid.Empty)
         {
@@ -126,7 +135,8 @@ public sealed class RefreshToken : Entity
             ComputeHash(plaintextToken),
             expiresOnUtc,
             authContext,
-            sessionId);
+            sessionId,
+            isPersistent);
 
         return (token, plaintextToken);
     }

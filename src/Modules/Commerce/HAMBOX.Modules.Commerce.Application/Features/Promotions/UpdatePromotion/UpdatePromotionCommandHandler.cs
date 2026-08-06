@@ -48,8 +48,13 @@ internal sealed class UpdatePromotionCommandHandler : IRequestHandler<UpdateProm
             request.StartDateUtc,
             request.EndDateUtc);
 
-        promotion.ReplaceConditions(PromotionMapper.ParseConditions(request.Conditions));
-        promotion.ReplaceTargets(PromotionMapper.ParseTargets(request.Targets));
+        // Promotion is tracked as Unchanged (loaded via Include); EF only discovers the new
+        // conditions/targets by graph traversal, and since their Guid keys are already set they
+        // would otherwise be tracked as Modified (UPDATE against non-existent rows) instead of Added.
+        var newConditions = promotion.ReplaceConditions(PromotionMapper.ParseConditions(request.Conditions));
+        var newTargets = promotion.ReplaceTargets(PromotionMapper.ParseTargets(request.Targets));
+        _dbContext.PromotionConditions.AddRange(newConditions);
+        _dbContext.PromotionTargets.AddRange(newTargets);
 
         PromotionAuditWriter.Write(
             _dbContext,

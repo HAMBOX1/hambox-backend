@@ -106,6 +106,7 @@ try
     builder.Services.AddCatalogInfrastructure(builder.Configuration);
     builder.Services.AddCommerceInfrastructure(builder.Configuration);
     builder.Services.AddCommerceApplication();
+    builder.Services.AddCommerceRealtime();
     builder.Services.AddThemesInfrastructure(builder.Configuration);
     builder.Services.AddLegalInfrastructure(builder.Configuration);
     builder.Services.AddSuppliersInfrastructure(builder.Configuration);
@@ -186,6 +187,7 @@ try
     app.UseResponseCompression();
 
     app.UseCors("HamboxCors");
+    app.UseRateLimiter();
 
     // Avoid 307 redirects to HTTPS in dev — they break the Angular proxy and strip Authorization headers.
     if (!app.Environment.IsDevelopment())
@@ -229,6 +231,7 @@ try
     app.MapContentEndpoints();
     app.MapSupportEndpoints();
     app.MapSupportHub();
+    app.MapNotificationHub();
     app.MapLocalizationEndpoints();
     app.MapHealthChecks("/health");
 

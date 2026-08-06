@@ -13,13 +13,16 @@ internal sealed class MarkAllNotificationsReadCommandHandler : IRequestHandler<M
 {
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IUserNotificationRealtimeNotifier _realtimeNotifier;
 
     public MarkAllNotificationsReadCommandHandler(
         ICommerceDbContext commerceDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IUserNotificationRealtimeNotifier realtimeNotifier)
     {
         _commerceDbContext = commerceDbContext;
         _currentUserService = currentUserService;
+        _realtimeNotifier = realtimeNotifier;
     }
 
     public async Task<Result> Handle(MarkAllNotificationsReadCommand request, CancellationToken cancellationToken)
@@ -39,6 +42,11 @@ internal sealed class MarkAllNotificationsReadCommandHandler : IRequestHandler<M
         }
 
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
+
+        if (notifications.Count > 0)
+        {
+            await _realtimeNotifier.NotifyAllNotificationsReadAsync(_currentUserService.UserId, cancellationToken);
+        }
 
         return Result.Success();
     }

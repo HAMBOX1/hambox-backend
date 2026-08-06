@@ -11,7 +11,8 @@ public sealed record DeleteNotificationCommand(Guid NotificationId) : IRequest<R
 
 internal sealed class DeleteNotificationCommandHandler(
     ICommerceDbContext commerceDbContext,
-    ICurrentUserService currentUserService) : IRequestHandler<DeleteNotificationCommand, Result>
+    ICurrentUserService currentUserService,
+    IUserNotificationRealtimeNotifier realtimeNotifier) : IRequestHandler<DeleteNotificationCommand, Result>
 {
     public async Task<Result> Handle(DeleteNotificationCommand request, CancellationToken cancellationToken)
     {
@@ -30,6 +31,11 @@ internal sealed class DeleteNotificationCommandHandler(
 
         commerceDbContext.UserNotifications.Remove(notification);
         await commerceDbContext.SaveChangesAsync(cancellationToken);
+
+        var unreadCount = await commerceDbContext.UserNotifications
+            .CountAsync(n => n.UserId == currentUserService.UserId && !n.IsRead, cancellationToken);
+        await realtimeNotifier.NotifyNotificationDeletedAsync(
+            currentUserService.UserId, request.NotificationId, unreadCount, cancellationToken);
 
         return Result.Success();
     }

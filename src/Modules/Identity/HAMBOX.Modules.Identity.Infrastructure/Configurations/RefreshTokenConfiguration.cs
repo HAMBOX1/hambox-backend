@@ -42,6 +42,10 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.Property(t => t.ReplacedByTokenHash)
             .HasMaxLength(512);
 
+        builder.Property(t => t.IsPersistent)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         // Base entity properties
         builder.Property(t => t.CreatedOnUtc)
             .IsRequired();

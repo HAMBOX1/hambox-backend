@@ -98,6 +98,7 @@ internal sealed class VerifyAdminOtpCommandHandler(
             otpVerified: true,
             request.IpAddress,
             request.UserAgent,
+            rememberMe: false,
             cancellationToken: cancellationToken);
     }
 }

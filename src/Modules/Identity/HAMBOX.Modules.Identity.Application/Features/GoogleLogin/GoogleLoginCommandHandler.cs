@@ -12,7 +12,10 @@ using Microsoft.EntityFrameworkCore;
 namespace HAMBOX.Modules.Identity.Application.Features.GoogleLogin;
 
 /// <summary>
-/// Handler for the <see cref="GoogleLoginCommand"/> command.
+/// Handler for the <see cref="GoogleLoginCommand"/> command. Routes through the same
+/// blocklist/device-block/trusted-device/risk-scoring/login-history pipeline as
+/// <c>LoginCommandHandler</c> (password login) — Google's own token verification replaces the
+/// password check, everything else is the shared security pipeline.
 /// </summary>
 internal sealed class GoogleLoginCommandHandler(
     IIdentityDbContext dbContext,
@@ -20,7 +23,12 @@ internal sealed class GoogleLoginCommandHandler(
     IPasswordHasher passwordHasher,
     ITokenGenerator tokenGenerator,
     IAdminAccessResolver adminAccessResolver,
-    IAuthTokenIssuer authTokenIssuer) : IRequestHandler<GoogleLoginCommand, Result<AuthTokenResponse>>
+    IAuthTokenIssuer authTokenIssuer,
+    ISecurityBlocklistService blocklistService,
+    ISecurityEventLogger securityEventLogger,
+    IClientInfoParser clientInfoParser,
+    ITrustedDeviceService trustedDeviceService,
+    ILoginRiskScorer riskScorer) : IRequestHandler<GoogleLoginCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
     public async Task<Result<AuthTokenResponse>> Handle(GoogleLoginCommand request, CancellationToken cancellationToken)
@@ -31,12 +39,32 @@ internal sealed class GoogleLoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.GoogleTokenInvalid);
         }
 
+        var (browserName, osName, deviceType) = clientInfoParser.ParseUserAgent(request.UserAgent);
+        var fingerprint = DeviceFingerprint.Compute(request.UserAgent);
+        var context = new LoginContext(request.CountryCode, request.City, browserName, osName, deviceType, fingerprint);
+
         var normalizedEmail = payload.Email.ToUpperInvariant();
         var user = await dbContext.Users
             .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
 
         if (user is null)
         {
+            // First-time sign-in via Google is equivalent to registration — apply the same
+            // email-blocklist gate RegisterCommandHandler applies before creating an account.
+            if (await blocklistService.IsEmailBlockedAsync(payload.Email, cancellationToken))
+            {
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.EmailBlock,
+                    SecurityEventSeverity.Medium,
+                    $"Google sign-up rejected for {payload.Email}: email address is blocked.",
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
+                    cancellationToken: cancellationToken);
+                return Result.Failure<AuthTokenResponse>(IdentityErrors.RegistrationNotAllowed);
+            }
+
             user = await CreateUserAsync(payload, cancellationToken);
             if (user is null)
             {
@@ -45,7 +73,45 @@ internal sealed class GoogleLoginCommandHandler(
         }
         else
         {
-            var linkResult = await LinkExistingUserAsync(user, request, cancellationToken);
+            if (await blocklistService.IsEmailBlockedAsync(user.Email, cancellationToken))
+            {
+                var blockedFailure = LoginHistory.RecordFailure(
+                    user.Id, request.IpAddress, request.UserAgent, "Email address is blocked", context, SecurityEventSeverity.High);
+                dbContext.LoginHistory.Add(blockedFailure);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.BlockedLogin,
+                    SecurityEventSeverity.High,
+                    $"Google login rejected for {user.Email}: email address is blocked.",
+                    targetUserId: user.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
+                    cancellationToken: cancellationToken);
+                return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+            }
+
+            if (await trustedDeviceService.IsDeviceBlockedAsync(user.Id, fingerprint, cancellationToken))
+            {
+                var deviceBlockedFailure = LoginHistory.RecordFailure(
+                    user.Id, request.IpAddress, request.UserAgent, "Device is blocked", context, SecurityEventSeverity.High);
+                dbContext.LoginHistory.Add(deviceBlockedFailure);
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.DeviceBlock,
+                    SecurityEventSeverity.High,
+                    $"Google login rejected for {user.Email}: device is blocked.",
+                    targetUserId: user.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
+                    cancellationToken: cancellationToken);
+                return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+            }
+
+            var linkResult = await LinkExistingUserAsync(user, request, context, cancellationToken);
             if (linkResult.IsFailure)
             {
                 return Result.Failure<AuthTokenResponse>(linkResult.Error);
@@ -53,7 +119,14 @@ internal sealed class GoogleLoginCommandHandler(
         }
 
         user.ResetAccessFailedCount();
-        dbContext.LoginHistory.Add(LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent));
+
+        var isNewCountry = !string.IsNullOrEmpty(request.CountryCode) && !await dbContext.LoginHistory.AnyAsync(
+            h => h.UserId == user.Id && h.IsSuccessful && h.CountryCode == request.CountryCode, cancellationToken);
+        var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
+        var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
+
+        var successHistory = LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent, context, successRisk);
+        dbContext.LoginHistory.Add(successHistory);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return await authTokenIssuer.IssueAsync(
@@ -62,7 +135,9 @@ internal sealed class GoogleLoginCommandHandler(
             otpVerified: false,
             request.IpAddress,
             request.UserAgent,
-            cancellationToken: cancellationToken);
+            rememberMe: false,
+            context,
+            cancellationToken);
     }
 
     private async Task<ApplicationUser?> CreateUserAsync(GoogleTokenPayload payload, CancellationToken cancellationToken)
@@ -95,11 +170,12 @@ internal sealed class GoogleLoginCommandHandler(
     private async Task<Result> LinkExistingUserAsync(
         ApplicationUser user,
         GoogleLoginCommand request,
+        LoginContext context,
         CancellationToken cancellationToken)
     {
         if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
         {
-            dbContext.LoginHistory.Add(LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked"));
+            dbContext.LoginHistory.Add(LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked", context));
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure(IdentityErrors.AccountLocked);
         }
@@ -130,8 +206,26 @@ internal sealed class GoogleLoginCommandHandler(
         }
         else if (user.Status != UserStatus.Active)
         {
-            dbContext.LoginHistory.Add(LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account not active"));
+            var isBlockedStatus = user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended;
+            dbContext.LoginHistory.Add(LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, "Account not active", context,
+                isBlockedStatus ? SecurityEventSeverity.Medium : null));
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            if (isBlockedStatus)
+            {
+                await securityEventLogger.LogAsync(
+                    SecurityEventType.BlockedLogin,
+                    SecurityEventSeverity.Medium,
+                    $"Google login rejected for {user.Email}: account is {user.Status}.",
+                    targetUserId: user.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    country: request.CountryCode,
+                    city: request.City,
+                    cancellationToken: cancellationToken);
+            }
+
             return Result.Failure(IdentityErrors.AccountNotActive);
         }
 
@@ -141,7 +235,8 @@ internal sealed class GoogleLoginCommandHandler(
                 user.Id,
                 request.IpAddress,
                 request.UserAgent,
-                "Admin account must use admin portal login"));
+                "Admin account must use admin portal login",
+                context));
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure(IdentityErrors.AdminMustUseAdminPortal);
         }

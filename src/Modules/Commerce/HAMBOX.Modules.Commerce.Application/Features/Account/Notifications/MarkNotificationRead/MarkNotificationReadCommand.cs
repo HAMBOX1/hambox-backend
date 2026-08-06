@@ -1,6 +1,7 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -13,13 +14,16 @@ internal sealed class MarkNotificationReadCommandHandler : IRequestHandler<MarkN
 {
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IUserNotificationRealtimeNotifier _realtimeNotifier;
 
     public MarkNotificationReadCommandHandler(
         ICommerceDbContext commerceDbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IUserNotificationRealtimeNotifier realtimeNotifier)
     {
         _commerceDbContext = commerceDbContext;
         _currentUserService = currentUserService;
+        _realtimeNotifier = realtimeNotifier;
     }
 
     public async Task<Result> Handle(MarkNotificationReadCommand request, CancellationToken cancellationToken)
@@ -41,6 +45,11 @@ internal sealed class MarkNotificationReadCommandHandler : IRequestHandler<MarkN
 
         notification.MarkAsRead();
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
+
+        var unreadCount = await _commerceDbContext.UserNotifications
+            .CountAsync(n => n.UserId == _currentUserService.UserId && !n.IsRead, cancellationToken);
+        await _realtimeNotifier.NotifyNotificationUpdatedAsync(
+            _currentUserService.UserId, AccountMapper.ToUserNotificationDto(notification), unreadCount, cancellationToken);
 
         return Result.Success();
     }

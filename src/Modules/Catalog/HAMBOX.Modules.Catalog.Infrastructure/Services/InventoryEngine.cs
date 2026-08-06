@@ -221,6 +221,42 @@ internal sealed class InventoryEngine : IInventoryEngine
         return stale.Count;
     }
 
+    public async Task<int> ReleaseSoldCodesForOrderAsync(
+        Guid orderId,
+        string? performedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var sold = await _db.DigitalInventoryCodes
+            .Where(c => c.OrderId == orderId && c.Status == InventoryCodeStatus.Sold)
+            .ToListAsync(cancellationToken);
+
+        if (sold.Count == 0)
+        {
+            return 0;
+        }
+
+        foreach (var code in sold)
+        {
+            var previous = code.Status;
+            code.ReturnToStock();
+
+            var batch = await _db.InventoryBatches.FirstAsync(b => b.Id == code.BatchId, cancellationToken);
+            batch.OnCodeStatusChanged(previous, InventoryCodeStatus.Available);
+
+            _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                InventoryAuditAction.CodeReturned,
+                variantId: code.VariantId,
+                batchId: code.BatchId,
+                codeId: code.Id,
+                performedByUserId: performedByUserId ?? _currentUser.UserId,
+                details: $"Returned to stock after order {orderId} was cancelled or refunded",
+                orderId: orderId));
+        }
+
+        await PersistIfNotEnlistedAsync(cancellationToken);
+        return sold.Count;
+    }
+
     public async Task<InventoryStatisticsSnapshot> GetStatisticsAsync(
         Guid? productId = null,
         Guid? variantId = null,

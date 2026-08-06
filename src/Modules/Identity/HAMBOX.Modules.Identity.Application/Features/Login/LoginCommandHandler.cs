@@ -187,6 +187,7 @@ internal sealed class LoginCommandHandler(
             otpVerified: false,
             request.IpAddress,
             request.UserAgent,
+            request.RememberMe,
             context,
             cancellationToken);
     }

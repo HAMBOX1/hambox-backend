@@ -165,22 +165,28 @@ public sealed class Promotion : AggregateRoot, ISoftDeletable
         return copy;
     }
 
-    public void ReplaceConditions(IEnumerable<(PromotionConditionType Type, string Value)> conditions)
+    public IReadOnlyList<PromotionCondition> ReplaceConditions(IEnumerable<(PromotionConditionType Type, string Value)> conditions)
     {
         _conditions.Clear();
+        var added = new List<PromotionCondition>();
         foreach (var (type, value) in conditions)
         {
-            AddCondition(type, value);
+            added.Add(AddCondition(type, value));
         }
+
+        return added;
     }
 
-    public void ReplaceTargets(IEnumerable<(PromotionTargetType Type, Guid TargetId)> targets)
+    public IReadOnlyList<PromotionTarget> ReplaceTargets(IEnumerable<(PromotionTargetType Type, Guid TargetId)> targets)
     {
         _targets.Clear();
+        var added = new List<PromotionTarget>();
         foreach (var (type, targetId) in targets)
         {
-            AddTarget(type, targetId);
+            added.Add(AddTarget(type, targetId));
         }
+
+        return added;
     }
 
     public PromotionCondition AddCondition(PromotionConditionType conditionType, string value)

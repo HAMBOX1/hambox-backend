@@ -15,10 +15,12 @@ using HAMBOX.Modules.Identity.Application.Features.ResetPassword;
 using HAMBOX.Modules.Identity.Application.Features.Sessions;
 using HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 using HAMBOX.Modules.Identity.Application.Features.VerifyEmail;
+using HAMBOX.Modules.Identity.Application.RateLimiting;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 
 namespace HAMBOX.Modules.Identity.Presentation.Endpoints;
@@ -61,7 +63,7 @@ public static class AuthEndpoints
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapPost("login", async (
             [FromBody] LoginRequest request,
@@ -79,11 +81,12 @@ public static class AuthEndpoints
                 ipAddress,
                 userAgent,
                 geoLocation?.CountryCode,
-                geoLocation?.City);
+                geoLocation?.City,
+                request.RememberMe);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("google", async (
             [FromBody] GoogleLoginRequest request,
@@ -93,12 +96,18 @@ public static class AuthEndpoints
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var geoLocation = GetGeoLocation(httpContext);
 
-            var command = new GoogleLoginCommand(request.IdToken, ipAddress, userAgent);
+            var command = new GoogleLoginCommand(
+                request.IdToken,
+                ipAddress,
+                userAgent,
+                geoLocation?.CountryCode,
+                geoLocation?.City);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/login", async (
             [FromBody] LoginRequest request,
@@ -120,7 +129,7 @@ public static class AuthEndpoints
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/verify-otp", async (
             [FromBody] VerifyAdminOtpRequest request,
@@ -206,7 +215,7 @@ public static class AuthEndpoints
             var command = new ForgotPasswordCommand(request.Email);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapPost("reset-password", async (
             [FromBody] ResetPasswordRequest request,
@@ -217,7 +226,7 @@ public static class AuthEndpoints
             var command = new ResetPasswordCommand(request.Token, request.NewPassword);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapPost("resend-verification", async (
             [FromBody] ResendVerificationRequest request,
@@ -228,7 +237,7 @@ public static class AuthEndpoints
             var command = new ResendVerificationCommand(request.Email);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapGet("me", async (
             HttpContext httpContext,
@@ -305,7 +314,7 @@ public sealed record RegisterRequest(string Email, string Password, string First
 /// <summary>
 /// Represents a login request.
 /// </summary>
-public sealed record LoginRequest(string Email, string Password);
+public sealed record LoginRequest(string Email, string Password, bool RememberMe = false);
 
 /// <summary>
 /// Represents a Google sign-in request.
