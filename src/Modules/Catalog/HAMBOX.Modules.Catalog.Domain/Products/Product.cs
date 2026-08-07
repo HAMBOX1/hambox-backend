@@ -84,6 +84,14 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public ProductStatus Status { get; private set; }
 
     /// <summary>
+    /// Gets the date the product becomes available to the general public. Null means it is
+    /// public as soon as it's <see cref="ProductStatus.Active"/> (the default for every existing
+    /// product). When set in the future, members whose plan grants an EarlyAccess benefit may
+    /// still purchase during their lead-time window; everyone else sees a release countdown.
+    /// </summary>
+    public DateTime? PublicReleaseOnUtc { get; private set; }
+
+    /// <summary>
     /// Gets the identifier of the primary category this product belongs to.
     /// </summary>
     /// <remarks>
@@ -383,6 +391,12 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
 
         RaiseDomainEvent(new ProductPriceChangedDomainEvent(Id, oldPrice, newPrice));
     }
+
+    /// <summary>
+    /// Sets or clears the product's public release date. Pass null to make it public
+    /// immediately (subject to <see cref="Status"/> being Active).
+    /// </summary>
+    public void ScheduleRelease(DateTime? publicReleaseOnUtc) => PublicReleaseOnUtc = publicReleaseOnUtc;
 
     /// <summary>
     /// Changes the primary category this product belongs to.

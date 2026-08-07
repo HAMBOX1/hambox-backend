@@ -67,6 +67,7 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
 
         var newAdditionalCategories = product.SetAdditionalCategories(additionalCategoryIds);
         var newCollectionItems = product.SetCollections(collectionIds);
+        product.ScheduleRelease(request.PublicReleaseOnUtc);
 
         _dbContext.Products.Add(product);
         foreach (var newAdditionalCategory in newAdditionalCategories)

@@ -12,4 +12,5 @@ public record CreateProductCommand(
     decimal Price,
     Guid CategoryId,
     IReadOnlyList<Guid>? AdditionalCategoryIds = null,
-    IReadOnlyList<Guid>? CollectionIds = null) : IRequest<Result<Guid>>;
+    IReadOnlyList<Guid>? CollectionIds = null,
+    DateTime? PublicReleaseOnUtc = null) : IRequest<Result<Guid>>;

@@ -2,8 +2,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById;
 using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Analytics;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -19,15 +21,18 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 {
     private readonly ICatalogDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
+    private readonly IMembershipAccessProvider _membershipAccess;
     private readonly ILogger<GetProductsQueryHandler> _logger;
 
     public GetProductsQueryHandler(
         ICatalogDbContext dbContext,
         ICurrentUserService currentUser,
+        IMembershipAccessProvider membershipAccess,
         ILogger<GetProductsQueryHandler> logger)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
+        _membershipAccess = membershipAccess;
         _logger = logger;
     }
 
@@ -63,15 +68,23 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 CategoryOwnImageUrl = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.ImageUrl,
                 CategoryEffectiveImageUrl = _dbContext.Categories.FirstOrDefault(c => c.Id == p.CategoryId)!.EffectiveImageUrl,
                 p.CreatedOnUtc,
+                p.PublicReleaseOnUtc,
                 CollectionIds = p.Collections.Select(pc => pc.CollectionId).ToList(),
             })
             .ToListAsync(cancellationToken);
+
+        var rowIds = rows.Select(r => r.Id).ToList();
+        var productAccessById = await _membershipAccess.GetProductsAccessAsync(_currentUser.UserId, rowIds, cancellationToken);
+        var membershipAccess = await _membershipAccess.GetAccessInfoAsync(_currentUser.UserId, cancellationToken);
 
         var products = rows
             .Select(r =>
             {
                 var displayImage = ProductDisplayImageResolver.Resolve(
                     r.ProductImageUrl, r.CategoryOwnImageUrl, r.CategoryEffectiveImageUrl);
+                var access = productAccessById.GetValueOrDefault(r.Id, ProductAccessInfo.Unrestricted);
+                var canPurchase = access.HasAccess
+                    && GetProductByIdQueryHandler.IsReleasedFor(r.PublicReleaseOnUtc, membershipAccess);
 
                 return new ProductDto(
                     r.Id,
@@ -91,7 +104,11 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     0,
                     r.CollectionIds,
                     displayImage.Url,
-                    displayImage.Source);
+                    displayImage.Source,
+                    r.PublicReleaseOnUtc,
+                    access.IsRestricted,
+                    canPurchase,
+                    access.RequiredPlanNames);
             })
             .ToList();
 

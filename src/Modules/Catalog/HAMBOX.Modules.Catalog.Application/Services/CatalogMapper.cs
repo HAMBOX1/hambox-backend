@@ -38,7 +38,10 @@ internal static class CatalogMapper
         string categoryNameAr,
         bool includeImages,
         string? categoryOwnImageUrl = null,
-        string? categoryEffectiveImageUrl = null)
+        string? categoryEffectiveImageUrl = null,
+        bool isMembersOnly = false,
+        bool canPurchase = true,
+        IReadOnlyList<string>? requiredPlanNames = null)
     {
         var images = includeImages ? ToProductImageDtos(product.Images) : null;
         var primaryImageUrl = GetPrimaryImageUrl(product);
@@ -61,6 +64,10 @@ internal static class CatalogMapper
             product.CreatedOnUtc,
             CollectionIds: product.Collections.Select(pc => pc.CollectionId).ToList(),
             DisplayImageUrl: displayImage.Url,
-            DisplayImageSource: displayImage.Source);
+            DisplayImageSource: displayImage.Source,
+            PublicReleaseOnUtc: product.PublicReleaseOnUtc,
+            IsMembersOnly: isMembersOnly,
+            CanPurchase: canPurchase,
+            RequiredPlanNames: requiredPlanNames);
     }
 }

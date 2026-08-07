@@ -46,6 +46,8 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.CategoryId)
             .IsRequired();
 
+        builder.Property(p => p.PublicReleaseOnUtc);
+
         builder.Property(p => p.StockQuantity)
             .IsRequired()
             .HasDefaultValue(100);

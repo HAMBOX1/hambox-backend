@@ -15,4 +15,5 @@ public record UpdateProductCommand(
     Guid CategoryId,
     ProductStatus Status,
     IReadOnlyList<Guid>? AdditionalCategoryIds = null,
-    IReadOnlyList<Guid>? CollectionIds = null) : IRequest<Result>;
+    IReadOnlyList<Guid>? CollectionIds = null,
+    DateTime? PublicReleaseOnUtc = null) : IRequest<Result>;

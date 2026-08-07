@@ -26,6 +26,10 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// via <see cref="Services.ProductDisplayImageResolver"/>; the frontend should never re-derive this.
 /// </param>
 /// <param name="DisplayImageSource">Where <see cref="DisplayImageUrl"/> came from — see <see cref="Services.ProductDisplayImageSource"/>.</param>
+/// <param name="PublicReleaseOnUtc">Null if already public; otherwise the date it becomes public to non-members (Early Access membership benefit).</param>
+/// <param name="IsMembersOnly">True if the product is restricted to one or more membership plans (Exclusive Products benefit), regardless of the current viewer.</param>
+/// <param name="CanPurchase">True if the current viewer may purchase this product right now (both membership-restriction and release-date gates satisfied).</param>
+/// <param name="RequiredPlanNames">When <see cref="IsMembersOnly"/> is true, the plan(s) that grant access — used for the upgrade CTA.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -44,4 +48,8 @@ public sealed record ProductDto(
     int AvailableStock = 0,
     IReadOnlyList<Guid>? CollectionIds = null,
     string DisplayImageUrl = Services.ProductDisplayImageResolver.PlaceholderImageUrl,
-    string DisplayImageSource = Services.ProductDisplayImageSource.Placeholder);
+    string DisplayImageSource = Services.ProductDisplayImageSource.Placeholder,
+    DateTime? PublicReleaseOnUtc = null,
+    bool IsMembersOnly = false,
+    bool CanPurchase = true,
+    IReadOnlyList<string>? RequiredPlanNames = null);

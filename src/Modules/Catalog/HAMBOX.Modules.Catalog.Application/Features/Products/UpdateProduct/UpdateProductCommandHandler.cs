@@ -84,6 +84,7 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
 
         product.Update(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn);
         product.ChangePrice(request.Price);
+        product.ScheduleRelease(request.PublicReleaseOnUtc);
 
         if (request.Status != product.Status)
         {

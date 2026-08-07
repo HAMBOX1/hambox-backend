@@ -124,7 +124,7 @@ internal static class ProductEndpoints
         // POST /api/v1/products
         group.MapPost("", async Task<Results<Created<Guid>, BadRequest<ProblemDetails>>> ([FromBody] CreateProductRequest request, ISender sender) =>
         {
-            var command = new CreateProductCommand(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.AdditionalCategoryIds, request.CollectionIds);
+            var command = new CreateProductCommand(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -146,7 +146,7 @@ internal static class ProductEndpoints
         // PUT /api/v1/products/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateProductRequest request, ISender sender) =>
         {
-            var command = new UpdateProductCommand(id, request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.Status, request.AdditionalCategoryIds, request.CollectionIds);
+            var command = new UpdateProductCommand(id, request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.Status, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -320,7 +320,7 @@ internal static class ProductEndpoints
 
 internal sealed record DuplicateProductRequest(string? NameSuffix);
 
-internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null);
-internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null);
+internal sealed record CreateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null, DateTime? PublicReleaseOnUtc = null);
+internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null, DateTime? PublicReleaseOnUtc = null);
 internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);
