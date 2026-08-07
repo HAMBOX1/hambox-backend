@@ -1,10 +1,12 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Communication;
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
@@ -28,6 +30,8 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly CartResponseBuilder _cartResponseBuilder;
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
     private readonly ICommunicationService _communicationService;
+    private readonly IMembershipAccessProvider _membershipAccess;
+    private readonly ReferralLifecycleService _referralLifecycle;
     private readonly ILogger<CheckoutCommandHandler> _logger;
 
     public CheckoutCommandHandler(
@@ -39,6 +43,8 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         CartResponseBuilder cartResponseBuilder,
         IEnumerable<IPaymentProvider> paymentProviders,
         ICommunicationService communicationService,
+        IMembershipAccessProvider membershipAccess,
+        ReferralLifecycleService referralLifecycle,
         ILogger<CheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -49,6 +55,8 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         _cartResponseBuilder = cartResponseBuilder;
         _paymentProviders = paymentProviders;
         _communicationService = communicationService;
+        _membershipAccess = membershipAccess;
+        _referralLifecycle = referralLifecycle;
         _logger = logger;
     }
 
@@ -66,6 +74,22 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         if (cart is null || cart.Items.Count == 0)
         {
             return Result.Failure<Contracts.OrderDto>(CommerceErrors.CartEmpty);
+        }
+
+        var access = await _membershipAccess.GetAccessInfoAsync(_currentUserService.UserId, cancellationToken);
+        if (access.MaxPurchasesPerMonth is int monthlyLimit)
+        {
+            var startOfMonthUtc = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            var purchasesThisMonth = await _commerceDbContext.Orders.CountAsync(
+                o => o.UserId == _currentUserService.UserId
+                    && o.Status == OrderStatus.Completed
+                    && o.CreatedOnUtc >= startOfMonthUtc,
+                cancellationToken);
+
+            if (purchasesThisMonth >= monthlyLimit)
+            {
+                return Result.Failure<Contracts.OrderDto>(CommerceErrors.MembershipPurchaseLimitExceeded(monthlyLimit));
+            }
         }
 
         await _inventoryEngine.ExpireStaleReservationsAsync(cancellationToken);
@@ -87,6 +111,9 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             ? await _inventoryEngine.GetVariantStockBulkAsync(variantIds, cancellationToken)
             : new Dictionary<Guid, VariantStockSnapshot>();
 
+        var productAccess = await _membershipAccess.GetProductsAccessAsync(
+            _currentUserService.UserId, productIds, cancellationToken);
+
         foreach (var item in cart.Items)
         {
             if (!products.TryGetValue(item.ProductId, out var product))
@@ -97,6 +124,20 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             if (product.Status != ProductStatus.Active)
             {
                 return Result.Failure<Contracts.OrderDto>(CatalogErrors.ProductNotActive);
+            }
+
+            if (productAccess.TryGetValue(item.ProductId, out var itemAccess) && itemAccess is { IsRestricted: true, HasAccess: false })
+            {
+                return Result.Failure<Contracts.OrderDto>(CommerceErrors.ProductMembersOnly(itemAccess.RequiredPlanNames));
+            }
+
+            if (product.PublicReleaseOnUtc is DateTime releaseOnUtc && releaseOnUtc > DateTime.UtcNow)
+            {
+                var earlyAccessStartsUtc = releaseOnUtc.AddDays(-access.EarlyAccessDays);
+                if (DateTime.UtcNow < earlyAccessStartsUtc)
+                {
+                    return Result.Failure<Contracts.OrderDto>(CommerceErrors.ProductNotYetReleased(releaseOnUtc));
+                }
             }
 
             if (item.ProductVariantId is Guid variantId)
@@ -309,6 +350,10 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                             $"Coupon {applied.CouponCode} redeemed on order {order.OrderNumber}"));
                     }
                 }
+
+                // Awards the referrer's points if this order qualifies (the referred user's first
+                // completed order) — points-only, nothing priced into this order depends on the outcome.
+                await _referralLifecycle.ProcessOrderCompletedAsync(order, ct);
 
                 var commitAssignments = new List<(Guid OrderItemId, Guid CodeId)>();
                 var reservedCodeCursor = new Dictionary<(Guid ProductId, Guid? VariantId), int>();

@@ -213,9 +213,18 @@ internal static class AccountEndpoints
             return ToResult(result);
         }).WithName("GetReferralDashboard");
 
-        group.MapGet("referral/history", async (ISender sender) =>
+        group.MapGet("referral/history", async (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] string? search,
+            [FromQuery] string? status,
+            ISender sender) =>
         {
-            var result = await sender.Send(new GetReferralHistoryQuery());
+            var result = await sender.Send(new GetReferralHistoryQuery(
+                pageNumber <= 0 ? 1 : pageNumber,
+                pageSize <= 0 ? 10 : pageSize,
+                search,
+                status));
             return ToResult(result);
         }).WithName("GetReferralHistory");
 

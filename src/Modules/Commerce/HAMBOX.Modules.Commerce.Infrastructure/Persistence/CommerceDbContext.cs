@@ -48,6 +48,9 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     public DbSet<ReferralHistoryEntry> ReferralHistoryEntries => Set<ReferralHistoryEntry>();
 
     /// <inheritdoc />
+    public DbSet<ReferralAuditLog> ReferralAuditLogs => Set<ReferralAuditLog>();
+
+    /// <inheritdoc />
     public DbSet<OrderLicenseKey> OrderLicenseKeys => Set<OrderLicenseKey>();
 
     /// <inheritdoc />
@@ -79,6 +82,7 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
     public DbSet<MembershipBenefit> MembershipBenefits => Set<MembershipBenefit>();
+    public DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess => Set<MembershipPlanProductAccess>();
     public DbSet<MembershipSubscription> MembershipSubscriptions => Set<MembershipSubscription>();
     public DbSet<MembershipHistory> MembershipHistories => Set<MembershipHistory>();
     public DbSet<MembershipTransaction> MembershipTransactions => Set<MembershipTransaction>();

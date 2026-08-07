@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -19,6 +20,7 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
     private readonly ICommerceTransactionService _transactionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly OrderInventoryReleaseService _inventoryReleaseService;
+    private readonly ReferralLifecycleService _referralLifecycle;
     private readonly ISender _sender;
 
     public RefundAdminOrderCommandHandler(
@@ -26,12 +28,14 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
         ICommerceTransactionService transactionService,
         ICurrentUserService currentUserService,
         OrderInventoryReleaseService inventoryReleaseService,
+        ReferralLifecycleService referralLifecycle,
         ISender sender)
     {
         _dbContext = dbContext;
         _transactionService = transactionService;
         _currentUserService = currentUserService;
         _inventoryReleaseService = inventoryReleaseService;
+        _referralLifecycle = referralLifecycle;
         _sender = sender;
     }
 
@@ -78,6 +82,7 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                 if (!wasAlreadyReleased)
                 {
                     await _inventoryReleaseService.ReleaseAsync(order, actorId, ct);
+                    await _referralLifecycle.ReverseForOrderAsync(order, ct);
                 }
             }, cancellationToken);
         }

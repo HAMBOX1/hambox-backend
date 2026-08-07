@@ -89,6 +89,9 @@ internal sealed class MembershipEngine : IMembershipEngine
     {
         decimal? discount = null;
         decimal referralMultiplier = 1m;
+        int? maxPurchasesPerMonth = null;
+        var earlyAccessDays = 0;
+        var hasPrioritySupport = false;
         var featureFlags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var benefits = new List<ResolvedMembershipBenefitDto>();
 
@@ -110,6 +113,15 @@ internal sealed class MembershipEngine : IMembershipEngine
                 case MembershipBenefitType.FeatureFlag:
                     featureFlags[benefit.DisplayName] = benefit.Value;
                     break;
+                case MembershipBenefitType.MaxPurchasesPerMonth when int.TryParse(benefit.Value, out var limit):
+                    maxPurchasesPerMonth = limit;
+                    break;
+                case MembershipBenefitType.EarlyAccess when int.TryParse(benefit.Value, out var days):
+                    earlyAccessDays = days;
+                    break;
+                case MembershipBenefitType.PrioritySupport:
+                    hasPrioritySupport = benefit.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    break;
             }
         }
 
@@ -117,11 +129,15 @@ internal sealed class MembershipEngine : IMembershipEngine
             subscription?.Id ?? Guid.Empty,
             plan.Id,
             plan.Name,
+            plan.Slug,
             plan.BadgeLabel,
             subscription?.ExpiresOnUtc ?? DateTime.UtcNow.AddYears(10),
             discount,
             referralMultiplier,
             benefits,
-            featureFlags);
+            featureFlags,
+            maxPurchasesPerMonth,
+            earlyAccessDays,
+            hasPrioritySupport);
     }
 }

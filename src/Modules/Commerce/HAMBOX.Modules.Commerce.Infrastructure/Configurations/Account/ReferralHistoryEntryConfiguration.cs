@@ -24,8 +24,22 @@ internal sealed class ReferralHistoryEntryConfiguration : IEntityTypeConfigurati
             .IsRequired()
             .HasMaxLength(450);
 
+        builder.Property(r => r.ReferredEmail)
+            .IsRequired()
+            .HasMaxLength(256);
+
         builder.Property(r => r.PointsEarned)
             .IsRequired();
+
+        builder.Property(r => r.Status)
+            .IsRequired()
+            .HasConversion<int>();
+
+        builder.Property(r => r.ExpiresOnUtc);
+
+        builder.Property(r => r.QualifiedOnUtc);
+
+        builder.Property(r => r.RewardedOnUtc);
 
         builder.Property(r => r.CreatedOnUtc)
             .IsRequired();
@@ -38,5 +52,17 @@ internal sealed class ReferralHistoryEntryConfiguration : IEntityTypeConfigurati
         builder.HasIndex(r => r.ReferredUserId)
             .IsUnique()
             .HasDatabaseName("IX_ReferralHistoryEntries_ReferredUserId");
+
+        builder.HasIndex(r => r.Status)
+            .HasDatabaseName("IX_ReferralHistoryEntries_Status");
+
+        // Concurrency: protects the state-machine transitions (Pending -> Qualified -> Rewarded,
+        // Pending -> Expired, Qualified/Rewarded -> Reversed) against two concurrent order
+        // completions/refunds racing on the same entry. A real, app-managed Guid rather than
+        // ProductConfiguration's SQL Server rowversion — portable across every EF Core provider
+        // (including SQLite in tests), since the entity itself bumps the value on each transition
+        // instead of relying on a database-generated column.
+        builder.Property(r => r.ConcurrencyStamp)
+            .IsConcurrencyToken();
     }
 }

@@ -59,7 +59,8 @@ public static class AuthEndpoints
                 request.LastName,
                 ipAddress,
                 userAgent,
-                language);
+                language,
+                request.ReferralCode);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -309,7 +310,7 @@ public static class AuthEndpoints
 /// <summary>
 /// Represents a registration request.
 /// </summary>
-public sealed record RegisterRequest(string Email, string Password, string FirstName, string LastName);
+public sealed record RegisterRequest(string Email, string Password, string FirstName, string LastName, string? ReferralCode = null);
 
 /// <summary>
 /// Represents a login request.

@@ -283,7 +283,7 @@ internal static class PlatformSettingsDefaultsFactory
         new(true, 0, true);
 
     private static ReferralSettingsPayload CreateReferral() =>
-        new(false, 5m, 10m, 30);
+        new(false, 100, 0.10m, 30);
 
     private static InventorySettingsPayload CreateInventory() =>
         new(5, 15, true, "AfterPayment");

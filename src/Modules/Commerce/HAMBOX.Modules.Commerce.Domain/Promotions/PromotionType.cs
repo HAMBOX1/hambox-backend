@@ -8,5 +8,4 @@ public enum PromotionType
     Category = 3,
     Product = 4,
     FlashSale = 5,
-    ReferralReward = 6,
 }

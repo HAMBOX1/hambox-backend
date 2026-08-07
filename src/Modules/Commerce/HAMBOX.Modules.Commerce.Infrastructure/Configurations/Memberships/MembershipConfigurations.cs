@@ -23,7 +23,23 @@ internal sealed class MembershipPlanConfiguration : IEntityTypeConfiguration<Mem
 
         builder.HasMany(p => p.Benefits).WithOne().HasForeignKey(b => b.PlanId).OnDelete(DeleteBehavior.Cascade);
         builder.Metadata.FindNavigation(nameof(MembershipPlan.Benefits))!.SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(p => p.ExclusiveProductAccess).WithOne().HasForeignKey(a => a.PlanId).OnDelete(DeleteBehavior.Cascade);
+        builder.Metadata.FindNavigation(nameof(MembershipPlan.ExclusiveProductAccess))!.SetPropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Ignore(p => p.DomainEvents);
+    }
+}
+
+internal sealed class MembershipPlanProductAccessConfiguration : IEntityTypeConfiguration<MembershipPlanProductAccess>
+{
+    public void Configure(EntityTypeBuilder<MembershipPlanProductAccess> builder)
+    {
+        builder.ToTable("MembershipPlanProductAccess");
+        builder.HasKey(a => a.Id);
+        builder.Property(a => a.ProductId).IsRequired();
+        builder.HasIndex(a => new { a.PlanId, a.ProductId }).IsUnique().HasDatabaseName("IX_MembershipPlanProductAccess_PlanId_ProductId");
+        builder.HasIndex(a => a.ProductId).HasDatabaseName("IX_MembershipPlanProductAccess_ProductId");
     }
 }
 

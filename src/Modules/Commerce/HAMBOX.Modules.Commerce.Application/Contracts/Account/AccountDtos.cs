@@ -57,9 +57,12 @@ public sealed record ReferralTierDto(
 /// </summary>
 public sealed record ReferralHistoryDto(
     Guid Id,
-    string ReferredUserId,
+    string FriendName,
     int PointsEarned,
-    DateTimeOffset CreatedOnUtc);
+    string Status,
+    DateTimeOffset CreatedOnUtc,
+    DateTime? QualifiedOnUtc,
+    DateTime? RewardedOnUtc);
 
 /// <summary>
 /// Represents the referral dashboard.
@@ -69,6 +72,8 @@ public sealed record ReferralDashboardDto(
     string Tier,
     int LifetimePoints,
     int SuccessfulReferrals,
+    int PendingReferrals,
+    decimal PointValueUsd,
     IReadOnlyList<ReferralTierDto> AvailableTiers,
     IReadOnlyList<ReferralHistoryDto> RecentHistory);
 
@@ -102,7 +107,8 @@ public sealed record ReferralSummaryDto(
     string ReferralCode,
     string Tier,
     int LifetimePoints,
-    int SuccessfulReferrals);
+    int SuccessfulReferrals,
+    decimal PointValueUsd);
 
 /// <summary>
 /// Represents a recent account activity item.

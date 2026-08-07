@@ -11,7 +11,6 @@ public sealed record PromotionEvaluationContext(
     string? CountryCode,
     bool IsAuthenticated,
     bool IsFirstPurchase,
-    bool HasReferralProfile,
     string? AppliedCouponCode,
     MembershipSnapshot Membership,
     DateTime UtcNow);

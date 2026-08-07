@@ -117,6 +117,20 @@ public static class CommerceErrors
     public static readonly Error MembershipCheckoutPending = new("Memberships.CheckoutPending", "A membership checkout is already pending. Complete or retry payment.");
     public static readonly Error MembershipPlanUnchanged = new("Memberships.PlanUnchanged", "You are already on this membership plan.");
 
+    public static Error ProductMembersOnly(IReadOnlyCollection<string> requiredPlanNames) => new(
+        "Cart.ProductMembersOnly",
+        requiredPlanNames.Count > 0
+            ? $"This product is exclusive to {string.Join(" or ", requiredPlanNames)} members."
+            : "This product is exclusive to members.");
+
+    public static Error ProductNotYetReleased(DateTime publicReleaseOnUtc) => new(
+        "Cart.ProductNotYetReleased",
+        $"This product is not yet available. It releases on {publicReleaseOnUtc:yyyy-MM-dd}.");
+
+    public static Error MembershipPurchaseLimitExceeded(int limit) => new(
+        "Checkout.MembershipPurchaseLimitExceeded",
+        $"Your membership plan allows up to {limit} purchase(s) per month. You've reached that limit for this month.");
+
     public static readonly Error PaymentMethodNotSupported = new(
         "Checkout.PaymentMethodNotSupported",
         "The selected payment method is not supported.");

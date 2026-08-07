@@ -1,6 +1,9 @@
+using HAMBOX.Application.Membership;
+using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Promotions;
 using HAMBOX.Modules.Commerce.Application.Promotions.Evaluators;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,8 +18,11 @@ public static class CommerceApplicationExtensions
     {
         services.AddScoped<IPromotionEngine, PromotionEngine>();
         services.AddScoped<IMembershipEngine, MembershipEngine>();
+        services.AddScoped<IMembershipAccessProvider, MembershipAccessProvider>();
         services.AddScoped<MembershipOperationsService>();
         services.AddScoped<ReferralRewardService>();
+        services.AddScoped<ReferralLifecycleService>();
+        services.AddScoped<IReferralRedemptionService>(sp => sp.GetRequiredService<ReferralLifecycleService>());
         services.AddScoped<OrderFulfillmentService>();
         services.AddScoped<OrderInventoryReleaseService>();
         services.AddScoped<IPromotionTypeEvaluator, AutomaticPromotionEvaluator>();
@@ -24,7 +30,6 @@ public static class CommerceApplicationExtensions
         services.AddScoped<IPromotionTypeEvaluator, CategoryPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, ProductPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, FlashSalePromotionEvaluator>();
-        services.AddScoped<IPromotionTypeEvaluator, ReferralRewardPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, CouponPromotionEvaluator>();
         services.AddScoped<CartResponseBuilder>();
 

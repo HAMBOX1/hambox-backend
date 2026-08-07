@@ -12,12 +12,16 @@ public sealed record MembershipSnapshot(
     Guid SubscriptionId,
     Guid PlanId,
     string PlanName,
+    string PlanSlug,
     string? BadgeLabel,
     DateTime ExpiresOnUtc,
     decimal? DiscountPercentage,
     decimal ReferralMultiplier,
     IReadOnlyList<ResolvedMembershipBenefitDto> Benefits,
-    IReadOnlyDictionary<string, string> FeatureFlags)
+    IReadOnlyDictionary<string, string> FeatureFlags,
+    int? MaxPurchasesPerMonth,
+    int EarlyAccessDays,
+    bool HasPrioritySupport)
 {
     public bool HasActiveMembership => PlanId != Guid.Empty;
 
@@ -25,10 +29,14 @@ public sealed record MembershipSnapshot(
         Guid.Empty,
         Guid.Empty,
         "Free",
+        string.Empty,
         null,
         DateTime.UtcNow,
         null,
         1m,
         [],
-        new Dictionary<string, string>());
+        new Dictionary<string, string>(),
+        null,
+        0,
+        false);
 }

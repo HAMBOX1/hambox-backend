@@ -1,3 +1,4 @@
+using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
 using HAMBOX.Modules.Identity.Application.Options;
@@ -24,6 +25,7 @@ internal sealed class RegisterCommandHandler(
     ILegalDbContext legalDbContext,
     ISecurityBlocklistService blocklistService,
     ISecurityEventLogger securityEventLogger,
+    IReferralRedemptionService referralRedemption,
     IOptions<EmailSettings> emailSettings) : IRequestHandler<RegisterCommand, Result>
 {
     /// <inheritdoc />
@@ -82,6 +84,14 @@ internal sealed class RegisterCommandHandler(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Sequential, not cross-schema-atomic with the user creation above — acceptable for a
+        // best-effort side effect, not a money/inventory-critical path. Redemption itself no-ops
+        // on an invalid/disabled code rather than failing, since registration has already succeeded.
+        if (!string.IsNullOrWhiteSpace(request.ReferralCode))
+        {
+            await referralRedemption.RedeemAsync(request.ReferralCode, user.Id.ToString(), request.Email, cancellationToken);
+        }
 
         // Sequential, not cross-schema-atomic with the user creation above — acceptable for a
         // compliance-audit row, not a money/inventory-critical path.

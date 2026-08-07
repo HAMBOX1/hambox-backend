@@ -13,8 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HAMBOX.Modules.Commerce.Domain\HAMBOX.Modules.Commerce.Domain.csproj" />
     <ProjectReference Include="..\..\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\Themes\HAMBOX.Modules.Themes.Application\HAMBOX.Modules.Themes.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
   </ItemGroup>

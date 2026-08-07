@@ -5,6 +5,7 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Memberships;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
@@ -34,6 +35,7 @@ internal sealed class MembershipCheckoutCommandHandler
     private readonly MembershipOperationsService _membershipOperations;
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
     private readonly ICommunicationService _communicationService;
+    private readonly ReferralLifecycleService _referralLifecycle;
     private readonly ILogger<MembershipCheckoutCommandHandler> _logger;
 
     public MembershipCheckoutCommandHandler(
@@ -43,6 +45,7 @@ internal sealed class MembershipCheckoutCommandHandler
         MembershipOperationsService membershipOperations,
         IEnumerable<IPaymentProvider> paymentProviders,
         ICommunicationService communicationService,
+        ReferralLifecycleService referralLifecycle,
         ILogger<MembershipCheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -51,6 +54,7 @@ internal sealed class MembershipCheckoutCommandHandler
         _membershipOperations = membershipOperations;
         _paymentProviders = paymentProviders;
         _communicationService = communicationService;
+        _referralLifecycle = referralLifecycle;
         _logger = logger;
     }
 
@@ -161,6 +165,12 @@ internal sealed class MembershipCheckoutCommandHandler
                     ct);
 
                 order.LinkMembershipSubscription(subscription.Id);
+
+                // Membership checkout never evaluates cart promotions, so there's no referee discount
+                // to race here — this only exists so a referred user's first purchase can be a
+                // membership plan, not just a product order. Kept inside the same transaction as the
+                // other completion paths for consistency, not because it needs the atomicity here.
+                await _referralLifecycle.ProcessOrderCompletedAsync(order, ct);
 
                 _logger.LogInformation(
                     "Membership checkout completed for {UserId}: plan {PlanId}, action {Action}, order {OrderNumber}",

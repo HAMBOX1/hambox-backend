@@ -25,7 +25,6 @@ public sealed record PromotionEvaluationRequest(
     string? CountryCode,
     bool IsAuthenticated,
     bool IsFirstPurchase,
-    bool HasReferralProfile,
     string? AppliedCouponCode,
     CouponCode? MatchedCoupon,
     int UserRedemptionCount,

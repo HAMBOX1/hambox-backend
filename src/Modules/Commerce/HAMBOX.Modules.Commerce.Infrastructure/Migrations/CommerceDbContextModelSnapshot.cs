@@ -119,20 +119,86 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.ToTable("ProductReviews", "commerce");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.ReferralAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTime>("OccurredOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PerformedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ReferralHistoryEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReferrerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredOnUtc")
+                        .HasDatabaseName("IX_ReferralAuditLogs_OccurredOnUtc");
+
+                    b.HasIndex("ReferralHistoryEntryId")
+                        .HasDatabaseName("IX_ReferralAuditLogs_ReferralHistoryEntryId");
+
+                    b.HasIndex("ReferrerUserId")
+                        .HasDatabaseName("IX_ReferralAuditLogs_ReferrerUserId");
+
+                    b.ToTable("ReferralAuditLogs", "commerce");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.ReferralHistoryEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTime?>("ExpiresOnUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("PointsEarned")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("QualifiedOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReferredEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("ReferredUserId")
                         .IsRequired()
@@ -144,6 +210,12 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<DateTime?>("RewardedOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ReferredUserId")
@@ -152,6 +224,9 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.HasIndex("ReferrerUserId")
                         .HasDatabaseName("IX_ReferralHistoryEntries_ReferrerUserId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_ReferralHistoryEntries_Status");
 
                     b.ToTable("ReferralHistoryEntries", "commerce");
                 });
@@ -627,6 +702,36 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasDatabaseName("IX_MembershipPlans_Status_Sort");
 
                     b.ToTable("MembershipPlans", "commerce");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipPlanProductAccess", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("IX_MembershipPlanProductAccess_ProductId");
+
+                    b.HasIndex("PlanId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_MembershipPlanProductAccess_PlanId_ProductId");
+
+                    b.ToTable("MembershipPlanProductAccess", "commerce");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipSubscription", b =>
@@ -1847,6 +1952,15 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipPlanProductAccess", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipPlan", null)
+                        .WithMany("ExclusiveProductAccess")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Orders.OrderItem", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Commerce.Domain.Orders.Order", null)
@@ -1891,6 +2005,8 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Memberships.MembershipPlan", b =>
                 {
                     b.Navigation("Benefits");
+
+                    b.Navigation("ExclusiveProductAccess");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Orders.Order", b =>

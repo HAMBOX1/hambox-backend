@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -20,19 +21,22 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
     private readonly CartResponseBuilder _cartResponseBuilder;
+    private readonly IMembershipAccessProvider _membershipAccess;
 
     public MoveWishlistItemToCartCommandHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
-        CartResponseBuilder cartResponseBuilder)
+        CartResponseBuilder cartResponseBuilder,
+        IMembershipAccessProvider membershipAccess)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
         _cartResponseBuilder = cartResponseBuilder;
+        _membershipAccess = membershipAccess;
     }
 
     public async Task<Result<Contracts.CartDto>> Handle(
@@ -65,6 +69,23 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
         if (product.Status != ProductStatus.Active)
         {
             return Result.Failure<Contracts.CartDto>(CatalogErrors.ProductNotActive);
+        }
+
+        var membership = await _membershipAccess.GetAccessInfoAsync(_currentUserService.UserId, cancellationToken);
+
+        if (product.PublicReleaseOnUtc is DateTime releaseOnUtc && releaseOnUtc > DateTime.UtcNow)
+        {
+            var earlyAccessStartsUtc = releaseOnUtc.AddDays(-membership.EarlyAccessDays);
+            if (DateTime.UtcNow < earlyAccessStartsUtc)
+            {
+                return Result.Failure<Contracts.CartDto>(CommerceErrors.ProductNotYetReleased(releaseOnUtc));
+            }
+        }
+
+        var productAccess = await _membershipAccess.GetProductAccessAsync(_currentUserService.UserId, product.Id, cancellationToken);
+        if (productAccess is { IsRestricted: true, HasAccess: false })
+        {
+            return Result.Failure<Contracts.CartDto>(CommerceErrors.ProductMembersOnly(productAccess.RequiredPlanNames));
         }
 
         decimal unitPrice = product.Price;

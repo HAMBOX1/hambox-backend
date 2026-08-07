@@ -1,6 +1,7 @@
 using HAMBOX.SharedKernel.Errors;
 using HAMBOX.Modules.Themes.Application.Errors;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Themes.Application.Abstractions;
 using HAMBOX.Modules.Themes.Application.Contracts.Themes;
 using HAMBOX.Modules.Themes.Application.Services;
@@ -131,14 +132,29 @@ internal sealed class GetThemeByIdQueryHandler(IThemesDbContext dbContext)
 public sealed record GetActiveThemeQuery(string? MembershipPlanSlug)
     : IRequest<Result<ActiveThemeDto>>;
 
-internal sealed class GetActiveThemeQueryHandler(IThemeEngine themeEngine, ICurrentUserService currentUser)
+internal sealed class GetActiveThemeQueryHandler(
+    IThemeEngine themeEngine,
+    ICurrentUserService currentUser,
+    IMembershipAccessProvider membershipAccess)
     : IRequestHandler<GetActiveThemeQuery, Result<ActiveThemeDto>>
 {
     public async Task<Result<ActiveThemeDto>> Handle(GetActiveThemeQuery request, CancellationToken cancellationToken)
     {
+        // Theme Unlock membership benefit: the caller may pass a slug explicitly (e.g. admin
+        // preview), but for a real signed-in member we always resolve their actual plan slug
+        // server-side rather than trusting a client-supplied value — this is also what makes
+        // unlocked themes apply automatically the moment a membership changes, with no separate
+        // sync step required on the storefront.
+        var membershipPlanSlug = request.MembershipPlanSlug;
+        if (string.IsNullOrWhiteSpace(membershipPlanSlug) && !string.IsNullOrWhiteSpace(currentUser.UserId))
+        {
+            var access = await membershipAccess.GetAccessInfoAsync(currentUser.UserId, cancellationToken);
+            membershipPlanSlug = access.HasActiveMembership ? access.PlanSlug : null;
+        }
+
         var active = await themeEngine.ResolveActiveThemeAsync(
             currentUser.UserId,
-            request.MembershipPlanSlug,
+            membershipPlanSlug,
             cancellationToken: cancellationToken);
 
         return active is null
@@ -321,7 +337,11 @@ internal sealed class UpdateThemeCommandHandler(IThemesDbContext dbContext, ICur
 
         theme.Rename(request.Request.Name, null);
 
-        var existingDraft = theme.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault(v => !v.IsPublished);
+        // The draft is the newest version, and only while it is still unpublished. Filtering the whole
+        // set by !IsPublished would resurrect a superseded version as the edit target, because
+        // PublishVersion un-publishes whichever version was previously live.
+        var latestVersion = theme.Versions.OrderByDescending(v => v.VersionNumber).FirstOrDefault();
+        var existingDraft = latestVersion is { IsPublished: false } ? latestVersion : null;
         var draft = existingDraft ?? theme.CreateDraftVersion(request.Request.Tokens, request.Request.Notes);
         if (existingDraft is null)
         {

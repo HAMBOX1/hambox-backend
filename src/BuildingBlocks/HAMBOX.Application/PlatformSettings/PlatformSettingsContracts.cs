@@ -273,8 +273,8 @@ public sealed record MembershipsSettingsPayload(
 
 public sealed record ReferralSettingsPayload(
     bool Enabled,
-    decimal ReferrerRewardPercent,
-    decimal RefereeDiscountPercent,
+    int PointsPerReferral,
+    decimal PointValueUsd,
     int RewardExpiryDays);
 
 public sealed record InventorySettingsPayload(

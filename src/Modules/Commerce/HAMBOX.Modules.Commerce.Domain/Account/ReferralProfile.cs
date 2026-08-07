@@ -61,22 +61,7 @@ public sealed class ReferralProfile : AggregateRoot
             Guid.NewGuid(),
             userId,
             GenerateReferralCode(),
-            "Starter");
-    }
-
-    /// <summary>
-    /// Awards referral points for a successful referral.
-    /// </summary>
-    public void AwardReferralPoints(int points)
-    {
-        if (points <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(points), "Points must be greater than zero.");
-        }
-
-        LifetimePoints += points;
-        SuccessfulReferrals++;
-        Tier = ResolveTier(LifetimePoints);
+            ReferralTierPolicy.DefaultTier);
     }
 
     private static string GenerateReferralCode()
@@ -91,11 +76,4 @@ public sealed class ReferralProfile : AggregateRoot
         return ReferralCodePrefix + new string(code);
     }
 
-    private static string ResolveTier(int lifetimePoints) => lifetimePoints switch
-    {
-        >= 1000 => "Gold",
-        >= 500 => "Silver",
-        >= 100 => "Bronze",
-        _ => "Starter"
-    };
 }

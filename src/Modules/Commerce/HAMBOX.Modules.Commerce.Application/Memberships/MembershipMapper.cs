@@ -11,7 +11,7 @@ internal static class MembershipMapper
     public static MembershipBenefitDto ToBenefitDto(MembershipBenefit benefit) =>
         new(benefit.BenefitType.ToString(), benefit.Value, benefit.DisplayName, benefit.SortOrder);
 
-    public static MembershipPlanDetailDto ToDetailDto(MembershipPlan plan) =>
+    public static MembershipPlanDetailDto ToDetailDto(MembershipPlan plan, IReadOnlyList<Guid>? unlockedThemeIds = null) =>
         new(
             plan.Id,
             plan.Name,
@@ -25,6 +25,8 @@ internal static class MembershipMapper
             plan.ThemeKey,
             plan.IsDefault,
             plan.Benefits.Select(ToBenefitDto).ToList(),
+            plan.ExclusiveProductAccess.Select(a => a.ProductId).ToList(),
+            unlockedThemeIds ?? [],
             plan.CreatedOnUtc);
 
     public static MembershipSubscriptionDto ToSubscriptionDto(MembershipSubscription subscription, MembershipPlan plan) =>

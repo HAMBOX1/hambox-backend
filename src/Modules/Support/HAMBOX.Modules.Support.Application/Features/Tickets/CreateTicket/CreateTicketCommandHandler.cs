@@ -1,4 +1,5 @@
 using HAMBOX.Application.Communication;
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Contracts;
 using HAMBOX.Modules.Support.Application.Services;
@@ -13,7 +14,8 @@ internal sealed class CreateTicketCommandHandler(
     ISupportDbContext dbContext,
     TicketContextBuilder contextBuilder,
     ICommunicationService communicationService,
-    ISupportRealtimeNotifier realtimeNotifier)
+    ISupportRealtimeNotifier realtimeNotifier,
+    IMembershipAccessProvider membershipAccess)
     : IRequestHandler<CreateTicketCommand, Result<TicketDetailDto>>
 {
     public async Task<Result<TicketDetailDto>> Handle(CreateTicketCommand request, CancellationToken cancellationToken)
@@ -23,10 +25,23 @@ internal sealed class CreateTicketCommandHandler(
             .Select(c => (Guid?)c.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var priorityId = request.PriorityId ?? await dbContext.TicketPriorities
-            .Where(p => p.IsDefault && p.IsActive)
-            .Select(p => (Guid?)p.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        // Priority Support membership benefit: a customer who didn't explicitly pick a priority
+        // gets routed to the highest-urgency active priority instead of the tenant's plain default.
+        // Doesn't override an explicit customer choice, and reads a generic membership fact (not a
+        // hardcoded Commerce type), so any future module can reuse the same check.
+        var membership = await membershipAccess.GetAccessInfoAsync(request.CustomerUserId, cancellationToken);
+
+        var priorityId = request.PriorityId ?? (membership.HasPrioritySupport
+            ? await dbContext.TicketPriorities
+                .Where(p => p.IsActive)
+                .OrderByDescending(p => p.Level)
+                .Select(p => (Guid?)p.Id)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null)
+            ?? await dbContext.TicketPriorities
+                .Where(p => p.IsDefault && p.IsActive)
+                .Select(p => (Guid?)p.Id)
+                .FirstOrDefaultAsync(cancellationToken);
 
         var ticket = Ticket.Create(
             TicketNumberGenerator.Generate(),
@@ -63,6 +78,7 @@ internal sealed class CreateTicketCommandHandler(
                 ["TicketNumber"] = ticket.TicketNumber,
                 ["Subject"] = ticket.Subject,
             },
+            Priority: membership.HasPrioritySupport ? CommunicationPriority.High : CommunicationPriority.Normal,
             RelatedEntityType: "Ticket",
             RelatedEntityId: ticket.Id.ToString(),
             ActionUrl: $"/account/support/tickets/{ticket.Id}"), cancellationToken);

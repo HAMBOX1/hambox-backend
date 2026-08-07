@@ -17,7 +17,11 @@ internal sealed class IdempotencyKeyConfiguration : IEntityTypeConfiguration<Ide
         builder.Property(k => k.Endpoint).HasMaxLength(200).IsRequired();
         builder.Property(k => k.RequestHash).HasMaxLength(64).IsRequired();
         builder.Property(k => k.State).HasConversion<int>();
-        builder.Property(k => k.SerializedResponse).HasColumnType("nvarchar(max)");
+        // No explicit HasColumnType: EF Core's own convention already maps an unbounded string to
+        // nvarchar(max) on SQL Server — the literal "nvarchar(max)" string was provider-specific and
+        // broke schema creation on any other provider (e.g. SQLite in integration tests), for no
+        // behavior difference on SQL Server.
+        builder.Property(k => k.SerializedResponse);
         builder.Property(k => k.RowVersion).IsRowVersion();
 
         builder.HasIndex(k => k.Key).IsUnique().HasDatabaseName("IX_IdempotencyKeys_Key");

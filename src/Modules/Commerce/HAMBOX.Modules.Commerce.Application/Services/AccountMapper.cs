@@ -49,15 +49,14 @@ internal static class MembershipTierResolver
 /// </summary>
 internal static class AccountMapper
 {
-    public const int ReferralPointsPerSuccessfulReferral = 100;
-
-    public static IReadOnlyList<Contracts.Account.ReferralTierDto> GetReferralTiers() =>
-    [
-        new("Starter", 0, ReferralPointsPerSuccessfulReferral),
-        new("Bronze", 100, ReferralPointsPerSuccessfulReferral),
-        new("Silver", 500, ReferralPointsPerSuccessfulReferral),
-        new("Gold", 1000, ReferralPointsPerSuccessfulReferral)
-    ];
+    /// <summary>
+    /// Builds the dashboard's tier list from the single centralized threshold table
+    /// (<see cref="ReferralTierPolicy"/>) rather than a second, independently-hardcoded copy.
+    /// </summary>
+    public static IReadOnlyList<Contracts.Account.ReferralTierDto> GetReferralTiers(int pointsPerReferral) =>
+        ReferralTierPolicy.Tiers
+            .Select(t => new Contracts.Account.ReferralTierDto(t.Name, t.MinimumPoints, pointsPerReferral))
+            .ToList();
 
     public static Contracts.Account.OrderSummaryDto ToOrderSummaryDto(Order order, string? imageUrl = null) =>
         new(
@@ -92,21 +91,33 @@ internal static class AccountMapper
         return events;
     }
 
-    public static Contracts.Account.ReferralSummaryDto ToReferralSummaryDto(ReferralProfile profile) =>
-        new(profile.ReferralCode, profile.Tier, profile.LifetimePoints, profile.SuccessfulReferrals);
+    public static Contracts.Account.ReferralSummaryDto ToReferralSummaryDto(ReferralProfile profile, decimal pointValueUsd) =>
+        new(profile.ReferralCode, profile.Tier, profile.LifetimePoints, profile.SuccessfulReferrals, pointValueUsd);
 
     public static Contracts.Account.ReferralHistoryDto ToReferralHistoryDto(ReferralHistoryEntry entry) =>
-        new(entry.Id, entry.ReferredUserId, entry.PointsEarned, entry.CreatedOnUtc);
+        new(
+            entry.Id,
+            AdminOrderMapper.ResolveCustomerName(entry.ReferredEmail),
+            entry.PointsEarned,
+            entry.Status.ToString(),
+            entry.CreatedOnUtc,
+            entry.QualifiedOnUtc,
+            entry.RewardedOnUtc);
 
     public static Contracts.Account.ReferralDashboardDto ToReferralDashboardDto(
         ReferralProfile profile,
-        IReadOnlyList<ReferralHistoryEntry> recentHistory) =>
+        IReadOnlyList<ReferralHistoryEntry> recentHistory,
+        int pendingReferrals,
+        int pointsPerReferral,
+        decimal pointValueUsd) =>
         new(
             profile.ReferralCode,
             profile.Tier,
             profile.LifetimePoints,
             profile.SuccessfulReferrals,
-            GetReferralTiers(),
+            pendingReferrals,
+            pointValueUsd,
+            GetReferralTiers(pointsPerReferral),
             recentHistory.Select(ToReferralHistoryDto).ToList());
 
     public static Contracts.Account.WishlistItemDto ToWishlistItemDto(

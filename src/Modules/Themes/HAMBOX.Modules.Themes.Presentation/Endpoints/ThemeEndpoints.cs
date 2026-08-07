@@ -62,7 +62,10 @@ internal static class ThemeEndpoints
             MapResult(await sender.Send(new DuplicateThemeCommand(id, request)), StatusCodes.Status201Created))
             .RequirePermission(PermissionConstants.Themes.Create);
 
-        admin.MapPost("{id:guid}/publish", async Task<IResult> (Guid id, [FromBody] Guid? versionId, ISender sender) =>
+        // versionId is optional (omit it to publish the latest version). It stays in the query string
+        // rather than the body: a bodyless POST sends no Content-Type, which a [FromBody] parameter
+        // rejects with 415 before the handler ever runs.
+        admin.MapPost("{id:guid}/publish", async Task<IResult> (Guid id, [FromQuery] Guid? versionId, ISender sender) =>
             MapResult(await sender.Send(new PublishThemeCommand(id, versionId))))
             .RequirePermission(PermissionConstants.Themes.Publish);
 
@@ -74,7 +77,7 @@ internal static class ThemeEndpoints
             MapResult(await sender.Send(new RollbackThemeCommand(id, versionId))))
             .RequirePermission(PermissionConstants.Themes.Rollback);
 
-        admin.MapPost("{id:guid}/preview", async Task<IResult> (Guid id, [FromBody] Guid? versionId, ISender sender) =>
+        admin.MapPost("{id:guid}/preview", async Task<IResult> (Guid id, [FromQuery] Guid? versionId, ISender sender) =>
             MapResult(await sender.Send(new CreatePreviewSessionCommand(id, versionId)), StatusCodes.Status201Created))
             .RequirePermission(PermissionConstants.Themes.View);
 

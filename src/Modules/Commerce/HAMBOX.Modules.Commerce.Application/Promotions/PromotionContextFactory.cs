@@ -3,7 +3,6 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Memberships.Models;
 using HAMBOX.Modules.Commerce.Application.Promotions.Models;
-using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Carts;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Catalog.Domain.Products;
@@ -43,9 +42,6 @@ internal static class PromotionContextFactory
             ? true
             : !await dbContext.Orders.AnyAsync(o => o.UserId == userId, cancellationToken);
 
-        var hasReferralProfile = userId is not null &&
-            await dbContext.ReferralProfiles.AnyAsync(r => r.UserId == userId, cancellationToken);
-
         var membership = isAuthenticated && userId is not null
             ? await membershipEngine.ResolveAsync(userId, cancellationToken)
             : MembershipSnapshot.None;
@@ -56,7 +52,6 @@ internal static class PromotionContextFactory
             countryCode,
             isAuthenticated,
             isFirstPurchase,
-            hasReferralProfile,
             cart.AppliedCouponCode,
             membership,
             DateTime.UtcNow);

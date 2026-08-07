@@ -72,12 +72,19 @@ internal sealed class AccountMembershipHandlers :
         var counts = await MembershipMapper.GetSubscriberCountsAsync(_dbContext, plans.Select(p => p.Id), cancellationToken);
         var planDtos = plans.Select(p => new MembershipPlanListItemDto(
             p.Id, p.Name, p.Slug, p.Price, p.DurationDays, p.Status.ToString(), p.SortOrder,
-            p.BadgeLabel, p.IsDefault, p.Benefits.Count, counts.GetValueOrDefault(p.Id))).ToList();
+            p.BadgeLabel, p.IsDefault, p.Benefits.Count, counts.GetValueOrDefault(p.Id),
+            p.Benefits.OrderBy(b => b.SortOrder).Select(MembershipMapper.ToBenefitDto).ToList())).ToList();
+
+        var activeFeatureFlags = snapshot.FeatureFlags
+            .Where(kv => kv.Value.Equals("true", StringComparison.OrdinalIgnoreCase))
+            .Select(kv => kv.Key)
+            .ToList();
 
         return Result.Success(new CurrentMembershipDto(
             subDto,
             snapshot.Benefits.Select(b => new MembershipBenefitDto(b.Type, b.Value, b.DisplayName, 0)).ToList(),
-            planDtos));
+            planDtos,
+            activeFeatureFlags));
     }
 
     public async Task<Result<IReadOnlyList<MembershipHistoryDto>>> Handle(GetMembershipHistoryQuery request, CancellationToken cancellationToken)

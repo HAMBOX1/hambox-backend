@@ -1,6 +1,7 @@
 using System.Text.Json;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,8 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 internal abstract class OrderRetryJobHandlerBase(
     IBackgroundJobSerializer serializer,
     ICommerceDbContext db,
-    OrderFulfillmentService fulfillment) : BackgroundJobHandlerBase<string?>(serializer)
+    OrderFulfillmentService fulfillment,
+    ReferralLifecycleService referralLifecycle) : BackgroundJobHandlerBase<string?>(serializer)
 {
     public override async Task HandleAsync(string? payload, IBackgroundJobContext context, CancellationToken cancellationToken)
     {
@@ -36,6 +38,14 @@ internal abstract class OrderRetryJobHandlerBase(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        if (result.OrderCompleted)
+        {
+            // Deferred fulfillment completing an order (e.g. a backorder finally getting stock) is a
+            // legitimate completion path like any other — no promotions are (re-)evaluated here, so
+            // there's no referee discount to protect, just the referrer's reward to process.
+            await referralLifecycle.ProcessOrderCompletedAsync(order, cancellationToken);
+        }
     }
 
     private static Guid ResolveOrderId(IBackgroundJobContext context, string? payload)

@@ -56,6 +56,26 @@ public static class CommunicationDataSeeder
                 "<p><strong>{{Severity}}</strong> security event at {{OccurredOnUtc}} UTC:</p><p>{{Description}}</p><p>IP address: {{IpAddress}}</p>");
         }
 
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "ReferralFriendJoined"))
+        {
+            SeedTemplate(db, "ReferralFriendJoined", CommunicationChannels.InApp, CommunicationCategory.Promotion,
+                "A friend joined using your referral code",
+                "Someone signed up using your referral code {{ReferralCode}}. You'll earn points once they complete their first order.");
+            SeedTemplate(db, "ReferralFriendJoined", CommunicationChannels.Email, CommunicationCategory.Promotion,
+                "Someone joined HAMBOX using your referral code",
+                "<p>A new member signed up using your referral code <strong>{{ReferralCode}}</strong>. You'll earn referral points once they complete their first order.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "ReferralRewardEarned"))
+        {
+            SeedTemplate(db, "ReferralRewardEarned", CommunicationChannels.InApp, CommunicationCategory.Promotion,
+                "You earned {{Points}} referral points",
+                "Your referral completed their first order. {{Points}} points were added to your referral balance.");
+            SeedTemplate(db, "ReferralRewardEarned", CommunicationChannels.Email, CommunicationCategory.Promotion,
+                "You earned {{Points}} HAMBOX referral points",
+                "<p>Your referral completed their first order and <strong>{{Points}} points</strong> were added to your referral balance.</p>");
+        }
+
         await db.SaveChangesAsync();
     }
 

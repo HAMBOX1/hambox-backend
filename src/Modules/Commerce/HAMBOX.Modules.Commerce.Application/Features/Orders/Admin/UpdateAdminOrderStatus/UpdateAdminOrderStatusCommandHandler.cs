@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -21,6 +22,7 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
     private readonly ICommerceTransactionService _transactionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly OrderInventoryReleaseService _inventoryReleaseService;
+    private readonly ReferralLifecycleService _referralLifecycle;
     private readonly ISender _sender;
 
     public UpdateAdminOrderStatusCommandHandler(
@@ -28,12 +30,14 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
         ICommerceTransactionService transactionService,
         ICurrentUserService currentUserService,
         OrderInventoryReleaseService inventoryReleaseService,
+        ReferralLifecycleService referralLifecycle,
         ISender sender)
     {
         _dbContext = dbContext;
         _transactionService = transactionService;
         _currentUserService = currentUserService;
         _inventoryReleaseService = inventoryReleaseService;
+        _referralLifecycle = referralLifecycle;
         _sender = sender;
     }
 
@@ -78,6 +82,15 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
                 if (!wasAlreadyReleased && status is OrderStatus.Cancelled or OrderStatus.Refunded)
                 {
                     await _inventoryReleaseService.ReleaseAsync(order, actorId, ct);
+                    await _referralLifecycle.ReverseForOrderAsync(order, ct);
+                }
+
+                if (status == OrderStatus.Completed)
+                {
+                    // order.SetAdminStatus(Completed) above already threw if the order was Completed
+                    // before this call (Order.Complete()'s own guard), so reaching here always means
+                    // this is a genuine, first-time completion — safe to process unconditionally.
+                    await _referralLifecycle.ProcessOrderCompletedAsync(order, ct);
                 }
             }, cancellationToken);
         }

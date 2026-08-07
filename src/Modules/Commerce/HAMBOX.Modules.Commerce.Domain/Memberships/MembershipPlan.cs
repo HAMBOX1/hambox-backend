@@ -8,6 +8,7 @@ namespace HAMBOX.Modules.Commerce.Domain.Memberships;
 public sealed class MembershipPlan : AggregateRoot
 {
     private readonly List<MembershipBenefit> _benefits = [];
+    private readonly List<MembershipPlanProductAccess> _exclusiveProductAccess = [];
 
     private MembershipPlan()
     {
@@ -50,6 +51,7 @@ public sealed class MembershipPlan : AggregateRoot
     public MembershipPlanStatus Status { get; private set; }
 
     public IReadOnlyCollection<MembershipBenefit> Benefits => _benefits.AsReadOnly();
+    public IReadOnlyCollection<MembershipPlanProductAccess> ExclusiveProductAccess => _exclusiveProductAccess.AsReadOnly();
 
     public static MembershipPlan Create(
         string name,
@@ -122,6 +124,8 @@ public sealed class MembershipPlan : AggregateRoot
             copy.AddBenefit(benefit.BenefitType, benefit.Value, benefit.DisplayName, benefit.SortOrder);
         }
 
+        copy.SetExclusiveProducts(_exclusiveProductAccess.Select(a => a.ProductId));
+
         return copy;
     }
 
@@ -143,5 +147,21 @@ public sealed class MembershipPlan : AggregateRoot
         var benefit = MembershipBenefit.Create(Id, benefitType, value, displayName, sortOrder);
         _benefits.Add(benefit);
         return benefit;
+    }
+
+    /// <summary>
+    /// Replaces the full set of products exclusively unlocked for this plan's members
+    /// (backs the ExclusiveProducts benefit). Duplicates are ignored.
+    /// </summary>
+    public void SetExclusiveProducts(IEnumerable<Guid> productIds)
+    {
+        var distinctIds = productIds.Distinct().ToList();
+        _exclusiveProductAccess.RemoveAll(a => !distinctIds.Contains(a.ProductId));
+
+        var existingIds = _exclusiveProductAccess.Select(a => a.ProductId).ToHashSet();
+        foreach (var productId in distinctIds.Where(id => !existingIds.Contains(id)))
+        {
+            _exclusiveProductAccess.Add(MembershipPlanProductAccess.Create(Id, productId));
+        }
     }
 }

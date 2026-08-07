@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
@@ -23,19 +24,22 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
     private readonly ICurrentUserService _currentUserService;
     private readonly IMembershipEngine _membershipEngine;
     private readonly MembershipOperationsService _membershipOperations;
+    private readonly IPlatformSettingsProvider _platformSettings;
 
     public GetAccountDashboardQueryHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService,
         IMembershipEngine membershipEngine,
-        MembershipOperationsService membershipOperations)
+        MembershipOperationsService membershipOperations,
+        IPlatformSettingsProvider platformSettings)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
         _membershipEngine = membershipEngine;
         _membershipOperations = membershipOperations;
+        _platformSettings = platformSettings;
     }
 
     public async Task<Result<AccountDashboardDto>> Handle(
@@ -110,6 +114,9 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
             await _commerceDbContext.SaveChangesAsync(cancellationToken);
         }
 
+        var referralSettings = await _platformSettings.GetAsync<ReferralSettingsPayload>(
+            PlatformSettingsCategoryKeys.Referral, cancellationToken);
+
         var unreadCount = await _commerceDbContext.UserNotifications
             .CountAsync(n => n.UserId == userId && !n.IsRead, cancellationToken);
 
@@ -143,7 +150,7 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
         return Result.Success(new AccountDashboardDto(
             membershipCard,
             wishlistPreview,
-            AccountMapper.ToReferralSummaryDto(referralProfile),
+            AccountMapper.ToReferralSummaryDto(referralProfile, referralSettings.PointValueUsd),
             activity,
             unreadCount));
     }

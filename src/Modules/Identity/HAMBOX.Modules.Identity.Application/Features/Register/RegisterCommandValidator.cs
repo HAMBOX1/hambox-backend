@@ -1,5 +1,7 @@
 using FluentValidation;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.PlatformSettings;
+using HAMBOX.Application.Referrals;
 
 namespace HAMBOX.Modules.Identity.Application.Features.Register;
 
@@ -8,7 +10,7 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// </summary>
 public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
 {
-    public RegisterCommandValidator(IPlatformSettingsProvider platformSettings)
+    public RegisterCommandValidator(IPlatformSettingsProvider platformSettings, IReferralRedemptionService referralRedemption)
     {
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
@@ -52,5 +54,18 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Last name is required.")
             .MaximumLength(100).WithMessage("Last name must not exceed 100 characters.");
+
+        RuleFor(x => x.ReferralCode)
+            .Matches(@"^HAM-[A-Z0-9]{8}$").WithMessage("The referral code format is invalid.")
+            .MustAsync(async (_, cancellation) =>
+            {
+                var referral = await platformSettings.GetAsync<ReferralSettingsPayload>(
+                    PlatformSettingsCategoryKeys.Referral, cancellation);
+                return referral.Enabled;
+            })
+            .WithMessage("The referral program is not currently active.")
+            .MustAsync(async (code, cancellation) => await referralRedemption.ReferralCodeExistsAsync(code!, cancellation))
+            .WithMessage("The referral code you entered was not found.")
+            .When(x => !string.IsNullOrWhiteSpace(x.ReferralCode));
     }
 }

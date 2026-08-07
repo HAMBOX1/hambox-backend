@@ -61,6 +61,11 @@ public interface ICommerceDbContext
     DbSet<ReferralHistoryEntry> ReferralHistoryEntries { get; }
 
     /// <summary>
+    /// Gets the referral audit logs database set.
+    /// </summary>
+    DbSet<ReferralAuditLog> ReferralAuditLogs { get; }
+
+    /// <summary>
     /// Gets the order license keys database set.
     /// </summary>
     DbSet<OrderLicenseKey> OrderLicenseKeys { get; }
@@ -108,6 +113,7 @@ public interface ICommerceDbContext
 
     DbSet<MembershipPlan> MembershipPlans { get; }
     DbSet<MembershipBenefit> MembershipBenefits { get; }
+    DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess { get; }
     DbSet<MembershipSubscription> MembershipSubscriptions { get; }
     DbSet<MembershipHistory> MembershipHistories { get; }
     DbSet<MembershipTransaction> MembershipTransactions { get; }

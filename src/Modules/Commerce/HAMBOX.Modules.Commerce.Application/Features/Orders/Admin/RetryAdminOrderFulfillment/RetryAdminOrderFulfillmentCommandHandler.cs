@@ -4,6 +4,7 @@ using HAMBOX.Application.Communication;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -25,6 +26,7 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
     private readonly OrderFulfillmentService _fulfillmentService;
     private readonly IOperationalJobQueue _jobQueue;
     private readonly ICommunicationService _communicationService;
+    private readonly ReferralLifecycleService _referralLifecycle;
 
     public RetryAdminOrderFulfillmentCommandHandler(
         ICommerceDbContext dbContext,
@@ -32,7 +34,8 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
         ICurrentUserService currentUserService,
         OrderFulfillmentService fulfillmentService,
         IOperationalJobQueue jobQueue,
-        ICommunicationService communicationService)
+        ICommunicationService communicationService,
+        ReferralLifecycleService referralLifecycle)
     {
         _dbContext = dbContext;
         _transactionService = transactionService;
@@ -40,6 +43,7 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
         _fulfillmentService = fulfillmentService;
         _jobQueue = jobQueue;
         _communicationService = communicationService;
+        _referralLifecycle = referralLifecycle;
     }
 
     public async Task<Result<RetryAdminOrderFulfillmentResultDto>> Handle(
@@ -106,6 +110,8 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
 
         if (result!.OrderCompleted)
         {
+            await _referralLifecycle.ProcessOrderCompletedAsync(order!, cancellationToken);
+
             await _communicationService.SendAsync(new CommunicationRequest(
                 UserId: order!.UserId,
                 TemplateKey: "OrderConfirmation",

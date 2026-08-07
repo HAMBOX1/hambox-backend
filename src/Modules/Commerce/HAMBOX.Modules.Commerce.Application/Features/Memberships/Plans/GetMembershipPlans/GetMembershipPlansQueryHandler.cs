@@ -44,7 +44,8 @@ internal sealed class GetMembershipPlansQueryHandler : IRequestHandler<GetMember
         var counts = await MembershipMapper.GetSubscriberCountsAsync(_dbContext, plans.Select(p => p.Id), cancellationToken);
         var items = plans.Select(p => new MembershipPlanListItemDto(
             p.Id, p.Name, p.Slug, p.Price, p.DurationDays, p.Status.ToString(), p.SortOrder,
-            p.BadgeLabel, p.IsDefault, p.Benefits.Count, counts.GetValueOrDefault(p.Id))).ToList();
+            p.BadgeLabel, p.IsDefault, p.Benefits.Count, counts.GetValueOrDefault(p.Id),
+            p.Benefits.OrderBy(b => b.SortOrder).Select(MembershipMapper.ToBenefitDto).ToList())).ToList();
 
         return Result.Success(new PagedResult<MembershipPlanListItemDto>(items, request.PageNumber, request.PageSize, total));
     }

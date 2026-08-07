@@ -13,7 +13,8 @@ public sealed record MembershipPlanListItemDto(
     string? BadgeLabel,
     bool IsDefault,
     int BenefitCount,
-    int ActiveSubscribers);
+    int ActiveSubscribers,
+    IReadOnlyList<MembershipBenefitDto> Benefits);
 
 public sealed record MembershipPlanDetailDto(
     Guid Id,
@@ -28,6 +29,8 @@ public sealed record MembershipPlanDetailDto(
     string? ThemeKey,
     bool IsDefault,
     IReadOnlyList<MembershipBenefitDto> Benefits,
+    IReadOnlyList<Guid> ExclusiveProductIds,
+    IReadOnlyList<Guid> UnlockedThemeIds,
     DateTimeOffset CreatedOnUtc);
 
 public sealed record CreateMembershipPlanRequest(
@@ -40,7 +43,9 @@ public sealed record CreateMembershipPlanRequest(
     string? BadgeLabel,
     string? ThemeKey,
     bool IsDefault,
-    IReadOnlyList<MembershipBenefitDto>? Benefits);
+    IReadOnlyList<MembershipBenefitDto>? Benefits,
+    IReadOnlyList<Guid>? ExclusiveProductIds,
+    IReadOnlyList<Guid>? UnlockedThemeIds);
 
 public sealed record UpdateMembershipPlanRequest(
     string Name,
@@ -51,7 +56,9 @@ public sealed record UpdateMembershipPlanRequest(
     int SortOrder,
     string? BadgeLabel,
     string? ThemeKey,
-    IReadOnlyList<MembershipBenefitDto>? Benefits);
+    IReadOnlyList<MembershipBenefitDto>? Benefits,
+    IReadOnlyList<Guid>? ExclusiveProductIds,
+    IReadOnlyList<Guid>? UnlockedThemeIds);
 
 public sealed record AssignMembershipRequest(string UserId, Guid PlanId, bool AutoRenew);
 
@@ -89,7 +96,8 @@ public sealed record MembershipTransactionDto(
 public sealed record CurrentMembershipDto(
     MembershipSubscriptionDto? Subscription,
     IReadOnlyList<MembershipBenefitDto> Benefits,
-    IReadOnlyList<MembershipPlanListItemDto> AvailablePlans);
+    IReadOnlyList<MembershipPlanListItemDto> AvailablePlans,
+    IReadOnlyList<string> FeatureFlags);
 
 public sealed record MembershipStatisticsDto(
     int TotalPlans,
