@@ -139,6 +139,15 @@ public static class PermissionConstants
         public const string Manage = "Themes.Manage";
     }
 
+    public static class Campaigns
+    {
+        public const string View = "Campaigns.View";
+        public const string Create = "Campaigns.Create";
+        public const string Edit = "Campaigns.Edit";
+        public const string Publish = "Campaigns.Publish";
+        public const string Delete = "Campaigns.Delete";
+    }
+
     public static class Legal
     {
         public const string View = "Legal.View";

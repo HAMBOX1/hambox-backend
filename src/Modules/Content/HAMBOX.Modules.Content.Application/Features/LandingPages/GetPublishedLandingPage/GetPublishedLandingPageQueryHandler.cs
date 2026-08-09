@@ -17,7 +17,7 @@ internal sealed class GetPublishedLandingPageQueryHandler(IContentDbContext dbCo
     {
         var template = await dbContext.LandingPageTemplates
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(t => t.IsActive && t.Scope == request.Scope && t.TargetId == request.TargetId, cancellationToken);
 
         if (template is null)
         {
@@ -37,6 +37,12 @@ internal sealed class GetPublishedLandingPageQueryHandler(IContentDbContext dbCo
             .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(new PublishedLandingPageDto(
-            template.Id, template.Name, sections, publishedOnUtc?.UtcDateTime));
+            template.Id,
+            template.Name,
+            sections,
+            publishedOnUtc?.UtcDateTime,
+            template.SeoTitle,
+            template.SeoDescription,
+            template.SeoOgImageUrl));
     }
 }

@@ -38,7 +38,7 @@ internal sealed class CreateLandingPageTemplateCommandHandler(IContentDbContext 
             sectionsJson = LandingPageSectionsSerializer.Serialize(clonedSections);
         }
 
-        var template = LandingPageTemplate.Create(request.Name, sectionsJson);
+        var template = LandingPageTemplate.Create(request.Name, sectionsJson, request.Scope, request.TargetId);
 
         dbContext.LandingPageTemplates.Add(template);
         LandingPageAuditWriter.Record(dbContext, template.Id, LandingPageAuditAction.TemplateCreated, currentUser.UserId);
@@ -46,6 +46,16 @@ internal sealed class CreateLandingPageTemplateCommandHandler(IContentDbContext 
 
         var sections = LandingPageSectionsSerializer.Deserialize(template.SectionsJson);
         return Result.Success(new LandingPageTemplateDetailDto(
-            template.Id, template.Name, template.Slug, template.IsActive, template.HasUnpublishedChanges, sections));
+            template.Id,
+            template.Name,
+            template.Slug,
+            template.IsActive,
+            template.HasUnpublishedChanges,
+            sections,
+            template.Scope,
+            template.TargetId,
+            template.SeoTitle,
+            template.SeoDescription,
+            template.SeoOgImageUrl));
     }
 }

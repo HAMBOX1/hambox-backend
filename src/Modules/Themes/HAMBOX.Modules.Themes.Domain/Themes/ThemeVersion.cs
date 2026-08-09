@@ -24,6 +24,14 @@ public sealed class ThemeVersion : BaseEntity
     public string TokensJson { get; private set; } = "{}";
     public string? Notes { get; private set; }
     public bool IsPublished { get; private set; }
+
+    /// <summary>
+    /// Permanent record that this version was published at least once. Unlike <see cref="IsPublished"/>
+    /// (which flips back to false the moment another version supersedes it), this never resets — it is
+    /// the real immutability guard and the eligibility check for rollback, since a superseded version is
+    /// still a legitimate rollback target even though it's no longer the live one.
+    /// </summary>
+    public bool HasEverBeenPublished { get; private set; }
     public DateTime? PublishedOnUtc { get; private set; }
     public string? PublishedBy { get; private set; }
     public string? ValidationWarningsJson { get; private set; }
@@ -35,7 +43,7 @@ public sealed class ThemeVersion : BaseEntity
 
     public void UpdateTokens(Dictionary<string, string> tokens, string? notes = null)
     {
-        if (IsPublished)
+        if (HasEverBeenPublished)
         {
             throw new InvalidOperationException("Published versions are immutable.");
         }
@@ -50,6 +58,7 @@ public sealed class ThemeVersion : BaseEntity
     public void Publish(string? publishedBy = null)
     {
         IsPublished = true;
+        HasEverBeenPublished = true;
         PublishedOnUtc = DateTime.UtcNow;
         PublishedBy = publishedBy;
     }

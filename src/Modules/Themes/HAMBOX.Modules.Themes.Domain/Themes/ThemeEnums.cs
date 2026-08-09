@@ -17,8 +17,25 @@ public enum ThemeAssignmentType
 {
     Store = 0,
     Membership = 1,
+
+    /// <summary>
+    /// Reserved — never resolved by ThemeEngine and rejected by AssignThemeCommandHandler for new
+    /// assignments. The real, working mechanism for time-boxed marketing overrides is the
+    /// dedicated <see cref="Campaigns.ThemeCampaign"/> aggregate, not this assignment type. The
+    /// numeric value is preserved (not renumbered/reused) in case any pre-existing row references
+    /// it — confirmed via repo-wide audit that no seed data or code path ever constructs this
+    /// value, but a row created through a direct API call prior to this change can't be ruled out
+    /// without inspecting the live database.
+    /// </summary>
+    [Obsolete("Non-functional — never resolved by ThemeEngine. Use the ThemeCampaign aggregate instead.")]
     Campaign = 2,
+
+    /// <summary>Reserved — no HAMBOX use case exists for region-based theming. See Campaign's remarks.</summary>
+    [Obsolete("Non-functional — never resolved by ThemeEngine. No region-based theming use case exists.")]
     Region = 3,
+
+    /// <summary>Reserved — HAMBOX is single-tenant; no use case exists. See Campaign's remarks.</summary>
+    [Obsolete("Non-functional — never resolved by ThemeEngine. HAMBOX is single-tenant.")]
     Tenant = 4,
 }
 

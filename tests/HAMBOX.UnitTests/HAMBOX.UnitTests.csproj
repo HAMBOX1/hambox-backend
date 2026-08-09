@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +28,11 @@
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Suppliers\HAMBOX.Modules.Suppliers.Application\HAMBOX.Modules.Suppliers.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Suppliers\HAMBOX.Modules.Suppliers.Infrastructure\HAMBOX.Modules.Suppliers.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Themes\HAMBOX.Modules.Themes.Domain\HAMBOX.Modules.Themes.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Themes\HAMBOX.Modules.Themes.Application\HAMBOX.Modules.Themes.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Domain\HAMBOX.Modules.Content.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Application\HAMBOX.Modules.Content.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Infrastructure\HAMBOX.Modules.Content.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

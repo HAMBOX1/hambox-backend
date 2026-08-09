@@ -1,3 +1,5 @@
+using HAMBOX.Modules.Content.Domain.LandingPages;
+
 namespace HAMBOX.Modules.Content.Application.Contracts.LandingPages;
 
 public sealed record LandingPageSectionEntry(
@@ -14,7 +16,9 @@ public sealed record LandingPageTemplateSummaryDto(
     string Slug,
     bool IsActive,
     bool HasUnpublishedChanges,
-    DateTime ModifiedOnUtc);
+    DateTime ModifiedOnUtc,
+    LandingPageScope Scope,
+    Guid? TargetId);
 
 public sealed record LandingPageTemplateDetailDto(
     Guid Id,
@@ -22,13 +26,21 @@ public sealed record LandingPageTemplateDetailDto(
     string Slug,
     bool IsActive,
     bool HasUnpublishedChanges,
-    IReadOnlyList<LandingPageSectionEntry> Sections);
+    IReadOnlyList<LandingPageSectionEntry> Sections,
+    LandingPageScope Scope,
+    Guid? TargetId,
+    string? SeoTitle,
+    string? SeoDescription,
+    string? SeoOgImageUrl);
 
 public sealed record PublishedLandingPageDto(
     Guid TemplateId,
     string TemplateName,
     IReadOnlyList<LandingPageSectionEntry> Sections,
-    DateTime? PublishedOnUtc);
+    DateTime? PublishedOnUtc,
+    string? SeoTitle,
+    string? SeoDescription,
+    string? SeoOgImageUrl);
 
 /// <summary>
 /// Wraps the optional footer section so it can travel through <see cref="HAMBOX.SharedKernel.Results.Result{TValue}"/>,

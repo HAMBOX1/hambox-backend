@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Themes.Domain.Campaigns;
 using HAMBOX.Modules.Themes.Domain.Themes;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,8 @@ public interface IThemesDbContext
     DbSet<ThemeAsset> ThemeAssets { get; }
     DbSet<ThemeAuditLog> ThemeAuditLogs { get; }
     DbSet<ThemePreviewSession> ThemePreviewSessions { get; }
+    DbSet<ThemeCampaign> ThemeCampaigns { get; }
+    DbSet<CampaignAuditLog> CampaignAuditLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

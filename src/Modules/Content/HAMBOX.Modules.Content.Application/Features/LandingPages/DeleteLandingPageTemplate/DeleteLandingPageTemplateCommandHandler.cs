@@ -27,10 +27,17 @@ internal sealed class DeleteLandingPageTemplateCommandHandler(IContentDbContext 
             return Result.Failure(ContentErrors.CannotDeleteActiveTemplate);
         }
 
-        var totalCount = await dbContext.LandingPageTemplates.CountAsync(cancellationToken);
-        if (totalCount <= 1)
+        // Homepage must always have at least one template to serve as the live site. Product/Category
+        // pages have no such minimum — deleting the last one for a target just means "no marketing page",
+        // a normal, expected state that falls back to the regular PDP/category experience.
+        if (template.Scope == LandingPageScope.Homepage)
         {
-            return Result.Failure(ContentErrors.CannotDeleteLastTemplate);
+            var homepageCount = await dbContext.LandingPageTemplates
+                .CountAsync(t => t.Scope == LandingPageScope.Homepage, cancellationToken);
+            if (homepageCount <= 1)
+            {
+                return Result.Failure(ContentErrors.CannotDeleteLastTemplate);
+            }
         }
 
         template.Delete();

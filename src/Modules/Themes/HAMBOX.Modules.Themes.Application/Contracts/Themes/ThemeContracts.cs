@@ -41,6 +41,7 @@ public sealed record ThemeVersionDto(
     Guid Id,
     int VersionNumber,
     bool IsPublished,
+    bool HasEverBeenPublished,
     DateTime? PublishedOnUtc,
     string? Notes,
     IReadOnlyDictionary<string, string> Tokens,
@@ -53,7 +54,9 @@ public sealed record ThemeScheduleDto(
     DateTime StartsAtUtc,
     DateTime? EndsAtUtc,
     string? RecurrenceRule,
-    bool IsActive);
+    int Priority,
+    bool IsActive,
+    bool HasOverlap);
 
 public sealed record ThemeAssignmentDto(
     Guid Id,
@@ -80,7 +83,8 @@ public sealed record DuplicateThemeRequest(string NewName, string NewSlug);
 public sealed record ScheduleThemeRequest(
     DateTime StartsAtUtc,
     DateTime? EndsAtUtc,
-    string? RecurrenceRule);
+    string? RecurrenceRule,
+    int Priority = 0);
 
 public sealed record AssignThemeRequest(
     string AssignmentType,

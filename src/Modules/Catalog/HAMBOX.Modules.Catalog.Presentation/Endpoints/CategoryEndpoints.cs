@@ -5,6 +5,7 @@ using HAMBOX.Modules.Catalog.Application.Features.Categories.CreateCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.DeleteCategory;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategories;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryById;
+using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryBySlug;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryTree;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.ReorderCategories;
 using HAMBOX.Modules.Catalog.Application.Features.Categories.UpdateCategory;
@@ -102,6 +103,28 @@ internal static class CategoryEndpoints
             });
         })
         .WithName("GetCategoryById")
+        .AllowAnonymous();
+
+        // GET /api/v1/categories/by-slug/{slug}
+        group.MapGet("by-slug/{slug}", async Task<Results<Ok<CategoryDto>, NotFound<ProblemDetails>>> (string slug, ISender sender) =>
+        {
+            var query = new GetCategoryBySlugQuery(slug);
+            var result = await sender.Send(query);
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.NotFound(new ProblemDetails
+            {
+                Title = "Not Found",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status404NotFound
+            });
+        })
+        .WithName("GetCategoryBySlug")
         .AllowAnonymous();
 
         // POST /api/v1/categories

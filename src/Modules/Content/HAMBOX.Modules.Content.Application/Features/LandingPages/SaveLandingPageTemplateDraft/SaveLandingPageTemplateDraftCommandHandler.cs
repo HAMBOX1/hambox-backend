@@ -24,11 +24,25 @@ internal sealed class SaveLandingPageTemplateDraftCommandHandler(IContentDbConte
             return Result.Failure<LandingPageTemplateDetailDto>(ContentErrors.TemplateNotFound);
         }
 
-        template.SaveDraft(LandingPageSectionsSerializer.Serialize(request.Sections));
+        template.SaveDraft(
+            LandingPageSectionsSerializer.Serialize(request.Sections),
+            request.SeoTitle,
+            request.SeoDescription,
+            request.SeoOgImageUrl);
         LandingPageAuditWriter.Record(dbContext, template.Id, LandingPageAuditAction.DraftSaved, currentUser.UserId);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new LandingPageTemplateDetailDto(
-            template.Id, template.Name, template.Slug, template.IsActive, template.HasUnpublishedChanges, request.Sections));
+            template.Id,
+            template.Name,
+            template.Slug,
+            template.IsActive,
+            template.HasUnpublishedChanges,
+            request.Sections,
+            template.Scope,
+            template.TargetId,
+            template.DraftSeoTitle,
+            template.DraftSeoDescription,
+            template.DraftSeoOgImageUrl));
     }
 }

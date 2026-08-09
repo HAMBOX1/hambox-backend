@@ -435,6 +435,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
             (await catalogDb.ProductVariants.AsNoTracking().Select(v => new { v.Id, v.Sku }).ToListAsync(cancellationToken))
                 .ForEach(v => { skuToVariantId[v.Sku] = v.Id; takenSkus.Add(v.Sku); });
 
+            var productIdsWithExplicitVariantRows = new HashSet<Guid>();
+
             foreach (var planRow in plan.Variants)
             {
                 var row = planRow.Row;
@@ -452,6 +454,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
                     summary.Errors.Add($"Variant '{label}': product '{row.ProductImportKey}' could not be resolved.");
                     continue;
                 }
+
+                productIdsWithExplicitVariantRows.Add(productId);
 
                 var optionIds = row.SelectedOptionValues
                     .Where(v => optionValueToId.ContainsKey((productId, v)))
@@ -512,6 +516,23 @@ internal sealed class ExecuteCatalogImportJobHandler(
 
                     summary.Created++;
                 }
+            }
+
+            await catalogDb.SaveChangesAsync(cancellationToken);
+
+            // A file that defines option groups/values but no explicit Variants rows for a
+            // product means "generate every combination" — same as the manual admin "Generate
+            // Variants" action (VariantCombinationHelper). Products the file did author explicit
+            // Variants rows for are left alone so per-row price/status overrides aren't clobbered.
+            var importedProductIds = productKeyToId.Values.ToHashSet();
+            var productIdsNeedingGeneration = groupKeyToId.Keys
+                .Select(k => k.ProductId)
+                .Where(id => importedProductIds.Contains(id) && !productIdsWithExplicitVariantRows.Contains(id))
+                .Distinct();
+
+            foreach (var productId in productIdsNeedingGeneration)
+            {
+                await GenerateCombinatorialVariantsAsync(productId, takenSkus, summary, cancellationToken);
             }
 
             await catalogDb.SaveChangesAsync(cancellationToken);
@@ -601,6 +622,55 @@ internal sealed class ExecuteCatalogImportJobHandler(
             }
 
             await suppliersDb.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private async Task GenerateCombinatorialVariantsAsync(
+        Guid productId,
+        HashSet<string> takenSkus,
+        ImportRunSummary summary,
+        CancellationToken cancellationToken)
+    {
+        var groups = await catalogDb.ProductOptionGroups
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == productId)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var combinations = VariantCombinationHelper.Expand(groups);
+        if (combinations.Count == 0)
+        {
+            return;
+        }
+
+        var optionLookup = groups.SelectMany(g => g.Options).ToDictionary(o => o.Id);
+
+        var existingVariants = await catalogDb.ProductVariants
+            .Include(v => v.SelectedOptions)
+            .Where(v => v.ProductId == productId && !v.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        var existingKeys = existingVariants
+            .Select(v => VariantCombinationHelper.NormalizeCombinationKey(v.SelectedOptions.Select(o => o.OptionId)))
+            .ToHashSet();
+
+        var product = await catalogDb.Products.AsNoTracking().FirstAsync(p => p.Id == productId, cancellationToken);
+        var productPrefix = productId.ToString("N")[..8].ToUpperInvariant();
+        var sortOrder = existingVariants.Count > 0 ? existingVariants.Max(v => v.SortOrder) + 1 : 0;
+
+        foreach (var combination in combinations)
+        {
+            if (!existingKeys.Add(VariantCombinationHelper.NormalizeCombinationKey(combination)))
+            {
+                continue;
+            }
+
+            var optionValues = combination.Select(id => optionLookup[id].Value).ToList();
+            var sku = VariantCombinationHelper.BuildSku(productPrefix, optionValues, takenSkus);
+            var variant = ProductVariant.Create(productId, sku, priceOverride: product.Price, sortOrder: sortOrder++);
+            variant.SetOptions(combination);
+            catalogDb.ProductVariants.Add(variant);
+            summary.Created++;
         }
     }
 

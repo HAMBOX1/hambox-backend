@@ -125,10 +125,53 @@ internal sealed class GetThemeByIdQueryHandler(IThemesDbContext dbContext)
         var schedules = await dbContext.ThemeSchedules.AsNoTracking().Where(s => s.ThemeId == request.Id).ToListAsync(cancellationToken);
         var assignments = await dbContext.ThemeAssignments.AsNoTracking().Where(a => a.ThemeId == request.Id).ToListAsync(cancellationToken);
 
-        return Result.Success(ThemeMapper.ToDetail(theme, versions, assets, schedules, assignments));
+        var overlappingScheduleIds = await FindOverlappingScheduleIdsAsync(dbContext, schedules, cancellationToken);
+
+        return Result.Success(ThemeMapper.ToDetail(theme, versions, assets, schedules, assignments, overlappingScheduleIds));
+    }
+
+    /// <summary>
+    /// Only one theme can be "the" active one at any moment, so two schedules that overlap in time —
+    /// even across different themes — are an ambiguous configuration worth flagging to the admin,
+    /// regardless of which one the resolver's priority/start-date tiebreak would actually pick.
+    /// </summary>
+    private static async Task<IReadOnlySet<Guid>> FindOverlappingScheduleIdsAsync(
+        IThemesDbContext dbContext,
+        IReadOnlyList<ThemeSchedule> schedules,
+        CancellationToken cancellationToken)
+    {
+        var activeSchedules = schedules.Where(s => s.IsActive).ToList();
+        if (activeSchedules.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var allActiveSchedules = await dbContext.ThemeSchedules.AsNoTracking()
+            .Where(s => s.IsActive)
+            .ToListAsync(cancellationToken);
+
+        var overlapping = new HashSet<Guid>();
+        foreach (var schedule in activeSchedules)
+        {
+            var scheduleEnd = schedule.EndsAtUtc ?? DateTime.MaxValue;
+            var overlapsAnother = allActiveSchedules.Any(other =>
+                other.Id != schedule.Id &&
+                schedule.StartsAtUtc <= (other.EndsAtUtc ?? DateTime.MaxValue) &&
+                other.StartsAtUtc <= scheduleEnd);
+
+            if (overlapsAnother)
+            {
+                overlapping.Add(schedule.Id);
+            }
+        }
+
+        return overlapping;
     }
 }
 
+// MembershipPlanSlug is intentionally never honored by the handler below — see the security note
+// there. It's kept on the query only so the public endpoint's existing query-string contract
+// doesn't break for any current caller.
 public sealed record GetActiveThemeQuery(string? MembershipPlanSlug)
     : IRequest<Result<ActiveThemeDto>>;
 
@@ -140,13 +183,13 @@ internal sealed class GetActiveThemeQueryHandler(
 {
     public async Task<Result<ActiveThemeDto>> Handle(GetActiveThemeQuery request, CancellationToken cancellationToken)
     {
-        // Theme Unlock membership benefit: the caller may pass a slug explicitly (e.g. admin
-        // preview), but for a real signed-in member we always resolve their actual plan slug
-        // server-side rather than trusting a client-supplied value — this is also what makes
-        // unlocked themes apply automatically the moment a membership changes, with no separate
-        // sync step required on the storefront.
-        var membershipPlanSlug = request.MembershipPlanSlug;
-        if (string.IsNullOrWhiteSpace(membershipPlanSlug) && !string.IsNullOrWhiteSpace(currentUser.UserId))
+        // This endpoint is anonymous, so a client-supplied membership slug can never be trusted —
+        // it would let anyone request another tier's theme tokens simply by passing a different
+        // slug on the query string. The caller's real plan is always resolved server-side from
+        // their authenticated identity; a caller with no session falls through to Store/Default
+        // resolution. request.MembershipPlanSlug is intentionally never read.
+        string? membershipPlanSlug = null;
+        if (!string.IsNullOrWhiteSpace(currentUser.UserId))
         {
             var access = await membershipAccess.GetAccessInfoAsync(currentUser.UserId, cancellationToken);
             membershipPlanSlug = access.HasActiveMembership ? access.PlanSlug : null;
@@ -448,7 +491,18 @@ internal sealed class PublishThemeCommandHandler(IThemesDbContext dbContext, ICu
         version.SetValidationWarnings(validation.Warnings);
         theme.PublishVersion(version.Id);
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.Published, currentUser.UserId, $"{{\"versionId\":\"{version.Id}\"}}");
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Two admins racing to publish the same theme: whichever save loses the row-version
+            // check gets a clean, actionable failure instead of silently overwriting the winner.
+            return Result.Failure<ThemeValidationResultDto>(ThemeErrors.ThemeConcurrencyConflict);
+        }
+
         return Result.Success(validation);
     }
 }
@@ -489,7 +543,11 @@ internal sealed class RollbackThemeCommandHandler(IThemesDbContext dbContext, IC
             return Result.Failure(ThemeErrors.ThemeNotFound);
         }
 
-        var version = theme.Versions.FirstOrDefault(v => v.Id == request.VersionId && v.IsPublished);
+        // Any version that was published at some point is a valid rollback target — not just the
+        // currently-live one. PublishVersion unpublishes the previous version on every new publish,
+        // so filtering on the (current) IsPublished flag here would make rollback unreachable for
+        // exactly the versions an admin actually wants to roll back to.
+        var version = theme.Versions.FirstOrDefault(v => v.Id == request.VersionId && v.HasEverBeenPublished);
         if (version is null)
         {
             return Result.Failure(ThemeErrors.ThemeNoVersion);
@@ -497,7 +555,16 @@ internal sealed class RollbackThemeCommandHandler(IThemesDbContext dbContext, IC
 
         theme.PublishVersion(version.Id);
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.RolledBack, currentUser.UserId, $"{{\"versionId\":\"{request.VersionId}\"}}");
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(ThemeErrors.ThemeConcurrencyConflict);
+        }
+
         return Result.Success();
     }
 }
@@ -548,7 +615,7 @@ internal sealed class ScheduleThemeCommandHandler(IThemesDbContext dbContext, IC
             return Result.Failure<Guid>(ThemeErrors.ThemeNotFound);
         }
 
-        var schedule = theme.AddSchedule(request.Request.StartsAtUtc, request.Request.EndsAtUtc, request.Request.RecurrenceRule);
+        var schedule = theme.AddSchedule(request.Request.StartsAtUtc, request.Request.EndsAtUtc, request.Request.RecurrenceRule, request.Request.Priority);
         dbContext.ThemeSchedules.Add(schedule);
         ThemeAuditWriter.Record(dbContext, theme.Id, ThemeAuditAction.Scheduled, currentUser.UserId);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -564,6 +631,16 @@ internal sealed class AssignThemeCommandHandler(IThemesDbContext dbContext, ICur
     public async Task<Result<Guid>> Handle(AssignThemeCommand request, CancellationToken cancellationToken)
     {
         if (!Enum.TryParse<ThemeAssignmentType>(request.Request.AssignmentType, true, out var type))
+        {
+            return Result.Failure<Guid>(ThemeErrors.ThemeInvalidAssignmentType);
+        }
+
+        // Campaign/Region/Tenant are reserved, never-resolved values (see ThemeAssignmentType) —
+        // rejecting them here closes the gap where the write side used to be more permissive than
+        // the read side. The real mechanism for time-boxed marketing overrides is ThemeCampaign.
+#pragma warning disable CS0618 // intentionally comparing against the obsolete reserved values to reject them
+        if (type is ThemeAssignmentType.Campaign or ThemeAssignmentType.Region or ThemeAssignmentType.Tenant)
+#pragma warning restore CS0618
         {
             return Result.Failure<Guid>(ThemeErrors.ThemeInvalidAssignmentType);
         }

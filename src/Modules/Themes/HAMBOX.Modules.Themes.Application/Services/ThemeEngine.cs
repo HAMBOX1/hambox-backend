@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Themes.Application.Abstractions;
 using HAMBOX.Modules.Themes.Application.Contracts.Themes;
+using HAMBOX.Modules.Themes.Domain.Campaigns;
 using HAMBOX.Modules.Themes.Domain.Themes;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +44,19 @@ public sealed class ThemeEngine : IThemeEngine
         CancellationToken cancellationToken = default)
     {
         var now = asOfUtc ?? DateTime.UtcNow;
+
+        // Highest precedence: an active, storefront-wide marketing campaign overrides every other
+        // source, including membership themes — see ThemeCampaign's remarks for the business
+        // rationale. Reuses BuildPublishedThemeAsync exactly like every other source below.
+        var campaignThemeId = await ResolveActiveCampaignThemeIdAsync(now, cancellationToken);
+        if (campaignThemeId.HasValue)
+        {
+            var campaignTheme = await BuildPublishedThemeAsync(campaignThemeId.Value, "campaign", cancellationToken);
+            if (campaignTheme is not null)
+            {
+                return campaignTheme;
+            }
+        }
 
         var scheduledThemeId = await ResolveScheduledThemeIdAsync(now, cancellationToken);
         if (scheduledThemeId.HasValue)
@@ -94,12 +108,29 @@ public sealed class ThemeEngine : IThemeEngine
         return null;
     }
 
+    private async Task<Guid?> ResolveActiveCampaignThemeIdAsync(DateTime utcNow, CancellationToken cancellationToken)
+    {
+        // Live campaigns are an admin-configured dataset (a handful of rows, not a hot high-volume
+        // table), so the candidate set is filtered in SQL and the final tiebreak is applied
+        // in-memory via the shared CampaignResolutionOrdering helper — this also sidesteps
+        // SQLite's inability to translate ORDER BY on DateTimeOffset (CreatedOnUtc), which only
+        // matters for the SQLite-backed integration test harness, not the SQL Server provider
+        // this runs against in every real environment.
+        var candidates = await _dbContext.ThemeCampaigns
+            .AsNoTracking()
+            .Where(c => c.Status == CampaignStatus.Published && c.IsEnabled && c.StartsAtUtc <= utcNow && c.EndsAtUtc > utcNow)
+            .ToListAsync(cancellationToken);
+
+        return CampaignResolutionOrdering.SelectWinner(candidates)?.ThemeId;
+    }
+
     private async Task<Guid?> ResolveScheduledThemeIdAsync(DateTime utcNow, CancellationToken cancellationToken)
     {
         return await _dbContext.ThemeSchedules
             .AsNoTracking()
             .Where(s => s.IsActive && s.StartsAtUtc <= utcNow && (s.EndsAtUtc == null || s.EndsAtUtc >= utcNow))
-            .OrderByDescending(s => s.StartsAtUtc)
+            .OrderByDescending(s => s.Priority)
+            .ThenByDescending(s => s.StartsAtUtc)
             .Select(s => (Guid?)s.ThemeId)
             .FirstOrDefaultAsync(cancellationToken);
     }

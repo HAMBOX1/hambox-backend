@@ -110,9 +110,9 @@ public sealed class StoreTheme : AggregateRoot, ISoftDeletable
         Description = description?.Trim();
     }
 
-    public ThemeSchedule AddSchedule(DateTime startsAtUtc, DateTime? endsAtUtc, string? recurrenceRule = null)
+    public ThemeSchedule AddSchedule(DateTime startsAtUtc, DateTime? endsAtUtc, string? recurrenceRule = null, int priority = 0)
     {
-        var schedule = ThemeSchedule.Create(Id, startsAtUtc, endsAtUtc, recurrenceRule);
+        var schedule = ThemeSchedule.Create(Id, startsAtUtc, endsAtUtc, recurrenceRule, priority);
         _schedules.Add(schedule);
         return schedule;
     }

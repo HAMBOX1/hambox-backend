@@ -12,8 +12,19 @@ internal sealed class GetLandingPageTemplatesQueryHandler(IContentDbContext dbCo
     public async Task<Result<IReadOnlyList<LandingPageTemplateSummaryDto>>> Handle(
         GetLandingPageTemplatesQuery request, CancellationToken cancellationToken)
     {
-        var templates = await dbContext.LandingPageTemplates
-            .AsNoTracking()
+        var query = dbContext.LandingPageTemplates.AsNoTracking();
+
+        if (request.Scope is { } scope)
+        {
+            query = query.Where(t => t.Scope == scope);
+        }
+
+        if (request.TargetIds is { Count: > 0 } targetIds)
+        {
+            query = query.Where(t => t.TargetId != null && targetIds.Contains(t.TargetId!.Value));
+        }
+
+        var templates = await query
             .OrderByDescending(t => t.IsActive)
             .ThenByDescending(t => t.ModifiedOnUtc)
             .ToListAsync(cancellationToken);
@@ -25,7 +36,9 @@ internal sealed class GetLandingPageTemplatesQueryHandler(IContentDbContext dbCo
                 t.Slug,
                 t.IsActive,
                 t.HasUnpublishedChanges,
-                (t.ModifiedOnUtc ?? t.CreatedOnUtc).UtcDateTime))
+                (t.ModifiedOnUtc ?? t.CreatedOnUtc).UtcDateTime,
+                t.Scope,
+                t.TargetId))
             .ToList();
 
         return Result.Success<IReadOnlyList<LandingPageTemplateSummaryDto>>(dtos);

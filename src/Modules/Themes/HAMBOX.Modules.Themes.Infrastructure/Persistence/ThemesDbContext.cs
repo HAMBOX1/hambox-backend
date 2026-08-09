@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Themes.Application.Abstractions;
+using HAMBOX.Modules.Themes.Domain.Campaigns;
 using HAMBOX.Modules.Themes.Domain.Themes;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,8 @@ public sealed class ThemesDbContext(DbContextOptions<ThemesDbContext> options)
     public DbSet<ThemeAsset> ThemeAssets => Set<ThemeAsset>();
     public DbSet<ThemeAuditLog> ThemeAuditLogs => Set<ThemeAuditLog>();
     public DbSet<ThemePreviewSession> ThemePreviewSessions => Set<ThemePreviewSession>();
+    public DbSet<ThemeCampaign> ThemeCampaigns => Set<ThemeCampaign>();
+    public DbSet<CampaignAuditLog> CampaignAuditLogs => Set<CampaignAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,5 +25,6 @@ public sealed class ThemesDbContext(DbContextOptions<ThemesDbContext> options)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ThemesDbContext).Assembly);
 
         modelBuilder.Entity<StoreTheme>().HasQueryFilter(t => !t.IsDeleted);
+        modelBuilder.Entity<ThemeCampaign>().HasQueryFilter(c => !c.IsDeleted);
     }
 }

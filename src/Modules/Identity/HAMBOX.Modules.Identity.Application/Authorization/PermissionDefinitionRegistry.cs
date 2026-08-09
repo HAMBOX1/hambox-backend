@@ -55,6 +55,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Communication = new("15000000-0000-0000-0000-000000000030");
         public static readonly Guid Collections = new("15000000-0000-0000-0000-000000000031");
         public static readonly Guid PageBuilder = new("15000000-0000-0000-0000-000000000032");
+        public static readonly Guid Campaigns = new("15000000-0000-0000-0000-000000000033");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -91,6 +92,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Communication, "Communication", "Communication Center", "Communication", 148, "Templates, notifications, providers, and delivery history"),
         new(GroupIds.Collections, "Collections", "Collections", "Catalog", 45, "Internal, owner-only product organization (never customer-facing)"),
         new(GroupIds.PageBuilder, "PageBuilder", "Page Builder", "Platform", 149, "Storefront homepage landing page templates and section arrangement"),
+        new(GroupIds.Campaigns, "Campaigns", "Theme Campaigns", "Platform", 141, "Time-boxed, storefront-wide marketing theme overrides (Black Friday, Ramadan, ...)"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -293,6 +295,13 @@ public static class PermissionDefinitionRegistry
         // Security Center redesign (269-270) appended to preserve RolePermission seed indices
         new(new Guid("20000000-0000-0000-0000-000000000269"), GroupIds.Security, PermissionConstants.Security.ManageAlerts, 7),
         new(new Guid("20000000-0000-0000-0000-000000000270"), GroupIds.Security, PermissionConstants.Security.ManageDevices, 8),
+
+        // Theme Campaigns (271-275) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000271"), GroupIds.Campaigns, PermissionConstants.Campaigns.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000272"), GroupIds.Campaigns, PermissionConstants.Campaigns.Create, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000273"), GroupIds.Campaigns, PermissionConstants.Campaigns.Edit, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000274"), GroupIds.Campaigns, PermissionConstants.Campaigns.Publish, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000275"), GroupIds.Campaigns, PermissionConstants.Campaigns.Delete, 5),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

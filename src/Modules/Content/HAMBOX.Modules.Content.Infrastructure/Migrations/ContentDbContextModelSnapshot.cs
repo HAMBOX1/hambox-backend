@@ -74,6 +74,18 @@ namespace HAMBOX.Modules.Content.Infrastructure.Migrations
                     b.Property<string>("DraftSectionsJson")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("DraftSeoDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("DraftSeoOgImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DraftSeoTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -92,18 +104,41 @@ namespace HAMBOX.Modules.Content.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
                     b.Property<string>("SectionsJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SeoDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SeoOgImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("SeoTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
 
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IsActive");
+
+                    b.HasIndex("Scope", "TargetId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LandingPageTemplates_ActiveTarget")
+                        .HasFilter("[IsActive] = 1 AND [IsDeleted] = 0");
 
                     b.ToTable("LandingPageTemplates", "content");
                 });

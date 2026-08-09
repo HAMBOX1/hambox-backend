@@ -23,10 +23,21 @@ internal sealed class GetLandingPageTemplateByIdQueryHandler(IContentDbContext d
             return Result.Failure<LandingPageTemplateDetailDto>(ContentErrors.TemplateNotFound);
         }
 
-        // Editing state: an unpublished draft (if any) takes precedence over the published sections.
+        // Editing state: an unpublished draft (if any) takes precedence over the published sections/SEO.
         var sections = LandingPageSectionsSerializer.Deserialize(template.DraftSectionsJson ?? template.SectionsJson);
+        var hasDraft = template.DraftSectionsJson is not null;
 
         return Result.Success(new LandingPageTemplateDetailDto(
-            template.Id, template.Name, template.Slug, template.IsActive, template.HasUnpublishedChanges, sections));
+            template.Id,
+            template.Name,
+            template.Slug,
+            template.IsActive,
+            template.HasUnpublishedChanges,
+            sections,
+            template.Scope,
+            template.TargetId,
+            hasDraft ? template.DraftSeoTitle : template.SeoTitle,
+            hasDraft ? template.DraftSeoDescription : template.SeoDescription,
+            hasDraft ? template.DraftSeoOgImageUrl : template.SeoOgImageUrl));
     }
 }

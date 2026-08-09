@@ -30,6 +30,16 @@ internal sealed class DiscardLandingPageTemplateDraftCommandHandler(IContentDbCo
 
         var sections = LandingPageSectionsSerializer.Deserialize(template.SectionsJson);
         return Result.Success(new LandingPageTemplateDetailDto(
-            template.Id, template.Name, template.Slug, template.IsActive, template.HasUnpublishedChanges, sections));
+            template.Id,
+            template.Name,
+            template.Slug,
+            template.IsActive,
+            template.HasUnpublishedChanges,
+            sections,
+            template.Scope,
+            template.TargetId,
+            template.SeoTitle,
+            template.SeoDescription,
+            template.SeoOgImageUrl));
     }
 }

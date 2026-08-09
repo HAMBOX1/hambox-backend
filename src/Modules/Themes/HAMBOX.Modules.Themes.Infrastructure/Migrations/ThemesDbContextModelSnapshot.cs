@@ -23,6 +23,97 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Campaigns.CampaignAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("CampaignId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DetailsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampaignId", "CreatedOnUtc");
+
+                    b.ToTable("CampaignAuditLogs", "platform");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Campaigns.ThemeCampaign", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ThemeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ThemeId");
+
+                    b.HasIndex("Status", "IsEnabled", "StartsAtUtc", "EndsAtUtc");
+
+                    b.ToTable("ThemeCampaigns", "platform");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Themes.StoreTheme", b =>
                 {
                     b.Property<Guid>("Id")
@@ -61,6 +152,11 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
 
                     b.Property<Guid?>("PublishedVersionId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -242,6 +338,9 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
                     b.Property<string>("RecurrenceRule")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -268,6 +367,9 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("HasEverBeenPublished")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
@@ -284,6 +386,11 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
 
                     b.Property<DateTime?>("PublishedOnUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("ThemeId")
                         .HasColumnType("uniqueidentifier");
@@ -304,6 +411,15 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ThemeVersions", "platform");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Campaigns.ThemeCampaign", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Themes.Domain.Themes.StoreTheme", null)
+                        .WithMany()
+                        .HasForeignKey("ThemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Themes.ThemeAsset", b =>

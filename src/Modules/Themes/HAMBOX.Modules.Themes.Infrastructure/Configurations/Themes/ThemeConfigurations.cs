@@ -17,6 +17,10 @@ internal sealed class StoreThemeConfiguration : IEntityTypeConfiguration<StoreTh
         builder.Property(t => t.BaseMode).HasConversion<int>();
         builder.HasIndex(t => t.Slug).IsUnique();
 
+        // Concurrency
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         builder.HasMany(t => t.Versions)
             .WithOne()
             .HasForeignKey(v => v.ThemeId)
@@ -48,11 +52,19 @@ internal sealed class ThemeVersionConfiguration : IEntityTypeConfiguration<Theme
     {
         builder.ToTable("ThemeVersions");
         builder.HasKey(v => v.Id);
-        builder.Property(v => v.TokensJson).HasColumnType("nvarchar(max)").IsRequired();
+        // No explicit HasColumnType: an un-annotated, un-length-capped string already defaults to
+        // nvarchar(max) under the SqlServer provider (same DDL either way) — leaving it implicit
+        // instead of hardcoding a SQL-Server-only type string keeps this portable to other
+        // providers (e.g. SQLite, used by integration tests elsewhere in this solution).
+        builder.Property(v => v.TokensJson).IsRequired();
         builder.Property(v => v.Notes).HasMaxLength(2000);
         builder.Property(v => v.PublishedBy).HasMaxLength(128);
-        builder.Property(v => v.ValidationWarningsJson).HasColumnType("nvarchar(max)");
+        builder.Property(v => v.ValidationWarningsJson);
         builder.HasIndex(v => new { v.ThemeId, v.VersionNumber }).IsUnique();
+
+        // Concurrency
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
     }
 }
 
@@ -99,7 +111,7 @@ internal sealed class ThemeAuditLogConfiguration : IEntityTypeConfiguration<Them
         builder.HasKey(l => l.Id);
         builder.Property(l => l.Action).HasConversion<int>();
         builder.Property(l => l.ActorUserId).HasMaxLength(128);
-        builder.Property(l => l.DetailsJson).HasColumnType("nvarchar(max)");
+        builder.Property(l => l.DetailsJson);
         builder.HasIndex(l => new { l.ThemeId, l.CreatedOnUtc });
     }
 }

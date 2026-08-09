@@ -26,8 +26,10 @@ internal sealed class ActivateLandingPageTemplateCommandHandler(IContentDbContex
 
         if (!target.IsActive)
         {
+            // Scoped to the same (Scope, TargetId) family only — activating a page for Product A
+            // must never deactivate a page for Product B or the homepage.
             var currentlyActive = await dbContext.LandingPageTemplates
-                .Where(t => t.IsActive && t.Id != target.Id)
+                .Where(t => t.IsActive && t.Id != target.Id && t.Scope == target.Scope && t.TargetId == target.TargetId)
                 .ToListAsync(cancellationToken);
 
             foreach (var other in currentlyActive)
@@ -46,6 +48,8 @@ internal sealed class ActivateLandingPageTemplateCommandHandler(IContentDbContex
             target.Slug,
             target.IsActive,
             target.HasUnpublishedChanges,
-            (target.ModifiedOnUtc ?? target.CreatedOnUtc).UtcDateTime));
+            (target.ModifiedOnUtc ?? target.CreatedOnUtc).UtcDateTime,
+            target.Scope,
+            target.TargetId));
     }
 }

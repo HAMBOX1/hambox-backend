@@ -38,6 +38,7 @@ public static class ThemeMapper
             version.Id,
             version.VersionNumber,
             version.IsPublished,
+            version.HasEverBeenPublished,
             version.PublishedOnUtc,
             version.Notes,
             version.GetTokens(),
@@ -49,7 +50,8 @@ public static class ThemeMapper
         IReadOnlyList<ThemeVersion> versions,
         IReadOnlyList<ThemeAsset> assets,
         IReadOnlyList<ThemeSchedule> schedules,
-        IReadOnlyList<ThemeAssignment> assignments) =>
+        IReadOnlyList<ThemeAssignment> assignments,
+        IReadOnlySet<Guid>? overlappingScheduleIds = null) =>
         new(
             theme.Id,
             theme.Name,
@@ -62,7 +64,14 @@ public static class ThemeMapper
             theme.VersionCounter,
             versions.Select(ToVersionDto).ToList(),
             assets.Select(a => new ThemeAssetDto(a.AssetType.ToString(), a.Url, a.AltText)).ToList(),
-            schedules.Select(s => new ThemeScheduleDto(s.Id, s.StartsAtUtc, s.EndsAtUtc, s.RecurrenceRule, s.IsActive)).ToList(),
+            schedules.Select(s => new ThemeScheduleDto(
+                s.Id,
+                s.StartsAtUtc,
+                s.EndsAtUtc,
+                s.RecurrenceRule,
+                s.Priority,
+                s.IsActive,
+                overlappingScheduleIds?.Contains(s.Id) ?? false)).ToList(),
             assignments.Select(a => new ThemeAssignmentDto(a.Id, a.AssignmentType.ToString(), a.TargetKey, a.Priority, a.IsActive)).ToList());
 
     public static Dictionary<string, string> DefaultTokens(ThemeBaseMode baseMode) =>

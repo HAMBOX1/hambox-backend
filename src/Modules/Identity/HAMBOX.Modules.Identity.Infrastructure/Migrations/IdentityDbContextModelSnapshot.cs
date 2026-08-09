@@ -1341,6 +1341,51 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Name = "Security.ManageDevices",
                             NormalizedName = "SECURITY.MANAGEDEVICES",
                             SortOrder = 8
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000271"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000033"),
+                            Name = "Campaigns.View",
+                            NormalizedName = "CAMPAIGNS.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000272"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000033"),
+                            Name = "Campaigns.Create",
+                            NormalizedName = "CAMPAIGNS.CREATE",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000273"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000033"),
+                            Name = "Campaigns.Edit",
+                            NormalizedName = "CAMPAIGNS.EDIT",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000274"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000033"),
+                            Name = "Campaigns.Publish",
+                            NormalizedName = "CAMPAIGNS.PUBLISH",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000275"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000033"),
+                            Name = "Campaigns.Delete",
+                            NormalizedName = "CAMPAIGNS.DELETE",
+                            SortOrder = 5
                         });
                 });
 
@@ -1679,6 +1724,16 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Module = "Platform",
                             Name = "Page Builder",
                             SortOrder = 149
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000033"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Time-boxed, storefront-wide marketing theme overrides (Black Friday, Ramadan, ...)",
+                            Key = "Campaigns",
+                            Module = "Platform",
+                            Name = "Theme Campaigns",
+                            SortOrder = 141
                         });
                 });
 
@@ -2753,6 +2808,41 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Id = new Guid("30000000-0000-0000-0000-000000000130"),
                             CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             PermissionId = new Guid("20000000-0000-0000-0000-000000000270"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000131"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000271"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000132"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000272"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000133"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000273"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000134"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000274"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000135"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000275"),
                             RoleId = new Guid("10000000-0000-0000-0000-000000000002")
                         });
                 });

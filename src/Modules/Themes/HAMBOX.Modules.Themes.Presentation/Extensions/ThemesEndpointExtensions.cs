@@ -15,6 +15,7 @@ public static class ThemesEndpointExtensions
             .Build();
 
         app.MapThemeEndpoints(apiVersionSet);
+        app.MapCampaignEndpoints(apiVersionSet);
         return app;
     }
 }
