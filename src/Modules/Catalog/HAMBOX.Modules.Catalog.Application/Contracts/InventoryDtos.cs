@@ -2,7 +2,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 
 public sealed record ProductPlanDto(Guid Id, Guid ProductId, string Name, string Slug, int SortOrder, string Status);
 
-public sealed record ProductOptionDto(Guid Id, Guid OptionGroupId, string Value, string Label, int SortOrder);
+public sealed record ProductOptionDto(Guid Id, Guid OptionGroupId, string Value, string Label, int SortOrder, string? DescriptionHtml = null);
 
 public sealed record ProductOptionGroupDto(
     Guid Id,
@@ -13,6 +13,18 @@ public sealed record ProductOptionGroupDto(
     int SortOrder,
     bool IsRequired,
     IReadOnlyList<ProductOptionDto> Options);
+
+/// <summary>Lightweight autocomplete suggestion for the "reuse a saved option group" combobox.</summary>
+public sealed record OptionGroupTemplateSummaryDto(Guid Id, string Name, int OptionCount);
+
+public sealed record OptionGroupTemplateOptionDto(Guid Id, string Value, string Label, int SortOrder, string? DescriptionHtml);
+
+/// <summary>Full snapshot of a saved reusable option group, for the "edit template" dialog.</summary>
+public sealed record OptionGroupTemplateDto(
+    Guid Id,
+    string Name,
+    bool IsRequiredDefault,
+    IReadOnlyList<OptionGroupTemplateOptionDto> Options);
 
 public sealed record ProductVariantDto(
     Guid Id,

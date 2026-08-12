@@ -182,6 +182,18 @@ public static class CatalogErrors
         "Inventory.InvalidCodeStatus",
         "The inventory code status does not allow this operation.");
 
+    public static readonly Error OptionGroupTemplateNotFound = new(
+        "Inventory.OptionGroupTemplateNotFound",
+        "The saved option group was not found.");
+
+    public static readonly Error DuplicateOptionGroupTemplateName = new(
+        "Inventory.DuplicateOptionGroupTemplateName",
+        "A saved option group with this name already exists.");
+
+    public static readonly Error OptionGroupHasChildGroups = new(
+        "Inventory.OptionGroupHasChildGroups",
+        "This option group has follow-up option groups and can't be saved as a reusable template yet.");
+
     /// <summary>
     /// Gets the error for when permanent variant deletion is blocked because usage inspection
     /// (re-run fresh, inside the same transaction as the delete attempt — never trusting counts

@@ -59,6 +59,8 @@ public interface ICatalogDbContext
     DbSet<ProductPlan> ProductPlans { get; }
     DbSet<ProductOptionGroup> ProductOptionGroups { get; }
     DbSet<ProductOption> ProductOptions { get; }
+    DbSet<OptionGroupTemplate> OptionGroupTemplates { get; }
+    DbSet<OptionGroupTemplateOption> OptionGroupTemplateOptions { get; }
     DbSet<ProductVariant> ProductVariants { get; }
     DbSet<ProductVariantOption> ProductVariantOptions { get; }
     DbSet<InventorySupplier> InventorySuppliers { get; }

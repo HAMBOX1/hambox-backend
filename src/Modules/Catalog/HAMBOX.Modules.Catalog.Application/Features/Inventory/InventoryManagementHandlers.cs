@@ -4,6 +4,7 @@ using HAMBOX.Application.Variants;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.SharedKernel.Results;
@@ -46,7 +47,7 @@ public sealed record UpdateProductOptionGroupCommand(
 public sealed record DeleteProductOptionGroupCommand(Guid GroupId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionGroupsCommand(Guid ProductId, IReadOnlyList<Guid> OrderedGroupIds) : IRequest<Result>;
 
-public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder) : IRequest<Result>;
+public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder, string? DescriptionHtml = null) : IRequest<Result>;
 public sealed record DeleteProductOptionCommand(Guid OptionId) : IRequest<Result>;
 public sealed record ReorderProductOptionsCommand(Guid GroupId, IReadOnlyList<Guid> OrderedOptionIds) : IRequest<Result>;
 
@@ -501,7 +502,8 @@ internal sealed class UpdateProductOptionCommandHandler : IRequestHandler<Update
             return Result.Failure(CatalogErrors.OptionNotFound);
         }
 
-        option.Update(request.Label, request.SortOrder);
+        var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);
+        option.Update(request.Label, request.SortOrder, descriptionHtml);
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -562,7 +564,7 @@ internal sealed class ReorderProductOptionsCommandHandler : IRequestHandler<Reor
                 return Result.Failure(CatalogErrors.OptionNotFound);
             }
 
-            option.Update(option.Label, index);
+            option.Update(option.Label, index, option.DescriptionHtml);
         }
 
         await _db.SaveChangesAsync(cancellationToken);

@@ -32,6 +32,9 @@ internal sealed class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQ
         int totalCount = await query.CountAsync(cancellationToken);
 
         var categories = await query
+            .OrderBy(c => c.ParentId)
+            .ThenBy(c => c.SortOrder)
+            .ThenBy(c => c.Id)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId, c.ImageUrl))

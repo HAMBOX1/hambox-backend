@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.SharedKernel.Results;
@@ -208,7 +209,7 @@ internal sealed class GetProductOptionGroupsQueryHandler : IRequestHandler<GetPr
 
         var dtos = groups.Select(g => new ProductOptionGroupDto(
             g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
-            g.Options.OrderBy(o => o.SortOrder).Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder)).ToList()
+            g.Options.OrderBy(o => o.SortOrder).Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml)).ToList()
         )).ToList();
 
         return Result.Success<IReadOnlyList<ProductOptionGroupDto>>(dtos);
@@ -261,7 +262,7 @@ internal sealed class CreateProductOptionGroupCommandHandler : IRequestHandler<C
     }
 }
 
-public sealed record CreateProductOptionCommand(Guid OptionGroupId, string Value, string Label, int SortOrder) : IRequest<Result<Guid>>;
+public sealed record CreateProductOptionCommand(Guid OptionGroupId, string Value, string Label, int SortOrder, string? DescriptionHtml = null) : IRequest<Result<Guid>>;
 
 internal sealed class CreateProductOptionCommandHandler : IRequestHandler<CreateProductOptionCommand, Result<Guid>>
 {
@@ -282,7 +283,8 @@ internal sealed class CreateProductOptionCommandHandler : IRequestHandler<Create
             return Result.Failure<Guid>(CatalogErrors.ProductNotFound);
         }
 
-        var option = ProductOption.Create(request.OptionGroupId, request.Value, request.Label, request.SortOrder);
+        var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);
+        var option = ProductOption.Create(request.OptionGroupId, request.Value, request.Label, request.SortOrder, descriptionHtml);
         _db.ProductOptions.Add(option);
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
             InventoryAuditAction.OptionCreated,

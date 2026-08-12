@@ -41,7 +41,34 @@ internal sealed class ProductOptionConfiguration : IEntityTypeConfiguration<Prod
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Value).IsRequired().HasMaxLength(100);
         builder.Property(x => x.Label).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.DescriptionHtml).HasColumnType("nvarchar(max)");
         builder.HasIndex(x => new { x.OptionGroupId, x.Value }).IsUnique();
+    }
+}
+
+internal sealed class OptionGroupTemplateConfiguration : IEntityTypeConfiguration<OptionGroupTemplate>
+{
+    public void Configure(EntityTypeBuilder<OptionGroupTemplate> builder)
+    {
+        builder.ToTable("OptionGroupTemplates");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
+        builder.HasIndex(x => x.Name).IsUnique();
+        builder.HasMany(x => x.Options).WithOne().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(x => x.Options).HasField("_options");
+    }
+}
+
+internal sealed class OptionGroupTemplateOptionConfiguration : IEntityTypeConfiguration<OptionGroupTemplateOption>
+{
+    public void Configure(EntityTypeBuilder<OptionGroupTemplateOption> builder)
+    {
+        builder.ToTable("OptionGroupTemplateOptions");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Value).IsRequired().HasMaxLength(100);
+        builder.Property(x => x.Label).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.DescriptionHtml).HasColumnType("nvarchar(max)");
+        builder.HasIndex(x => new { x.TemplateId, x.Value }).IsUnique();
     }
 }
 

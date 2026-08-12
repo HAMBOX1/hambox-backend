@@ -20,7 +20,7 @@ internal static class StorefrontProductConfigurationBuilder
         var optionGroupDtos = optionGroups.Select(g => new ProductOptionGroupDto(
             g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
             g.Options.OrderBy(o => o.SortOrder)
-                .Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder))
+                .Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml))
                 .ToList())).ToList();
 
         var variantDtos = variants.Select(v =>

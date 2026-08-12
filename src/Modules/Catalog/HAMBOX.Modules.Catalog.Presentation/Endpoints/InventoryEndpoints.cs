@@ -109,7 +109,38 @@ internal static class InventoryEndpoints
         group.MapPost("/option-groups/{groupId:guid}/options", async (
             Guid groupId,
             [FromBody] CreateOptionRequest body,
-            ISender sender) => await SendCreated(sender, new CreateProductOptionCommand(groupId, body.Value, body.Label, body.SortOrder)))
+            ISender sender) => await SendCreated(sender, new CreateProductOptionCommand(groupId, body.Value, body.Label, body.SortOrder, body.DescriptionHtml)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
+        group.MapGet("/option-group-templates", async (
+            [FromQuery] string? search,
+            ISender sender) => await Send(sender, new SearchOptionGroupTemplatesQuery(search)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        group.MapGet("/option-group-templates/{templateId:guid}", async (Guid templateId, ISender sender) =>
+            await Send(sender, new GetOptionGroupTemplateQuery(templateId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        group.MapPost("/option-groups/{groupId:guid}/save-as-template", async (
+            Guid groupId,
+            [FromBody] SaveOptionGroupAsTemplateRequest body,
+            ISender sender) => await SendCreated(sender, new SaveOptionGroupAsTemplateCommand(groupId, body.Name)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
+        group.MapPut("/option-group-templates/{templateId:guid}", async (
+            Guid templateId,
+            [FromBody] UpdateOptionGroupTemplateRequest body,
+            ISender sender) => await SendEmpty(sender, new UpdateOptionGroupTemplateCommand(templateId, body.Name, body.IsRequiredDefault, body.Options)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
+        group.MapDelete("/option-group-templates/{templateId:guid}", async (Guid templateId, ISender sender) =>
+            await SendEmpty(sender, new DeleteOptionGroupTemplateCommand(templateId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
+
+        group.MapPost("/products/{productId:guid}/option-groups/import-template", async (
+            Guid productId,
+            [FromBody] ImportOptionGroupTemplateRequest body,
+            ISender sender) => await SendCreated(sender, new ImportOptionGroupTemplateCommand(productId, body.TemplateId, body.Resolution)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
         group.MapPut("/option-groups/{groupId:guid}", async (
@@ -131,7 +162,7 @@ internal static class InventoryEndpoints
         group.MapPut("/options/{optionId:guid}", async (
             Guid optionId,
             [FromBody] UpdateOptionRequest body,
-            ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder)))
+            ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder, body.DescriptionHtml)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapDelete("/options/{optionId:guid}", async (Guid optionId, ISender sender) =>
@@ -339,7 +370,10 @@ internal sealed record CreateVariantRequest(
     IReadOnlyList<Guid> OptionIds);
 
 internal sealed record CreateOptionGroupRequest(string Key, string DisplayName, int SortOrder, bool IsRequired, Guid? ParentOptionId = null);
-internal sealed record CreateOptionRequest(string Value, string Label, int SortOrder);
+internal sealed record CreateOptionRequest(string Value, string Label, int SortOrder, string? DescriptionHtml = null);
+internal sealed record SaveOptionGroupAsTemplateRequest(string Name);
+internal sealed record UpdateOptionGroupTemplateRequest(string Name, bool IsRequiredDefault, IReadOnlyList<OptionGroupTemplateOptionInput> Options);
+internal sealed record ImportOptionGroupTemplateRequest(Guid TemplateId, ImportConflictResolution Resolution);
 internal sealed record CreateSupplierRequest(
     string CompanyName,
     string? ContactPerson,
@@ -377,7 +411,7 @@ internal sealed record BulkUpdateVariantsRequest(
     decimal? PriceOverride,
     ProductVariantStatus? Status);
 internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrder, bool IsRequired);
-internal sealed record UpdateOptionRequest(string Label, int SortOrder);
+internal sealed record UpdateOptionRequest(string Label, int SortOrder, string? DescriptionHtml = null);
 internal sealed record ReorderIdsRequest(IReadOnlyList<Guid> OrderedIds);
 internal sealed record BulkCodeIdsRequest(IReadOnlyList<Guid> CodeIds);
 internal sealed record BulkVariantIdsRequest(IReadOnlyList<Guid> VariantIds);
