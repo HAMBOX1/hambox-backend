@@ -15,6 +15,7 @@ public static class ContentEndpointExtensions
             .Build();
 
         app.MapLandingPageTemplateEndpoints(apiVersionSet);
+        app.MapFaqEndpoints(apiVersionSet);
         return app;
     }
 }

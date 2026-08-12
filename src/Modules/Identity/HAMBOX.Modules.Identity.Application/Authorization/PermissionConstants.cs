@@ -274,6 +274,15 @@ public static class PermissionConstants
         public const string Publish = "PageBuilder.Publish";
     }
 
+    public static class Faq
+    {
+        public const string View = "Faq.View";
+        public const string Create = "Faq.Create";
+        public const string Edit = "Faq.Edit";
+        public const string Delete = "Faq.Delete";
+        public const string Publish = "Faq.Publish";
+    }
+
     /// <summary>
     /// Every non-obsolete permission name declared anywhere in this class, discovered by reflection
     /// so a new <c>public const string</c> added under any nested group is automatically included —

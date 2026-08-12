@@ -56,6 +56,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Collections = new("15000000-0000-0000-0000-000000000031");
         public static readonly Guid PageBuilder = new("15000000-0000-0000-0000-000000000032");
         public static readonly Guid Campaigns = new("15000000-0000-0000-0000-000000000033");
+        public static readonly Guid Faq = new("15000000-0000-0000-0000-000000000034");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -93,6 +94,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Collections, "Collections", "Collections", "Catalog", 45, "Internal, owner-only product organization (never customer-facing)"),
         new(GroupIds.PageBuilder, "PageBuilder", "Page Builder", "Platform", 149, "Storefront homepage landing page templates and section arrangement"),
         new(GroupIds.Campaigns, "Campaigns", "Theme Campaigns", "Platform", 141, "Time-boxed, storefront-wide marketing theme overrides (Black Friday, Ramadan, ...)"),
+        new(GroupIds.Faq, "Faq", "FAQ", "Platform", 150, "Global, product, and category scoped frequently-asked-question entries"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -302,6 +304,13 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000273"), GroupIds.Campaigns, PermissionConstants.Campaigns.Edit, 3),
         new(new Guid("20000000-0000-0000-0000-000000000274"), GroupIds.Campaigns, PermissionConstants.Campaigns.Publish, 4),
         new(new Guid("20000000-0000-0000-0000-000000000275"), GroupIds.Campaigns, PermissionConstants.Campaigns.Delete, 5),
+
+        // FAQ (276-280) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000276"), GroupIds.Faq, PermissionConstants.Faq.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000277"), GroupIds.Faq, PermissionConstants.Faq.Create, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000278"), GroupIds.Faq, PermissionConstants.Faq.Edit, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000279"), GroupIds.Faq, PermissionConstants.Faq.Delete, 4),
+        new(new Guid("20000000-0000-0000-0000-000000000280"), GroupIds.Faq, PermissionConstants.Faq.Publish, 5),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

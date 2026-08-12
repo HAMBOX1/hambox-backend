@@ -6,6 +6,7 @@
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageVersion Include="HtmlSanitizer" Version="9.2.995" />
     <PackageVersion Include="MailKit" Version="4.16.0" />
     <PackageVersion Include="MaxMind.GeoIP2" Version="6.1.0" />
     <PackageVersion Include="MediatR" Version="14.1.0" />

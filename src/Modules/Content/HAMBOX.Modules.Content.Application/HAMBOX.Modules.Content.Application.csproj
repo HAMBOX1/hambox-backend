@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
+    <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="MediatR" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
@@ -16,6 +17,9 @@
     <ProjectReference Include="..\HAMBOX.Modules.Content.Domain\HAMBOX.Modules.Content.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
+    <!-- Read-only: validates Faq TargetId existence against Catalog (Product/Category scopes) — same
+         sanctioned cross-module Application-layer reference as Commerce.Application -> Catalog.Application. -->
+    <ProjectReference Include="..\..\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

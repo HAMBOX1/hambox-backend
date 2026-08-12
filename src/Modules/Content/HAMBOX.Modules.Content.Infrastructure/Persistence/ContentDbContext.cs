@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using HAMBOX.Domain.Entities;
 using HAMBOX.Modules.Content.Application.Abstractions;
+using HAMBOX.Modules.Content.Domain.Faqs;
 using HAMBOX.Modules.Content.Domain.LandingPages;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,9 @@ public sealed class ContentDbContext(DbContextOptions<ContentDbContext> options)
 {
     public DbSet<LandingPageTemplate> LandingPageTemplates => Set<LandingPageTemplate>();
     public DbSet<LandingPageAuditLog> LandingPageAuditLogs => Set<LandingPageAuditLog>();
+    public DbSet<Faq> Faqs => Set<Faq>();
+    public DbSet<FaqCategory> FaqCategories => Set<FaqCategory>();
+    public DbSet<FaqAuditLog> FaqAuditLogs => Set<FaqAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
