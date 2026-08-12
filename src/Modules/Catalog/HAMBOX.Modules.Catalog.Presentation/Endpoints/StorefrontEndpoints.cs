@@ -68,6 +68,18 @@ internal static class StorefrontEndpoints
         .WithName("GetStorefrontProductConfiguration")
         .AllowAnonymous();
 
+        // Bulk form for product listing pages — one request for the whole page of cards instead
+        // of one per card. Ids that don't resolve to an active product are silently omitted.
+        group.MapGet("products/configuration", async Task<Ok<IReadOnlyList<StorefrontProductConfigurationDto>>> (
+            Guid[] ids,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetStorefrontProductConfigurationsQuery(ids));
+            return TypedResults.Ok(result.Value);
+        })
+        .WithName("GetStorefrontProductConfigurations")
+        .AllowAnonymous();
+
         // GET /api/v1/storefront/products/{productId}/configuration/preview — admin-only, ignores Draft/Inactive status
         // so an owner can preview a product before publishing it.
         group.MapGet("products/{productId:guid}/configuration/preview", async Task<Results<Ok<StorefrontProductConfigurationDto>, BadRequest<ProblemDetails>>> (

@@ -65,6 +65,14 @@ internal static class InventoryEndpoints
                 body.LowStockThreshold, body.OptionIds)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
+        group.MapGet("/variants/{variantId:guid}/usage", async (Guid variantId, ISender sender) =>
+            await Send(sender, new GetProductVariantUsageQuery(variantId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        group.MapPost("/variants/{variantId:guid}/cleanup", async (Guid variantId, ISender sender) =>
+            await Send(sender, new CleanupProductVariantCommand(variantId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
+
         group.MapDelete("/variants/{variantId:guid}", async (Guid variantId, ISender sender) =>
             await SendEmpty(sender, new DeleteProductVariantCommand(variantId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
@@ -81,6 +89,10 @@ internal static class InventoryEndpoints
 
         group.MapPost("/variants/{variantId:guid}/deactivate", async (Guid variantId, ISender sender) =>
             await SendEmpty(sender, new DeactivateProductVariantCommand(variantId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
+        group.MapPost("/variants/{variantId:guid}/archive", async (Guid variantId, ISender sender) =>
+            await SendEmpty(sender, new ArchiveProductVariantCommand(variantId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapGet("/products/{productId:guid}/option-groups", async (Guid productId, ISender sender) =>

@@ -161,9 +161,13 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             {
                 return Result.Failure<Contracts.OrderDto>(CatalogErrors.VariantRequired);
             }
-            else if (product.AvailableStock < item.Quantity)
+            else
             {
-                return Result.Failure<Contracts.OrderDto>(CatalogErrors.InsufficientStock);
+                // No variant on this cart line and the product has no active, visible variant at
+                // all — there is no inventory-backed way to ever deliver this product. Block the
+                // order instead of falling back to the legacy Product.StockQuantity counter (CSV
+                // import bookkeeping only, not a real digital code) and fabricating a license key.
+                return Result.Failure<Contracts.OrderDto>(CatalogErrors.ProductNotPurchasable);
             }
         }
 
@@ -191,30 +195,27 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 
             await _transactionService.ExecuteAsync(async ct =>
             {
+                // Every cart line is guaranteed to carry a ProductVariantId here: the validation
+                // loop above already rejected any variant-less line, so reservation is always
+                // against real, inventory-backed digital codes.
                 foreach (var item in cart.Items)
                 {
-                    if (item.ProductVariantId is Guid variantId)
-                    {
-                        var reserved = await _inventoryEngine.ReserveCodesAsync(
-                            variantId,
-                            item.Quantity,
-                            _currentUserService.UserId,
-                            cart.Id,
-                            ct);
+                    var variantId = item.ProductVariantId!.Value;
+                    var reserved = await _inventoryEngine.ReserveCodesAsync(
+                        variantId,
+                        item.Quantity,
+                        _currentUserService.UserId,
+                        cart.Id,
+                        ct);
 
-                        var lineKey = (item.ProductId, item.ProductVariantId);
-                        if (!reservedCodesByLine.TryGetValue(lineKey, out var reservedList))
-                        {
-                            reservedList = [];
-                            reservedCodesByLine[lineKey] = reservedList;
-                        }
-
-                        reservedList.AddRange(reserved);
-                    }
-                    else
+                    var lineKey = (item.ProductId, item.ProductVariantId);
+                    if (!reservedCodesByLine.TryGetValue(lineKey, out var reservedList))
                     {
-                        products[item.ProductId].ReserveStock(item.Quantity);
+                        reservedList = [];
+                        reservedCodesByLine[lineKey] = reservedList;
                     }
+
+                    reservedList.AddRange(reserved);
                 }
 
                 await _catalogDbContext.SaveChangesAsync(ct);
@@ -358,6 +359,9 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                 var commitAssignments = new List<(Guid OrderItemId, Guid CodeId)>();
                 var reservedCodeCursor = new Dictionary<(Guid ProductId, Guid? VariantId), int>();
 
+                // Every order line resolved to a reserved, inventory-backed variant above, so
+                // every line key here is guaranteed to have reserved codes — there is no
+                // remaining branch that fabricates a license key with no real backing.
                 foreach (var orderItem in order.Items.Where(i => i.ProductId is Guid))
                 {
                     var lineKey = (orderItem.ProductId!.Value, orderItem.ProductVariantId);
@@ -374,20 +378,6 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                         }
 
                         reservedCodeCursor[lineKey] = cursor;
-                    }
-                    else if (orderItem.ProductId is Guid productId)
-                    {
-                        for (var i = 0; i < orderItem.Quantity; i++)
-                        {
-                            var licenseKey = OrderLicenseKey.Create(
-                                order.Id,
-                                orderItem.Id,
-                                productId,
-                                LicenseKeyGenerator.Generate(),
-                                orderItem.ProductVariantId);
-
-                            _commerceDbContext.OrderLicenseKeys.Add(licenseKey);
-                        }
                     }
                 }
 
@@ -409,11 +399,6 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     }
                 }
 
-                foreach (var item in cart.Items.Where(i => i.ProductVariantId is null))
-                {
-                    products[item.ProductId].CommitSale(item.Quantity);
-                }
-
                 _commerceDbContext.Orders.Add(order);
                 cart.Clear();
 
@@ -422,6 +407,15 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 
                 createdOrder = order;
             }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Legacy Product.StockQuantity/RowVersion race (optimistic concurrency, not the
+            // row-locked digital-code path) — a genuine concurrent write lost the race. Map to
+            // the same friendly, existing business error other product-concurrency conflicts use
+            // instead of letting it surface as an unhandled 500.
+            _logger.LogWarning(ex, "Checkout failed due to a concurrent product update.");
+            return Result.Failure<Contracts.OrderDto>(CatalogErrors.ProductConcurrencyConflict);
         }
         catch (InvalidOperationException ex)
         {

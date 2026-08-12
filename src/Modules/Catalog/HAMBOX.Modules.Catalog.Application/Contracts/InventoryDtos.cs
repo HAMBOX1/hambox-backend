@@ -118,3 +118,34 @@ public sealed record InventoryReservationDto(
 
 /// <summary>The only DTO in the module that carries a plaintext inventory code — returned solely by the reveal endpoint.</summary>
 public sealed record RevealInventoryCodeDto(string DigitalCode);
+
+/// <summary>
+/// One counted reference type within a <see cref="VariantUsageCategoryDto"/>. <paramref name="Type"/>
+/// is a stable machine key (e.g. "SoldInventoryCodes") the frontend maps to its own translated
+/// label/description — display copy is deliberately not sourced from the API, per the i18n convention.
+/// </summary>
+public sealed record VariantUsageItemDto(string Type, int Count);
+
+/// <summary>
+/// For the SafeToDetach category specifically: "detach" is informational, not an action.
+/// InventoryBatch/InventoryAuditLog rows have no FK to ProductVariant (deliberately — see
+/// InventoryConfigurations), so archiving or permanently deleting a variant never touches, nulls,
+/// or removes them. They simply keep pointing at the variant's (now archived/tombstoned) Id,
+/// which remains a valid historical identifier — no migration or detachment operation is needed
+/// or performed by cleanup or permanent delete. This category exists purely so the admin UI can
+/// explain what those references mean without implying they block or require action.
+/// </summary>
+public sealed record VariantUsageCategoryDto(IReadOnlyList<VariantUsageItemDto> Items, int TotalCount);
+
+/// <summary>
+/// Categorized, real-time usage inspection for a single variant, read fresh from the database on
+/// every call — never cached, never fabricated. <see cref="CanPermanentlyDelete"/> is true only when
+/// <see cref="ProtectedHistory"/>'s total is zero; it does not account for whether SafeToRemove/
+/// SafeToDetach items have been cleaned up yet (permanent delete still re-verifies that server-side).
+/// </summary>
+public sealed record VariantUsageDto(
+    Guid VariantId,
+    VariantUsageCategoryDto SafeToRemove,
+    VariantUsageCategoryDto SafeToDetach,
+    VariantUsageCategoryDto ProtectedHistory,
+    bool CanPermanentlyDelete);

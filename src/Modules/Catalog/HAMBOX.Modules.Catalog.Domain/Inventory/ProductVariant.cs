@@ -118,11 +118,30 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         IsVisible = false;
     }
 
-    public void SoftDelete()
+    /// <summary>
+    /// The primary, reversible "take this variant off sale" action. Sets Status/IsVisible only —
+    /// deliberately does NOT touch <see cref="IsDeleted"/>, so an archived variant stays reachable
+    /// by every lookup that filters on it (e.g. <c>Activate()</c> can bring it back). Blocks new
+    /// purchases and new inventory (see the Active-only checks at checkout and batch/code
+    /// creation) while preserving every historical record that already points at this variant.
+    /// </summary>
+    public void Archive()
     {
-        IsDeleted = true;
-        DeletedOnUtc = DateTimeOffset.UtcNow;
         Status = ProductVariantStatus.Archived;
         IsVisible = false;
+    }
+
+    /// <summary>
+    /// The permanent-delete tombstone. Deliberately irreversible in practice: once
+    /// <see cref="IsDeleted"/> is true, the global soft-delete query filter excludes this row from
+    /// every normal lookup (including the ones <c>Activate()</c>/<c>Update()</c> use), so there is
+    /// no "un-delete" path — this must only be called after usage inspection has proven zero
+    /// protected history remains for this variant.
+    /// </summary>
+    public void SoftDelete()
+    {
+        Archive();
+        IsDeleted = true;
+        DeletedOnUtc = DateTimeOffset.UtcNow;
     }
 }

@@ -49,6 +49,26 @@ public interface IInventoryEngine
         IReadOnlyList<ImportCodeItem> codes,
         string? performedByUserId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes only the genuinely disposable operational data for one variant — active
+    /// reservations (released through the same path as <see cref="ReleaseReservationsAsync"/>,
+    /// so the paired code status flip + audit log stay correct) and Available/Disabled codes.
+    /// Never touches Sold/Reserved/Returned/Expired/Lost codes, InventoryBatches, or
+    /// InventoryAuditLogs. Runs as one atomic transaction; safe to call more than once (idempotent
+    /// — a second call simply finds nothing left to remove).
+    /// </summary>
+    Task<VariantCleanupResult> CleanupVariantAsync(Guid variantId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes (tombstones — see <c>ProductVariant.SoftDelete</c>) a variant. Usage is
+    /// re-checked fresh inside this same call, under a row lock on the variant's inventory codes
+    /// so a concurrent checkout reservation for the same variant cannot interleave with the
+    /// check — never trusts counts the caller already saw. Throws <see cref="InvalidOperationException"/>
+    /// with message "Variant not found." or "Variant has protected usage." for the two expected
+    /// failure cases; both are caught and mapped to <c>Result</c> failures by the caller.
+    /// </summary>
+    Task DeleteVariantPermanentlyAsync(Guid variantId, CancellationToken cancellationToken = default);
 }
 
 public sealed record VariantStockSnapshot(
@@ -81,6 +101,8 @@ public sealed record ImportCodesResult(
     int Duplicates,
     int Invalid,
     IReadOnlyList<ImportCodeDuplicate> DuplicateDetails);
+
+public sealed record VariantCleanupResult(int ReservationsReleased, int CodesRemoved);
 
 public sealed record InventoryStatisticsSnapshot(
     int Available,

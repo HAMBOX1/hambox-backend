@@ -1,5 +1,7 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Variants;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Features.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
@@ -12,15 +14,18 @@ internal sealed class InventoryEngine : IInventoryEngine
     private readonly ICatalogDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly IPlatformSettingsProvider _platformSettings;
+    private readonly ICommerceVariantUsageProvider _commerceUsage;
 
     public InventoryEngine(
         ICatalogDbContext db,
         ICurrentUserService currentUser,
-        IPlatformSettingsProvider platformSettings)
+        IPlatformSettingsProvider platformSettings,
+        ICommerceVariantUsageProvider commerceUsage)
     {
         _db = db;
         _currentUser = currentUser;
         _platformSettings = platformSettings;
+        _commerceUsage = commerceUsage;
     }
 
     public async Task<VariantStockSnapshot> GetVariantStockAsync(Guid variantId, CancellationToken cancellationToken = default)
@@ -326,8 +331,16 @@ internal sealed class InventoryEngine : IInventoryEngine
         var targetVariant = await _db.ProductVariants
             .AsNoTracking()
             .Where(v => v.Id == variantId)
-            .Select(v => new { v.Sku, v.ProductId })
+            .Select(v => new { v.Sku, v.ProductId, v.Status })
             .FirstAsync(cancellationToken);
+
+        // The batch may have been created while the variant was Active and only archived
+        // afterwards — re-check at import time too, not just at batch-creation time, since
+        // archived variants must never receive new stock.
+        if (targetVariant.Status != ProductVariantStatus.Active)
+        {
+            throw new InvalidOperationException("Variant is not active.");
+        }
 
         var targetProductName = await _db.Products
             .AsNoTracking()
@@ -449,6 +462,149 @@ internal sealed class InventoryEngine : IInventoryEngine
 
         await _db.SaveChangesAsync(cancellationToken);
         return new ImportCodesResult(totalSubmitted, imported, duplicates, invalid, duplicateDetails);
+    }
+
+    public async Task<VariantCleanupResult> CleanupVariantAsync(Guid variantId, CancellationToken cancellationToken = default)
+    {
+        // Runs as one atomic transaction when the concrete EF context is available (always true
+        // at runtime; only test doubles for ICatalogDbContext might not be). ReleaseReservationRecordsAsync
+        // internally saves via PersistIfNotEnlistedAsync unless it detects this ambient transaction,
+        // so beginning it here is what makes reservation release and code removal commit or roll
+        // back together instead of as two separate implicit transactions.
+        var useTransaction = _db is CatalogDbContext;
+        var transaction = useTransaction
+            ? await ((CatalogDbContext)_db).Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
+        {
+            var activeReservations = await _db.InventoryReservations
+                .Where(r => r.VariantId == variantId && r.IsActive)
+                .ToListAsync(cancellationToken);
+
+            if (activeReservations.Count > 0)
+            {
+                await ReleaseReservationRecordsAsync(activeReservations, cancellationToken);
+            }
+
+            var removableCodes = await _db.DigitalInventoryCodes
+                .Where(c => c.VariantId == variantId
+                    && (c.Status == InventoryCodeStatus.Available || c.Status == InventoryCodeStatus.Disabled))
+                .ToListAsync(cancellationToken);
+
+            if (removableCodes.Count > 0)
+            {
+                _db.DigitalInventoryCodes.RemoveRange(removableCodes);
+            }
+
+            if (activeReservations.Count > 0 || removableCodes.Count > 0)
+            {
+                var variant = await _db.ProductVariants.IgnoreQueryFilters()
+                    .Where(v => v.Id == variantId)
+                    .Select(v => new { v.ProductId })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                    InventoryAuditAction.VariantCleanedUp,
+                    productId: variant?.ProductId,
+                    variantId: variantId,
+                    performedByUserId: _currentUser.UserId,
+                    details: $"Cleanup released {activeReservations.Count} reservation(s), removed {removableCodes.Count} code(s)"));
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return new VariantCleanupResult(activeReservations.Count, removableCodes.Count);
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
+    }
+
+    public async Task DeleteVariantPermanentlyAsync(Guid variantId, CancellationToken cancellationToken = default)
+    {
+        var catalogDbContext = _db as CatalogDbContext;
+        var transaction = catalogDbContext is not null
+            ? await catalogDbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        try
+        {
+            if (catalogDbContext is not null)
+            {
+                // Range-lock this variant's inventory codes for the duration of the transaction so
+                // a concurrent checkout reserving codes for the same variant (which locks the same
+                // rows via WITH (UPDLOCK, ROWLOCK) in GetLockedAvailableCodeIdsAsync) cannot
+                // interleave with the usage re-check below — one side blocks until the other's
+                // transaction commits or rolls back.
+                await catalogDbContext.Database
+                    .SqlQuery<Guid>($"SELECT Id FROM catalog.DigitalInventoryCodes WITH (UPDLOCK, HOLDLOCK) WHERE VariantId = {variantId}")
+                    .ToListAsync(cancellationToken);
+            }
+
+            var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == variantId && !v.IsDeleted, cancellationToken);
+            if (variant is null)
+            {
+                throw new InvalidOperationException("Variant not found.");
+            }
+
+            // Re-run usage inspection fresh, inside this same lock/transaction — never trust
+            // counts the caller (frontend, or an earlier GET /usage call) already saw. Both
+            // protected history and not-yet-cleaned-up removable data block permanent deletion.
+            var usage = await VariantUsageCalculator.ComputeAsync(_db, _commerceUsage, variantId, cancellationToken);
+            if (usage.ProtectedHistory.TotalCount > 0 || usage.SafeToRemove.TotalCount > 0)
+            {
+                throw new InvalidOperationException("Variant has protected usage.");
+            }
+
+            variant.SoftDelete();
+            _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                InventoryAuditAction.VariantDeleted,
+                productId: variant.ProductId,
+                variantId: variant.Id,
+                performedByUserId: _currentUser.UserId));
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     private async Task ReleaseReservationRecordsAsync(

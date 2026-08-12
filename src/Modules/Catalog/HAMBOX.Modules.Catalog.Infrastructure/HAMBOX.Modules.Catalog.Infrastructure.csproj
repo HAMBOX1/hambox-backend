@@ -34,4 +34,13 @@
     <ProjectReference Include="..\..\Suppliers\HAMBOX.Modules.Suppliers.Infrastructure\HAMBOX.Modules.Suppliers.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Lets HAMBOX.UnitTests/HAMBOX.IntegrationTests construct the real (internal) InventoryEngine
+         directly, mirroring the same InternalsVisibleTo already granted by Commerce/Content/Themes
+         Application projects. IntegrationTests needs this for the real-SQL-Server concurrency test
+         (InMemory can't execute InventoryEngine's transaction/row-lock code path at all). -->
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
+    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

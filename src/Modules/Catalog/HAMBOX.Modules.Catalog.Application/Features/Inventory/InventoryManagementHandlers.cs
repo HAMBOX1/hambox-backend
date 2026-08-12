@@ -1,5 +1,6 @@
 using System.Text;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Variants;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -29,6 +30,13 @@ public sealed record DuplicateProductVariantCommand(Guid VariantId, string? SkuS
 public sealed record ActivateProductVariantCommand(Guid VariantId) : IRequest<Result>;
 public sealed record DeactivateProductVariantCommand(Guid VariantId) : IRequest<Result>;
 
+/// <summary>
+/// The primary "take this variant off sale" admin action — reversible via
+/// <see cref="ActivateProductVariantCommand"/>. Distinct from <see cref="DeleteProductVariantCommand"/>,
+/// which is the permanent, irreversible-in-practice tombstone gated by usage inspection.
+/// </summary>
+public sealed record ArchiveProductVariantCommand(Guid VariantId) : IRequest<Result>;
+
 public sealed record UpdateProductOptionGroupCommand(
     Guid GroupId,
     string DisplayName,
@@ -54,7 +62,16 @@ public sealed record ExportInventoryCodesQuery(Guid VariantId, string? Status) :
 
 public sealed record ExportInventoryCodesDto(string FileName, string ContentType, byte[] Content);
 
-public sealed record BulkVariantsResultDto(int SuccessCount, int ErrorCount, IReadOnlyList<string> Errors);
+/// <summary>
+/// <paramref name="BlockedVariantIds"/> is populated only by bulk-delete (empty for bulk-duplicate)
+/// so the admin UI can offer "inspect usage" for exactly the variants that were blocked, instead of
+/// just a formatted error string.
+/// </summary>
+public sealed record BulkVariantsResultDto(
+    int SuccessCount,
+    int ErrorCount,
+    IReadOnlyList<string> Errors,
+    IReadOnlyList<Guid> BlockedVariantIds);
 public sealed record BulkDeleteProductVariantsCommand(Guid ProductId, IReadOnlyList<Guid> VariantIds) : IRequest<Result<BulkVariantsResultDto>>;
 public sealed record BulkDuplicateProductVariantsCommand(Guid ProductId, IReadOnlyList<Guid> VariantIds) : IRequest<Result<BulkVariantsResultDto>>;
 public sealed record ExportVariantsInventoryCodesQuery(Guid ProductId, IReadOnlyList<Guid> VariantIds, string? Status) : IRequest<Result<ExportInventoryCodesDto>>;
@@ -121,44 +138,35 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
     }
 }
 
+/// <summary>
+/// The permanent, irreversible-in-practice "Delete Permanently" action — distinct from
+/// <see cref="ArchiveProductVariantCommand"/>, which is the everyday reversible action. Only
+/// succeeds when a fresh, transactionally re-checked usage inspection proves zero protected
+/// history AND zero un-cleaned-up removable data; never trusts counts the caller already saw.
+/// The actual check/lock/delete sequence lives in <see cref="IInventoryEngine.DeleteVariantPermanentlyAsync"/>
+/// (Infrastructure), since it needs a real DB transaction + row lock that this layer cannot open.
+/// </summary>
 internal sealed class DeleteProductVariantCommandHandler : IRequestHandler<DeleteProductVariantCommand, Result>
 {
-    private readonly ICatalogDbContext _db;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IInventoryEngine _engine;
 
-    public DeleteProductVariantCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
-    {
-        _db = db;
-        _currentUser = currentUser;
-    }
+    public DeleteProductVariantCommandHandler(IInventoryEngine engine) => _engine = engine;
 
     public async Task<Result> Handle(DeleteProductVariantCommand request, CancellationToken cancellationToken)
     {
-        var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == request.VariantId && !v.IsDeleted, cancellationToken);
-        if (variant is null)
+        try
+        {
+            await _engine.DeleteVariantPermanentlyAsync(request.VariantId, cancellationToken);
+            return Result.Success();
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "Variant not found.")
         {
             return Result.Failure(CatalogErrors.VariantNotFound);
         }
-
-        var hasSoldCodes = await _db.DigitalInventoryCodes.AnyAsync(
-            c => c.VariantId == variant.Id && (c.Status == InventoryCodeStatus.Sold || c.Status == InventoryCodeStatus.Reserved),
-            cancellationToken);
-
-        if (hasSoldCodes)
+        catch (InvalidOperationException ex) when (ex.Message == "Variant has protected usage.")
         {
-            return Result.Failure(CatalogErrors.InvalidCodeStatus);
+            return Result.Failure(CatalogErrors.VariantHasProtectedUsage);
         }
-
-        variant.SoftDelete();
-
-        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
-            InventoryAuditAction.VariantDeleted,
-            productId: variant.ProductId,
-            variantId: variant.Id,
-            performedByUserId: _currentUser.UserId));
-
-        await _db.SaveChangesAsync(cancellationToken);
-        return Result.Success();
     }
 }
 
@@ -295,6 +303,43 @@ internal sealed class DeactivateProductVariantCommandHandler : IRequestHandler<D
     }
 }
 
+/// <summary>
+/// The primary "Delete" action surfaced to admins day-to-day: reversible via
+/// <see cref="ActivateProductVariantCommand"/>, preserves every historical record, and never
+/// requires usage inspection since nothing is removed or destroyed.
+/// </summary>
+internal sealed class ArchiveProductVariantCommandHandler : IRequestHandler<ArchiveProductVariantCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public ArchiveProductVariantCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result> Handle(ArchiveProductVariantCommand request, CancellationToken cancellationToken)
+    {
+        var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == request.VariantId && !v.IsDeleted, cancellationToken);
+        if (variant is null)
+        {
+            return Result.Failure(CatalogErrors.VariantNotFound);
+        }
+
+        variant.Archive();
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.VariantArchived,
+            productId: variant.ProductId,
+            variantId: variant.Id,
+            performedByUserId: _currentUser.UserId,
+            details: "Archived variant"));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
 internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<UpdateProductOptionGroupCommand, Result>
 {
     private readonly ICatalogDbContext _db;
@@ -315,15 +360,29 @@ internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<U
     }
 }
 
+/// <summary>
+/// Deleting an option group cascade-removes every ProductOption in it, which cascade-removes every
+/// ProductVariantOption row that referenced one of those options (a real DB FK — see
+/// InventoryConfigurations). That would silently strip a variant's identifying option combination
+/// out from under it regardless of the variant's own protected-history status, so this handler must
+/// route every affected variant through the exact same usage gate as a direct permanent delete —
+/// never a shortcut, and never partial: if any affected variant is still protected, nothing is
+/// mutated at all.
+/// </summary>
 internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<DeleteProductOptionGroupCommand, Result>
 {
     private readonly ICatalogDbContext _db;
-    private readonly ICurrentUserService _currentUser;
+    private readonly IInventoryEngine _engine;
+    private readonly ICommerceVariantUsageProvider _commerceUsage;
 
-    public DeleteProductOptionGroupCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    public DeleteProductOptionGroupCommandHandler(
+        ICatalogDbContext db,
+        IInventoryEngine engine,
+        ICommerceVariantUsageProvider commerceUsage)
     {
         _db = db;
-        _currentUser = currentUser;
+        _engine = engine;
+        _commerceUsage = commerceUsage;
     }
 
     public async Task<Result> Handle(DeleteProductOptionGroupCommand request, CancellationToken cancellationToken)
@@ -359,28 +418,24 @@ internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<D
                     return Result.Failure(CatalogErrors.OptionGroupInUse);
                 }
 
-                var hasSoldCodes = await _db.DigitalInventoryCodes.AnyAsync(
-                    c => affectedVariantIds.Contains(c.VariantId) && (c.Status == InventoryCodeStatus.Sold || c.Status == InventoryCodeStatus.Reserved),
-                    cancellationToken);
-
-                if (hasSoldCodes)
+                // Pass 1: check every affected variant before touching any of them. Anything less
+                // than zero SafeToRemove/ProtectedHistory blocks the whole operation, same as a
+                // direct DeleteProductVariantCommand would.
+                foreach (var variantId in affectedVariantIds)
                 {
-                    return Result.Failure(CatalogErrors.InvalidCodeStatus);
+                    var usage = await VariantUsageCalculator.ComputeAsync(_db, _commerceUsage, variantId, cancellationToken);
+                    if (usage.ProtectedHistory.TotalCount > 0 || usage.SafeToRemove.TotalCount > 0)
+                    {
+                        return Result.Failure(CatalogErrors.VariantHasProtectedUsage);
+                    }
                 }
 
-                var affectedVariants = await _db.ProductVariants
-                    .Where(v => affectedVariantIds.Contains(v.Id))
-                    .ToListAsync(cancellationToken);
-
-                foreach (var variant in affectedVariants)
+                // Pass 2: every affected variant already proved safe — permanently delete each one
+                // through the same engine method (own transaction + row lock + re-check) the
+                // single-variant endpoint uses.
+                foreach (var variantId in affectedVariantIds)
                 {
-                    variant.SoftDelete();
-                    _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
-                        InventoryAuditAction.VariantDeleted,
-                        productId: variant.ProductId,
-                        variantId: variant.Id,
-                        performedByUserId: _currentUser.UserId,
-                        details: $"Cascade-deleted with option group {group.Id}"));
+                    await _engine.DeleteVariantPermanentlyAsync(variantId, cancellationToken);
                 }
             }
         }
@@ -808,6 +863,7 @@ internal sealed class BulkDeleteProductVariantsCommandHandler : IRequestHandler<
 
         var success = 0;
         var errors = new List<string>();
+        var blockedVariantIds = new List<Guid>();
 
         foreach (var variantId in request.VariantIds.Distinct())
         {
@@ -819,10 +875,11 @@ internal sealed class BulkDeleteProductVariantsCommandHandler : IRequestHandler<
             else
             {
                 errors.Add($"{variantId}: {result.Error.Description}");
+                blockedVariantIds.Add(variantId);
             }
         }
 
-        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors));
+        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors, blockedVariantIds));
     }
 }
 
@@ -855,7 +912,7 @@ internal sealed class BulkDuplicateProductVariantsCommandHandler : IRequestHandl
             }
         }
 
-        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors));
+        return Result.Success(new BulkVariantsResultDto(success, errors.Count, errors, []));
     }
 }
 

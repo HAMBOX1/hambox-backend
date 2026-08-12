@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

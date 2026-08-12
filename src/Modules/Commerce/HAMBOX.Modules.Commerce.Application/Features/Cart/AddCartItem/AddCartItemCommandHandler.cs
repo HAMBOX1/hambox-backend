@@ -87,6 +87,14 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
         {
             return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantRequired);
         }
+        else
+        {
+            // No variant was requested and the product has no active, visible variant at all —
+            // there is no inventory-backed way to ever deliver this product. Reject rather than
+            // falling back to the legacy Product.StockQuantity counter, which is CSV-import
+            // bookkeeping only and has no real digital code behind it.
+            return Result.Failure<Contracts.CartDto>(CatalogErrors.ProductNotPurchasable);
+        }
 
         var (cart, guestSessionId) = await CartResolver.GetOrCreateCartAsync(
             _commerceDbContext,
@@ -101,21 +109,16 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
             ? request.Quantity
             : existingItem.Quantity + request.Quantity;
 
-        if (request.ProductVariantId is Guid stockVariantId)
+        // A ProductVariantId is guaranteed at this point: the block above already rejected
+        // any request that didn't resolve to one, so there is no variant-less stock branch here.
+        var stock = await _inventoryEngine.GetVariantStockAsync(request.ProductVariantId!.Value, cancellationToken);
+        if (stock.Available < newQuantity)
         {
-            var stock = await _inventoryEngine.GetVariantStockAsync(stockVariantId, cancellationToken);
-            if (stock.Available < newQuantity)
-            {
-                return Result.Failure<Contracts.CartDto>(
-                    CatalogErrors.InsufficientInventoryQuantity(
-                        stock.Available,
-                        newQuantity,
-                        existingItem?.Quantity ?? 0));
-            }
-        }
-        else if (product.AvailableStock < newQuantity)
-        {
-            return Result.Failure<Contracts.CartDto>(CatalogErrors.InsufficientStock);
+            return Result.Failure<Contracts.CartDto>(
+                CatalogErrors.InsufficientInventoryQuantity(
+                    stock.Available,
+                    newQuantity,
+                    existingItem?.Quantity ?? 0));
         }
 
         cart.AddOrUpdateItem(request.ProductId, newQuantity, unitPrice, request.ProductVariantId);

@@ -99,8 +99,13 @@ internal sealed class GetCustomerLibraryQueryHandler
             .Select(i => i.ProductId)
             .ToHashSetAsync(cancellationToken);
 
+        // Historical purchases must keep showing platform/edition/region even after the variant
+        // is archived or soft-deleted — IgnoreQueryFilters() bypasses the global !IsDeleted filter
+        // for this lookup only. This never affects storefront purchasability: that's gated
+        // separately by Status/IsVisible in the storefront product-configuration query.
         var variants = variantIds.Count > 0
             ? await _catalogDbContext.ProductVariants
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Include(v => v.SelectedOptions)
                 .Where(v => variantIds.Contains(v.Id))

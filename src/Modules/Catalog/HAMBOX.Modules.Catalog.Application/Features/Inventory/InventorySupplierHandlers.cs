@@ -112,6 +112,11 @@ internal sealed class CreateInventoryBatchCommandHandler : IRequestHandler<Creat
             return Result.Failure<Guid>(CatalogErrors.VariantNotFound);
         }
 
+        if (variant.Status != ProductVariantStatus.Active)
+        {
+            return Result.Failure<Guid>(CatalogErrors.VariantNotActive);
+        }
+
         var batch = InventoryBatch.Create(
             request.VariantId,
             request.Name,
@@ -209,6 +214,10 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
         catch (InvalidOperationException ex) when (ex.Message == "Batch not found.")
         {
             return Result.Failure<ImportCodesResultDto>(CatalogErrors.BatchNotFound);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "Variant is not active.")
+        {
+            return Result.Failure<ImportCodesResultDto>(CatalogErrors.VariantNotActive);
         }
     }
 }

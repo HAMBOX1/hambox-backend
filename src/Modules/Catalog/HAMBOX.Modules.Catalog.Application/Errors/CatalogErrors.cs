@@ -74,6 +74,14 @@ public static class CatalogErrors
         "The product is not active and cannot be purchased.");
 
     /// <summary>
+    /// Gets the error for when a product has no active, visible variant backed by real
+    /// inventory, so it cannot be sold — there is no way to produce a genuine deliverable.
+    /// </summary>
+    public static readonly Error ProductNotPurchasable = new(
+        "Products.NotPurchasable",
+        "This product is not available for purchase yet.");
+
+    /// <summary>
     /// Gets the error for when a product image is not found.
     /// </summary>
     public static readonly Error ProductImageNotFound = new(
@@ -101,6 +109,15 @@ public static class CatalogErrors
     public static readonly Error VariantRequired = new(
         "Inventory.VariantRequired",
         "A product variant must be selected for this product.");
+
+    /// <summary>
+    /// Gets the error for when inventory (a batch or codes) is created against a variant that
+    /// is not Active — e.g. Draft, Inactive, or Archived. Archived variants must never receive
+    /// new stock, since they are meant to be wound down, not restocked.
+    /// </summary>
+    public static readonly Error VariantNotActive = new(
+        "Inventory.VariantNotActive",
+        "The variant is not active and cannot receive new inventory.");
 
     public static readonly Error SupplierNotFound = new(
         "Inventory.SupplierNotFound",
@@ -164,6 +181,17 @@ public static class CatalogErrors
     public static readonly Error InvalidCodeStatus = new(
         "Inventory.InvalidCodeStatus",
         "The inventory code status does not allow this operation.");
+
+    /// <summary>
+    /// Gets the error for when permanent variant deletion is blocked because usage inspection
+    /// (re-run fresh, inside the same transaction as the delete attempt — never trusting counts
+    /// the frontend already saw) found either protected history or removable data that has not
+    /// been cleaned up yet. The frontend should reopen the usage-inspection dialog rather than
+    /// retry the delete.
+    /// </summary>
+    public static readonly Error VariantHasProtectedUsage = new(
+        "Inventory.VariantHasProtectedUsage",
+        "This variant is still in use and cannot be permanently deleted. Clean up removable data or archive it instead.");
 
     public static readonly Error CategoryHasChildren = new(
         "Categories.HasChildren",

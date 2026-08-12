@@ -85,19 +85,11 @@ public sealed class OrderFulfillmentService
                     delivered++;
                 }
             }
-            else
-            {
-                for (var i = 0; i < missing; i++)
-                {
-                    _commerceDb.OrderLicenseKeys.Add(OrderLicenseKey.Create(
-                        order.Id,
-                        item.Id,
-                        item.ProductId!.Value,
-                        LicenseKeyGenerator.Generate(),
-                        item.ProductVariantId));
-                    delivered++;
-                }
-            }
+
+            // Legacy order lines with no ProductVariantId predate the fix that requires a real,
+            // inventory-backed variant at checkout. There is no genuine deliverable to auto-assign
+            // here — skip rather than fabricate a license key; an admin must resolve these via
+            // AssignManualCodeAsync with a real code.
         }
 
         var orderCompleted = false;
