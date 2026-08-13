@@ -39,6 +39,7 @@ public sealed class TestCatalogDbContext(DbContextOptions<TestCatalogDbContext> 
     public DbSet<ProductOption> ProductOptions => Set<ProductOption>();
     public DbSet<OptionGroupTemplate> OptionGroupTemplates => Set<OptionGroupTemplate>();
     public DbSet<OptionGroupTemplateOption> OptionGroupTemplateOptions => Set<OptionGroupTemplateOption>();
+    public DbSet<OptionDescriptionTemplate> OptionDescriptionTemplates => Set<OptionDescriptionTemplate>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOption> ProductVariantOptions => Set<ProductVariantOption>();
     public DbSet<InventorySupplier> InventorySuppliers => Set<InventorySupplier>();
@@ -64,6 +65,7 @@ public sealed class TestCatalogDbContext(DbContextOptions<TestCatalogDbContext> 
         modelBuilder.Entity<OptionGroupTemplate>().HasMany(t => t.Options).WithOne().HasForeignKey(o => o.TemplateId);
         modelBuilder.Entity<OptionGroupTemplate>().Navigation(t => t.Options).HasField("_options");
         modelBuilder.Entity<OptionGroupTemplateOption>().HasKey(o => o.Id);
+        modelBuilder.Entity<OptionDescriptionTemplate>().HasKey(t => t.Id);
         modelBuilder.Entity<ProductVariant>().HasKey(v => v.Id);
         // Real composite key (matches InventoryConfigurations) — EF's convention can't infer this.
         modelBuilder.Entity<ProductVariantOption>().HasKey(vo => new { vo.VariantId, vo.OptionId });

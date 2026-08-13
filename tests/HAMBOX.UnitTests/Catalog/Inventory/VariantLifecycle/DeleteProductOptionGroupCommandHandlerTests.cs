@@ -1,7 +1,9 @@
+using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Infrastructure.Services;
+using HAMBOX.SharedKernel.Results;
 using HAMBOX.UnitTests.Commerce.TestDoubles;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +24,14 @@ public sealed class DeleteProductOptionGroupCommandHandlerTests
         return (group, option);
     }
 
+    private static DeleteProductOptionGroupCommandHandler CreateHandler(
+        TestCatalogDbContext db, InventoryEngine engine, FakeCommerceVariantUsageProvider commerceUsage)
+    {
+        var cleanupSender = new DispatchingFakeSender<CleanupProductVariantCommand, Result<VariantUsageDto>>(
+            new CleanupProductVariantCommandHandler(db, engine, commerceUsage));
+        return new DeleteProductOptionGroupCommandHandler(db, engine, commerceUsage, cleanupSender);
+    }
+
     [Fact]
     public async Task Handle_WithoutForce_AnyAffectedVariant_FailsFast_NothingMutated()
     {
@@ -37,7 +47,7 @@ public sealed class DeleteProductOptionGroupCommandHandlerTests
         await db.SaveChangesAsync(CancellationToken.None);
 
         var engine = new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), commerceUsage);
-        var handler = new DeleteProductOptionGroupCommandHandler(db, engine, commerceUsage);
+        var handler = CreateHandler(db, engine, commerceUsage);
 
         var result = await handler.Handle(new DeleteProductOptionGroupCommand(group.Id, Force: false), CancellationToken.None);
 
@@ -71,7 +81,7 @@ public sealed class DeleteProductOptionGroupCommandHandlerTests
         await db.SaveChangesAsync(CancellationToken.None);
 
         var engine = new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), commerceUsage);
-        var handler = new DeleteProductOptionGroupCommandHandler(db, engine, commerceUsage);
+        var handler = CreateHandler(db, engine, commerceUsage);
 
         var result = await handler.Handle(new DeleteProductOptionGroupCommand(group.Id, Force: true), CancellationToken.None);
 
@@ -99,7 +109,7 @@ public sealed class DeleteProductOptionGroupCommandHandlerTests
         await db.SaveChangesAsync(CancellationToken.None);
 
         var engine = new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), commerceUsage);
-        var handler = new DeleteProductOptionGroupCommandHandler(db, engine, commerceUsage);
+        var handler = CreateHandler(db, engine, commerceUsage);
 
         var result = await handler.Handle(new DeleteProductOptionGroupCommand(group.Id, Force: true), CancellationToken.None);
 
@@ -107,5 +117,40 @@ public sealed class DeleteProductOptionGroupCommandHandlerTests
         Assert.False(await db.ProductOptionGroups.AnyAsync(g => g.Id == group.Id));
         var reloadedVariant = await db.ProductVariants.IgnoreQueryFilters().SingleAsync(v => v.Id == variant.Id);
         Assert.True(reloadedVariant.IsDeleted);
+    }
+
+    [Fact]
+    public async Task Handle_ForceWithRemovableButNotProtectedData_AutoCleansUpThenDeletes()
+    {
+        // Reproduces the reported case: a variant still has one unsold, never-reserved "Available"
+        // inventory code — removable, not protected — which used to block a forced group delete
+        // outright and force a separate manual "Clean Up" step first. Force should now clean it up
+        // and proceed, exactly like the manual Clean Up action followed by Delete Permanently would.
+        var db = TestCatalogDbContextFactory.Create();
+        var commerceUsage = new FakeCommerceVariantUsageProvider();
+        var productId = Guid.NewGuid();
+        var (group, option) = CreatePlatformGroup(productId);
+        db.ProductOptionGroups.Add(group);
+
+        var variant = ProductVariant.Create(productId, $"SKU-{Guid.NewGuid():N}");
+        variant.SetOptions([option.Id]);
+        db.ProductVariants.Add(variant);
+
+        var batch = InventoryBatch.Create(variant.Id, "Batch 1", null, null, "USD", 0m, null, null);
+        db.InventoryBatches.Add(batch);
+        var availableCode = DigitalInventoryCode.Create(variant.Id, batch.Id, "AVAILABLE-CODE-1");
+        db.DigitalInventoryCodes.Add(availableCode);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var engine = new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), commerceUsage);
+        var handler = CreateHandler(db, engine, commerceUsage);
+
+        var result = await handler.Handle(new DeleteProductOptionGroupCommand(group.Id, Force: true), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(await db.ProductOptionGroups.AnyAsync(g => g.Id == group.Id));
+        var reloadedVariant = await db.ProductVariants.IgnoreQueryFilters().SingleAsync(v => v.Id == variant.Id);
+        Assert.True(reloadedVariant.IsDeleted);
+        Assert.False(await db.DigitalInventoryCodes.AnyAsync(c => c.Id == availableCode.Id));
     }
 }

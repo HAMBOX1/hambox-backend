@@ -66,6 +66,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<ProductOption> ProductOptions => Set<ProductOption>();
     public DbSet<OptionGroupTemplate> OptionGroupTemplates => Set<OptionGroupTemplate>();
     public DbSet<OptionGroupTemplateOption> OptionGroupTemplateOptions => Set<OptionGroupTemplateOption>();
+    public DbSet<OptionDescriptionTemplate> OptionDescriptionTemplates => Set<OptionDescriptionTemplate>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductVariantOption> ProductVariantOptions => Set<ProductVariantOption>();
     public DbSet<InventorySupplier> InventorySuppliers => Set<InventorySupplier>();

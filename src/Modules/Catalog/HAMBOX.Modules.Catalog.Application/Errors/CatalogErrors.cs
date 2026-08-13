@@ -194,6 +194,18 @@ public static class CatalogErrors
         "Inventory.OptionGroupHasChildGroups",
         "This option group has follow-up option groups and can't be saved as a reusable template yet.");
 
+    public static readonly Error OptionDescriptionTemplateNotFound = new(
+        "Inventory.OptionDescriptionTemplateNotFound",
+        "The saved description was not found.");
+
+    public static readonly Error DuplicateOptionDescriptionTemplateName = new(
+        "Inventory.DuplicateOptionDescriptionTemplateName",
+        "A saved description with this name already exists.");
+
+    public static readonly Error OptionDescriptionTemplateContentRequired = new(
+        "Inventory.OptionDescriptionTemplateContentRequired",
+        "The saved description must contain content after sanitization.");
+
     /// <summary>
     /// Gets the error for when permanent variant deletion is blocked because usage inspection
     /// (re-run fresh, inside the same transaction as the delete attempt — never trusting counts

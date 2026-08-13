@@ -48,7 +48,7 @@ public sealed record DeleteProductOptionGroupCommand(Guid GroupId, bool Force = 
 public sealed record ReorderProductOptionGroupsCommand(Guid ProductId, IReadOnlyList<Guid> OrderedGroupIds) : IRequest<Result>;
 
 public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder, string? DescriptionHtml = null) : IRequest<Result>;
-public sealed record DeleteProductOptionCommand(Guid OptionId) : IRequest<Result>;
+public sealed record DeleteProductOptionCommand(Guid OptionId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionsCommand(Guid GroupId, IReadOnlyList<Guid> OrderedOptionIds) : IRequest<Result>;
 
 public sealed record DisableInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
@@ -367,23 +367,29 @@ internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<U
 /// InventoryConfigurations). That would silently strip a variant's identifying option combination
 /// out from under it regardless of the variant's own protected-history status, so this handler must
 /// route every affected variant through the exact same usage gate as a direct permanent delete —
-/// never a shortcut, and never partial: if any affected variant is still protected, nothing is
-/// mutated at all.
+/// never a shortcut, and never partial: if any affected variant still has protected history
+/// (sold codes, order line items), nothing is mutated at all. Removable-but-not-protected data
+/// (active reservations, available/disabled codes, cart items) is cleaned up automatically as part
+/// of a forced delete instead — that's what "force" means here, not "skip the safety check
+/// entirely"; sold/ordered inventory can never be force-deleted.
 /// </summary>
 internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<DeleteProductOptionGroupCommand, Result>
 {
     private readonly ICatalogDbContext _db;
     private readonly IInventoryEngine _engine;
     private readonly ICommerceVariantUsageProvider _commerceUsage;
+    private readonly ISender _sender;
 
     public DeleteProductOptionGroupCommandHandler(
         ICatalogDbContext db,
         IInventoryEngine engine,
-        ICommerceVariantUsageProvider commerceUsage)
+        ICommerceVariantUsageProvider commerceUsage,
+        ISender sender)
     {
         _db = db;
         _engine = engine;
         _commerceUsage = commerceUsage;
+        _sender = sender;
     }
 
     public async Task<Result> Handle(DeleteProductOptionGroupCommand request, CancellationToken cancellationToken)
@@ -419,23 +425,25 @@ internal sealed class DeleteProductOptionGroupCommandHandler : IRequestHandler<D
                     return Result.Failure(CatalogErrors.OptionGroupInUse);
                 }
 
-                // Pass 1: check every affected variant before touching any of them. Anything less
-                // than zero SafeToRemove/ProtectedHistory blocks the whole operation, same as a
-                // direct DeleteProductVariantCommand would.
+                // Pass 1: check every affected variant before touching any of them. Only genuine
+                // protected history (sold codes, orders, license keys) blocks the whole operation —
+                // removable data alone no longer does, since Pass 2 cleans it up automatically.
                 foreach (var variantId in affectedVariantIds)
                 {
                     var usage = await VariantUsageCalculator.ComputeAsync(_db, _commerceUsage, variantId, cancellationToken);
-                    if (usage.ProtectedHistory.TotalCount > 0 || usage.SafeToRemove.TotalCount > 0)
+                    if (usage.ProtectedHistory.TotalCount > 0)
                     {
                         return Result.Failure(CatalogErrors.VariantHasProtectedUsage);
                     }
                 }
 
-                // Pass 2: every affected variant already proved safe — permanently delete each one
-                // through the same engine method (own transaction + row lock + re-check) the
-                // single-variant endpoint uses.
+                // Pass 2: no affected variant has protected history — clean up each one's removable
+                // data (reservations, available/disabled codes, cart items) via the same command the
+                // manual "Clean Up" action uses, then permanently delete it through the same engine
+                // method (own transaction + row lock + fresh re-check) the single-variant endpoint uses.
                 foreach (var variantId in affectedVariantIds)
                 {
+                    await _sender.Send(new CleanupProductVariantCommand(variantId), cancellationToken);
                     await _engine.DeleteVariantPermanentlyAsync(variantId, cancellationToken);
                 }
             }
@@ -509,11 +517,33 @@ internal sealed class UpdateProductOptionCommandHandler : IRequestHandler<Update
     }
 }
 
+/// <summary>
+/// Mirrors <see cref="DeleteProductOptionGroupCommandHandler"/>'s force semantics at the single-
+/// option scope: deleting an option cascade-removes every ProductVariantOption row that referenced
+/// it (a real DB FK), which would silently strip that option out from under any variant using it.
+/// Without <see cref="DeleteProductOptionCommand.Force"/>, any variant reference blocks the delete.
+/// With it, only genuine protected history (sold codes, orders, license keys) still blocks —
+/// removable-but-not-protected data (active reservations, available/disabled codes, cart items) is
+/// cleaned up automatically before the affected variants are permanently deleted.
+/// </summary>
 internal sealed class DeleteProductOptionCommandHandler : IRequestHandler<DeleteProductOptionCommand, Result>
 {
     private readonly ICatalogDbContext _db;
+    private readonly IInventoryEngine _engine;
+    private readonly ICommerceVariantUsageProvider _commerceUsage;
+    private readonly ISender _sender;
 
-    public DeleteProductOptionCommandHandler(ICatalogDbContext db) => _db = db;
+    public DeleteProductOptionCommandHandler(
+        ICatalogDbContext db,
+        IInventoryEngine engine,
+        ICommerceVariantUsageProvider commerceUsage,
+        ISender sender)
+    {
+        _db = db;
+        _engine = engine;
+        _commerceUsage = commerceUsage;
+        _sender = sender;
+    }
 
     public async Task<Result> Handle(DeleteProductOptionCommand request, CancellationToken cancellationToken)
     {
@@ -526,10 +556,36 @@ internal sealed class DeleteProductOptionCommandHandler : IRequestHandler<Delete
         var descendantOptionIds = await OptionGroupSubtreeHelper.CollectDescendantOptionIdsAsync(_db, option.Id, cancellationToken);
         var subtreeOptionIds = descendantOptionIds.Append(option.Id).ToList();
 
-        var inUse = await _db.ProductVariantOptions.AnyAsync(vo => subtreeOptionIds.Contains(vo.OptionId), cancellationToken);
-        if (inUse)
+        var affectedVariantIds = await _db.ProductVariantOptions
+            .Where(vo => subtreeOptionIds.Contains(vo.OptionId))
+            .Join(_db.ProductVariants.Where(v => !v.IsDeleted), vo => vo.VariantId, v => v.Id, (vo, v) => v.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (affectedVariantIds.Count > 0)
         {
-            return Result.Failure(CatalogErrors.OptionInUse);
+            if (!request.Force)
+            {
+                return Result.Failure(CatalogErrors.OptionInUse);
+            }
+
+            // Pass 1: only genuine protected history blocks — removable data alone no longer does,
+            // since Pass 2 cleans it up automatically.
+            foreach (var variantId in affectedVariantIds)
+            {
+                var usage = await VariantUsageCalculator.ComputeAsync(_db, _commerceUsage, variantId, cancellationToken);
+                if (usage.ProtectedHistory.TotalCount > 0)
+                {
+                    return Result.Failure(CatalogErrors.VariantHasProtectedUsage);
+                }
+            }
+
+            // Pass 2: clean up each affected variant's removable data, then permanently delete it.
+            foreach (var variantId in affectedVariantIds)
+            {
+                await _sender.Send(new CleanupProductVariantCommand(variantId), cancellationToken);
+                await _engine.DeleteVariantPermanentlyAsync(variantId, cancellationToken);
+            }
         }
 
         await OptionGroupSubtreeHelper.DeleteOptionDescendantsAsync(_db, option.Id, cancellationToken);

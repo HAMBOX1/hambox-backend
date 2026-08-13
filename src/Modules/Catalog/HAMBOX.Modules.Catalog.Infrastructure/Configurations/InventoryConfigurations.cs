@@ -72,6 +72,18 @@ internal sealed class OptionGroupTemplateOptionConfiguration : IEntityTypeConfig
     }
 }
 
+internal sealed class OptionDescriptionTemplateConfiguration : IEntityTypeConfiguration<OptionDescriptionTemplate>
+{
+    public void Configure(EntityTypeBuilder<OptionDescriptionTemplate> builder)
+    {
+        builder.ToTable("OptionDescriptionTemplates");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.DescriptionHtml).IsRequired().HasColumnType("nvarchar(max)");
+        builder.HasIndex(x => x.Name).IsUnique();
+    }
+}
+
 internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVariant>
 {
     public void Configure(EntityTypeBuilder<ProductVariant> builder)
@@ -82,7 +94,12 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         builder.Property(x => x.PriceOverride).HasColumnType("decimal(18,2)");
         builder.Property(x => x.ComparePrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
-        builder.HasIndex(x => x.Sku).IsUnique();
+        // Filtered so a permanently-deleted (soft-deleted) variant's SKU frees up for reuse —
+        // SoftDelete() deliberately leaves Sku untouched (see its doc comment), so without this
+        // filter a regenerated variant with the same option combination collides with the
+        // tombstoned row's SKU and GenerateProductVariantsCommandHandler's whole batch insert
+        // fails. Same pattern as Legal's Slug unique index.
+        builder.HasIndex(x => x.Sku).IsUnique().HasFilter("[IsDeleted] = 0");
         builder.HasIndex(x => x.ProductId);
         builder.HasMany(x => x.SelectedOptions).WithOne().HasForeignKey(x => x.VariantId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.SelectedOptions).HasField("_selectedOptions");

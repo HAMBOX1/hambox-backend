@@ -19,6 +19,8 @@ public sealed record OptionGroupTemplateSummaryDto(Guid Id, string Name, int Opt
 
 public sealed record OptionGroupTemplateOptionDto(Guid Id, string Value, string Label, int SortOrder, string? DescriptionHtml);
 
+public sealed record OptionDescriptionTemplateDto(Guid Id, string Name, string DescriptionHtml);
+
 /// <summary>Full snapshot of a saved reusable option group, for the "edit template" dialog.</summary>
 public sealed record OptionGroupTemplateDto(
     Guid Id,

@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
@@ -27,6 +28,15 @@ public sealed class OptionGroupTemplateHandlersTests
     private static ImportOptionGroupTemplateCommandHandler CreateImportHandler(TestCatalogDbContext db, ISender sender) =>
         new(db, sender, new FakeCurrentUserService("admin-1"));
 
+    private static DeleteProductOptionGroupCommandHandler CreateDeleteGroupHandler(TestCatalogDbContext db)
+    {
+        var commerceUsage = new FakeCommerceVariantUsageProvider();
+        var engine = new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), commerceUsage);
+        var cleanupSender = new DispatchingFakeSender<CleanupProductVariantCommand, Result<VariantUsageDto>>(
+            new CleanupProductVariantCommandHandler(db, engine, commerceUsage));
+        return new DeleteProductOptionGroupCommandHandler(db, engine, commerceUsage, cleanupSender);
+    }
+
     [Fact]
     public async Task SaveAsTemplate_ThenImport_CreatesIndependentProductOptionGroup()
     {
@@ -49,7 +59,7 @@ public sealed class OptionGroupTemplateHandlersTests
 
         var productB = Guid.NewGuid();
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         var importResult = await importHandler.Handle(new ImportOptionGroupTemplateCommand(productB, template.Id, ImportConflictResolution.AddSeparate), CancellationToken.None);
@@ -85,7 +95,7 @@ public sealed class OptionGroupTemplateHandlersTests
         var templateId = saveResult.Value;
 
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         var productA = Guid.NewGuid();
@@ -122,7 +132,7 @@ public sealed class OptionGroupTemplateHandlersTests
         var templateId = saveResult.Value;
 
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         var productA = Guid.NewGuid();
@@ -162,7 +172,7 @@ public sealed class OptionGroupTemplateHandlersTests
         var templateId = saveResult.Value;
 
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         var productA = Guid.NewGuid();
@@ -191,7 +201,7 @@ public sealed class OptionGroupTemplateHandlersTests
         var templateId = saveResult.Value;
 
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         // Import into a fresh product (no pre-existing groups) twice with AddSeparate — the
@@ -224,7 +234,7 @@ public sealed class OptionGroupTemplateHandlersTests
         var templateId = saveResult.Value;
 
         var sender = new DispatchingFakeSender<DeleteProductOptionGroupCommand, Result>(
-            new DeleteProductOptionGroupCommandHandler(db, new InventoryEngine(db, new FakeCurrentUserService("admin-1"), new FakePlatformSettingsProvider(), new FakeCommerceVariantUsageProvider()), new FakeCommerceVariantUsageProvider()));
+            CreateDeleteGroupHandler(db));
         var importHandler = CreateImportHandler(db, sender);
 
         // Import into the same product with Replace — should delete the original "xbox-region"

@@ -137,6 +137,30 @@ internal static class InventoryEndpoints
             await SendEmpty(sender, new DeleteOptionGroupTemplateCommand(templateId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
+        group.MapGet("/option-description-templates", async (
+            [FromQuery] string? search,
+            ISender sender) => await Send(sender, new SearchOptionDescriptionTemplatesQuery(search)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        group.MapGet("/option-description-templates/{templateId:guid}", async (Guid templateId, ISender sender) =>
+            await Send(sender, new GetOptionDescriptionTemplateQuery(templateId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        group.MapPost("/option-description-templates", async (
+            [FromBody] CreateOptionDescriptionTemplateRequest body,
+            ISender sender) => await SendCreated(sender, new CreateOptionDescriptionTemplateCommand(body.Name, body.DescriptionHtml)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
+        group.MapPut("/option-description-templates/{templateId:guid}", async (
+            Guid templateId,
+            [FromBody] UpdateOptionDescriptionTemplateRequest body,
+            ISender sender) => await SendEmpty(sender, new UpdateOptionDescriptionTemplateCommand(templateId, body.Name, body.DescriptionHtml)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
+        group.MapDelete("/option-description-templates/{templateId:guid}", async (Guid templateId, ISender sender) =>
+            await SendEmpty(sender, new DeleteOptionDescriptionTemplateCommand(templateId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
+
         group.MapPost("/products/{productId:guid}/option-groups/import-template", async (
             Guid productId,
             [FromBody] ImportOptionGroupTemplateRequest body,
@@ -165,8 +189,8 @@ internal static class InventoryEndpoints
             ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder, body.DescriptionHtml)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
-        group.MapDelete("/options/{optionId:guid}", async (Guid optionId, ISender sender) =>
-            await SendEmpty(sender, new DeleteProductOptionCommand(optionId)))
+        group.MapDelete("/options/{optionId:guid}", async (Guid optionId, [FromQuery] bool force, ISender sender) =>
+            await SendEmpty(sender, new DeleteProductOptionCommand(optionId, force)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
         group.MapPut("/option-groups/{groupId:guid}/options/reorder", async (
@@ -374,6 +398,8 @@ internal sealed record CreateOptionRequest(string Value, string Label, int SortO
 internal sealed record SaveOptionGroupAsTemplateRequest(string Name);
 internal sealed record UpdateOptionGroupTemplateRequest(string Name, bool IsRequiredDefault, IReadOnlyList<OptionGroupTemplateOptionInput> Options);
 internal sealed record ImportOptionGroupTemplateRequest(Guid TemplateId, ImportConflictResolution Resolution);
+internal sealed record CreateOptionDescriptionTemplateRequest(string Name, string DescriptionHtml);
+internal sealed record UpdateOptionDescriptionTemplateRequest(string Name, string DescriptionHtml);
 internal sealed record CreateSupplierRequest(
     string CompanyName,
     string? ContactPerson,
