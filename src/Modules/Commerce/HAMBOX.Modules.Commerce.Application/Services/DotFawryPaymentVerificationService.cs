@@ -92,7 +92,14 @@ public sealed class DotFawryPaymentVerificationService(
             return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, attempt.OrderId, "Order not found.");
         }
 
-        var statusResult = await dotFawryGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, cancellationToken);
+        // DOT's Check Transaction Status spec states the partnerTransId lookup is "available only
+        // for limited cases" — this operator/service combo rejects it outright (every production
+        // attempt observed resultCode 1005/1008, the check-status call's own error codes, never a
+        // real billing result). dotTransId lookup has no such caveat and is always available once
+        // the charge call has returned one, which happens before verification is ever reached.
+        var statusResult = string.IsNullOrWhiteSpace(attempt.ProviderTransactionId)
+            ? await dotFawryGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, cancellationToken)
+            : await dotFawryGateway.CheckTransactionStatusByDotTxIdAsync(attempt.ProviderTransactionId, cancellationToken);
 
         if (statusResult.IsFailure)
         {
