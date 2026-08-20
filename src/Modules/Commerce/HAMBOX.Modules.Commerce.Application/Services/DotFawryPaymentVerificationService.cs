@@ -126,13 +126,32 @@ public sealed class DotFawryPaymentVerificationService(
             return new DotFawryVerificationResult(DotFawryVerificationOutcome.StillPending, order.Id, status.BillingTransactionResultDesc);
         }
 
+        if (status.ResultCode != "0")
+        {
+            // Per the Check Transaction Status spec, resultCode != "0" means an error occurred in
+            // *this check-status call itself* (not found yet, invalid request, internal error) —
+            // billingTransactionResultCode is only ever populated once resultCode is "0", so there
+            // is no real billing answer to act on here. Treat exactly like a transient provider
+            // failure: release for retry, never guess "failed" from a check-status-layer error
+            // (observed in production: "1006 Transaction Not Found" moments after a charge that had
+            // already returned a real dotTransId — DOT's status lookup lagging behind the charge).
+            attempt.ReleaseForRetry();
+            await commerceDbContext.SaveChangesAsync(cancellationToken);
+
+            logger.LogWarning(
+                "DOT Fawry Check Transaction Status inconclusive for payment attempt {PaymentAttemptId}: resultCode {ResultCode} ({ResultDesc}).",
+                paymentAttemptId, status.ResultCode, status.ResultDesc);
+
+            return new DotFawryVerificationResult(DotFawryVerificationOutcome.StillPending, order.Id, status.ResultDesc);
+        }
+
         if (!status.IsSuccessfulTransaction)
         {
-            attempt.MarkFailed(status.BillingTransactionResultCode ?? status.ResultCode, status.BillingTransactionResultDesc ?? status.ResultDesc);
+            attempt.MarkFailed(status.BillingTransactionResultCode, status.BillingTransactionResultDesc);
             order.MarkFailed();
-            RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.BillingTransactionResultDesc ?? status.ResultDesc);
+            RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.BillingTransactionResultDesc);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
-            return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, status.BillingTransactionResultDesc ?? status.ResultDesc);
+            return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, status.BillingTransactionResultDesc);
         }
 
         await transactionService.ExecuteAsync(async ct =>

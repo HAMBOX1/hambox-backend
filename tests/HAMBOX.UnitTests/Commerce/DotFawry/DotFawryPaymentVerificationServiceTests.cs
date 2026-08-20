@@ -90,6 +90,30 @@ public sealed class DotFawryPaymentVerificationServiceTests
         Assert.Equal(OrderStatus.Pending, order.Status);
     }
 
+    [Theory]
+    [InlineData("1005", "Error occurred in the operator check status API")]
+    [InlineData("1006", "Transaction Not Found")]
+    [InlineData("1008", "Invalid request")]
+    [InlineData("1009", "Internal error")]
+    public async Task VerifyAndFinalizeAsync_CheckStatusCallItselfErrors_ReleasesBackToPendingInsteadOfFailing(
+        string checkStatusResultCode, string checkStatusResultDesc)
+    {
+        var (harness, attemptId, orderId) = await InitiateAsync();
+        // billingTransactionResultCode is only ever populated when the check-status call's own
+        // resultCode is "0" — a non-"0" resultCode here is an error in the status lookup itself
+        // (e.g. DOT hasn't indexed the transaction yet), not a real billing answer. Must never be
+        // treated as a failed payment.
+        harness.Gateway.StatusResult = new(checkStatusResultCode, checkStatusResultDesc, null, null, "dot-trans-1");
+
+        var result = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
+
+        Assert.Equal(DotFawryVerificationOutcome.StillPending, result.Outcome);
+        var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == attemptId);
+        Assert.Equal(PaymentAttemptStatus.Pending, attempt.Status);
+        var order = await harness.CommerceDb.Orders.FirstAsync(o => o.Id == orderId);
+        Assert.Equal(OrderStatus.Pending, order.Status);
+    }
+
     [Fact]
     public async Task VerifyAndFinalizeAsync_CalledTwiceAfterSuccess_IsIdempotentAndDoesNotDoubleFulfillOrNotify()
     {
