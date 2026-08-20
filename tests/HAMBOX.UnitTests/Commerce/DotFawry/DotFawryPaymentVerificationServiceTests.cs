@@ -176,6 +176,36 @@ public sealed class DotFawryPaymentVerificationServiceTests
     }
 
     [Fact]
+    public async Task VerifyAndFinalizeAsync_DefinitiveChargeFailureButStatusCheckInconclusive_TrustsTheOriginalChargeAnswer()
+    {
+        var harness = DotFawryTestHarness.Create();
+        var (product, variant) = await harness.SeedProductAsync(stock: 5, price: 10m);
+        await harness.SeedCartAsync(product, variant);
+
+        // Direct Billing itself already reported a definitive, documented terminal failure — not
+        // "1000 processing" — so the initiate handler verifies synchronously.
+        harness.Gateway.ChargeResult = new("1014", "Billing attempts exceeded", "dot-trans-1", null);
+        // But Check Transaction Status can't confirm it — observed in production as "1006
+        // Transaction Not Found" moments after the charge: DOT's status lookup never indexes a
+        // charge that already failed synchronously. Must not retry this forever.
+        harness.Gateway.StatusResult = new("1006", "Transaction Not Found", null, null, "dot-trans-1");
+
+        var result = await harness.InitiateHandler.Handle(
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == result.Value.PaymentAttemptId);
+        Assert.Equal(PaymentAttemptStatus.Failed, attempt.Status);
+        Assert.Equal("1014", attempt.LastReasonCode);
+
+        var order = await harness.CommerceDb.Orders.FirstAsync(o => o.Id == result.Value.OrderId);
+        Assert.Equal(OrderStatus.Failed, order.Status);
+        Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
+    }
+
+    [Fact]
     public async Task NotificationHandler_UnknownPartnerTransId_AcksWithoutThrowing()
     {
         var harness = DotFawryTestHarness.Create();

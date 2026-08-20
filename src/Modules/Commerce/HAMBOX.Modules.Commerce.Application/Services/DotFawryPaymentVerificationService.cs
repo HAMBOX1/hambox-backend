@@ -51,6 +51,16 @@ public sealed class DotFawryPaymentVerificationService(
     IOperationalJobQueue jobQueue,
     ILogger<DotFawryPaymentVerificationService> logger)
 {
+    /// <summary>
+    /// Direct Billing resultCodes that are documented, terminal billing outcomes reported
+    /// synchronously by DOT itself (Direct Billing API Integration PDF, p.6) — as opposed to "0"
+    /// (success, still re-verified rather than trusted alone) and "1000" (processing, never final).
+    /// Also the exact set the Transaction Status Notification webhook can send (PDF p.9: 0/1005/1009/1099),
+    /// a strict subset of this list.
+    /// </summary>
+    private static readonly HashSet<string> DefinitiveDirectBillingFailureCodes =
+        ["1004", "1005", "1007", "1008", "1009", "1010", "1011", "1013", "1014", "1099"];
+
     public async Task<DotFawryVerificationResult> VerifyAndFinalizeAsync(Guid paymentAttemptId, CancellationToken cancellationToken)
     {
         var attempt = await commerceDbContext.PaymentAttempts.FirstOrDefaultAsync(p => p.Id == paymentAttemptId, cancellationToken);
@@ -131,10 +141,27 @@ public sealed class DotFawryPaymentVerificationService(
             // Per the Check Transaction Status spec, resultCode != "0" means an error occurred in
             // *this check-status call itself* (not found yet, invalid request, internal error) —
             // billingTransactionResultCode is only ever populated once resultCode is "0", so there
-            // is no real billing answer to act on here. Treat exactly like a transient provider
-            // failure: release for retry, never guess "failed" from a check-status-layer error
-            // (observed in production: "1006 Transaction Not Found" moments after a charge that had
-            // already returned a real dotTransId — DOT's status lookup lagging behind the charge).
+            // is no real billing answer to act on here, from this call alone.
+            //
+            // But the original Direct Billing charge (or a webhook notification) may have already
+            // reported a definitive, documented terminal failure for this exact transaction —
+            // e.g. "1014 Billing attempts exceeded" — before this check-status call ever ran.
+            // Observed in production: a charge that failed synchronously with 1014 never became
+            // look-up-able via Check Transaction Status at all (repeatedly "1006 Transaction Not
+            // Found"), which without this check would retry forever and leave the customer stuck on
+            // "Awaiting Payment" indefinitely for a charge that was never going to succeed. DOT
+            // hasn't indexed/won't ever resolve it — that doesn't undo the answer it already gave.
+            if (attempt.LastReasonCode is { } lastReasonCode && DefinitiveDirectBillingFailureCodes.Contains(lastReasonCode))
+            {
+                attempt.MarkFailed(attempt.LastReasonCode, attempt.LastReasonDescription);
+                order.MarkFailed();
+                RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, attempt.LastReasonDescription);
+                await commerceDbContext.SaveChangesAsync(cancellationToken);
+                return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, attempt.LastReasonDescription);
+            }
+
+            // Otherwise genuinely inconclusive — release for retry exactly like a transient
+            // provider failure, never guess "failed" from a check-status-layer error alone.
             attempt.ReleaseForRetry();
             await commerceDbContext.SaveChangesAsync(cancellationToken);
 
