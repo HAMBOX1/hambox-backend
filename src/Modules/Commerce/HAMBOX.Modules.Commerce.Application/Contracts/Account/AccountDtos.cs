@@ -14,6 +14,21 @@ public sealed record WishlistItemDto(
     DateTimeOffset AddedOnUtc);
 
 /// <summary>
+/// Represents a customer's back-in-stock or price-drop alert subscription for one purchasable
+/// variant.
+/// </summary>
+public sealed record CustomerAlertSubscriptionDto(
+    Guid Id,
+    string AlertType,
+    Guid ProductId,
+    string ProductNameEn,
+    Guid VariantId,
+    string? VariantSku,
+    string? ProductImageUrl,
+    decimal? LastObservedPrice,
+    DateTimeOffset CreatedOnUtc);
+
+/// <summary>
 /// Represents a product review.
 /// </summary>
 public sealed record ProductReviewDto(

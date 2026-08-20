@@ -1,3 +1,4 @@
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -21,11 +22,13 @@ internal sealed class GetStorefrontProductConfigurationsQueryHandler
 {
     private readonly ICatalogDbContext _db;
     private readonly IInventoryEngine _inventoryEngine;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
 
-    public GetStorefrontProductConfigurationsQueryHandler(ICatalogDbContext db, IInventoryEngine inventoryEngine)
+    public GetStorefrontProductConfigurationsQueryHandler(ICatalogDbContext db, IInventoryEngine inventoryEngine, IFulfillmentRouter fulfillmentRouter)
     {
         _db = db;
         _inventoryEngine = inventoryEngine;
+        _fulfillmentRouter = fulfillmentRouter;
     }
 
     public async Task<Result<IReadOnlyList<StorefrontProductConfigurationDto>>> Handle(
@@ -70,6 +73,10 @@ internal sealed class GetStorefrontProductConfigurationsQueryHandler
             ? await _inventoryEngine.GetVariantStockBulkAsync(variants.Select(v => v.Id), cancellationToken)
             : new Dictionary<Guid, VariantStockSnapshot>();
 
+        var readiness = variants.Count > 0
+            ? await _fulfillmentRouter.GetReadinessBulkAsync(variants.Select(v => v.Id), cancellationToken)
+            : new Dictionary<Guid, FulfillmentReadiness>();
+
         // Deliberately no ProductViewEvent logging here (unlike the single-product query) — loading
         // a page of listing cards is not the same signal as a customer opening a product's own page.
 
@@ -78,7 +85,8 @@ internal sealed class GetStorefrontProductConfigurationsQueryHandler
                 product,
                 groupsByProduct[product.Id].ToList(),
                 variantsByProduct[product.Id].ToList(),
-                stock))
+                stock,
+                readiness))
             .ToList();
 
         return Result.Success<IReadOnlyList<StorefrontProductConfigurationDto>>(results);

@@ -95,12 +95,37 @@ internal sealed class InventoryEngine : IInventoryEngine
                 && v.IsVisible,
             cancellationToken);
 
-    public async Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveCodesAsync(
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveCodesAsync(
         Guid variantId,
         int quantity,
         string? userId,
         Guid? cartId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ReserveCodesCoreAsync(variantId, quantity, requireFullQuantity: true, userId, cartId, cancellationToken);
+
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ReservePartialCodesAsync(
+        Guid variantId,
+        int maxQuantity,
+        string? userId,
+        Guid? cartId,
+        CancellationToken cancellationToken = default) =>
+        ReserveCodesCoreAsync(variantId, maxQuantity, requireFullQuantity: false, userId, cartId, cancellationToken);
+
+    /// <summary>
+    /// Shared reservation body for both the all-or-nothing and partial entry points. The locking
+    /// primitive (<see cref="GetLockedAvailableCodeIdsAsync"/>) already only ever locks and returns
+    /// however many rows genuinely exist, up to the requested count — the all-or-nothing behavior of
+    /// <see cref="ReserveCodesAsync"/> is purely the <paramref name="requireFullQuantity"/> guard below,
+    /// not a property of the locking query itself, so reserving "whatever's available, up to N" needs
+    /// no new locking approach, just skipping that one guard.
+    /// </summary>
+    private async Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveCodesCoreAsync(
+        Guid variantId,
+        int quantity,
+        bool requireFullQuantity,
+        string? userId,
+        Guid? cartId,
+        CancellationToken cancellationToken)
     {
         if (quantity <= 0)
         {
@@ -110,9 +135,14 @@ internal sealed class InventoryEngine : IInventoryEngine
         await ExpireStaleReservationsAsync(cancellationToken);
 
         var lockedIds = await GetLockedAvailableCodeIdsAsync(variantId, quantity, cancellationToken);
-        if (lockedIds.Count < quantity)
+        if (requireFullQuantity && lockedIds.Count < quantity)
         {
             throw new InvalidOperationException("Insufficient inventory codes.");
+        }
+
+        if (lockedIds.Count == 0)
+        {
+            return [];
         }
 
         var codes = await _db.DigitalInventoryCodes

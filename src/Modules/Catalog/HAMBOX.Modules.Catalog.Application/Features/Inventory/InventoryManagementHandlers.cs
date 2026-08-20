@@ -26,6 +26,13 @@ public sealed record UpdateProductVariantCommand(
     int LowStockThreshold,
     IReadOnlyList<Guid> OptionIds) : IRequest<Result>;
 
+/// <summary>
+/// Kept deliberately separate from <see cref="UpdateProductVariantCommand"/> — changing fulfillment
+/// mode is a distinct, business-critical, real-money-adjacent action that gets its own audit entry
+/// with the before/after value, not folded into routine metadata edits.
+/// </summary>
+public sealed record SetVariantFulfillmentModeCommand(Guid VariantId, FulfillmentMode FulfillmentMode) : IRequest<Result>;
+
 public sealed record DeleteProductVariantCommand(Guid VariantId) : IRequest<Result>;
 public sealed record DuplicateProductVariantCommand(Guid VariantId, string? SkuSuffix) : IRequest<Result<Guid>>;
 public sealed record ActivateProductVariantCommand(Guid VariantId) : IRequest<Result>;
@@ -115,6 +122,19 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
             return Result.Failure(CatalogErrors.DuplicateVariantCombination);
         }
 
+        var optionGroups = await _db.ProductOptionGroups
+            .AsNoTracking()
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == variant.ProductId)
+            .ToListAsync(cancellationToken);
+
+        var missingGroups = VariantCombinationHelper.FindMissingGroups(requestedOptionIds, optionGroups);
+        if (missingGroups.Count > 0)
+        {
+            return Result.Failure(CatalogErrors.IncompleteVariantCombination(
+                missingGroups.Select(g => g.DisplayName).ToList()));
+        }
+
         variant.Update(
             request.Sku,
             request.PlanId,
@@ -133,6 +153,40 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
             productId: variant.ProductId,
             variantId: variant.Id,
             performedByUserId: _currentUser.UserId));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+internal sealed class SetVariantFulfillmentModeCommandHandler : IRequestHandler<SetVariantFulfillmentModeCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public SetVariantFulfillmentModeCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result> Handle(SetVariantFulfillmentModeCommand request, CancellationToken cancellationToken)
+    {
+        var variant = await _db.ProductVariants.FirstOrDefaultAsync(v => v.Id == request.VariantId && !v.IsDeleted, cancellationToken);
+        if (variant is null)
+        {
+            return Result.Failure(CatalogErrors.VariantNotFound);
+        }
+
+        var previous = variant.SetFulfillmentMode(request.FulfillmentMode);
+
+        // previous/new are safe, non-secret enum names — never any supplier credential/config value.
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.FulfillmentModeChanged,
+            productId: variant.ProductId,
+            variantId: variant.Id,
+            performedByUserId: _currentUser.UserId,
+            details: $"{{\"previous\":\"{previous}\",\"new\":\"{request.FulfillmentMode}\"}}"));
 
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
@@ -197,6 +251,19 @@ internal sealed class DuplicateProductVariantCommandHandler : IRequestHandler<Du
         var suffix = string.IsNullOrWhiteSpace(request.SkuSuffix) ? "-COPY" : request.SkuSuffix.Trim();
         var duplicateSku = BuildDuplicateSku(source.Sku, suffix);
         var optionIds = source.SelectedOptions.Select(o => o.OptionId).ToList();
+
+        var optionGroups = await _db.ProductOptionGroups
+            .AsNoTracking()
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == source.ProductId)
+            .ToListAsync(cancellationToken);
+
+        var missingGroups = VariantCombinationHelper.FindMissingGroups(optionIds, optionGroups);
+        if (missingGroups.Count > 0)
+        {
+            return Result.Failure<Guid>(CatalogErrors.IncompleteVariantCombination(
+                missingGroups.Select(g => g.DisplayName).ToList()));
+        }
 
         var duplicate = ProductVariant.Create(
             source.ProductId,

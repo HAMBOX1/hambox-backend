@@ -36,6 +36,16 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new GetSupplierByIdQuery(id))))
             .RequirePermission(PermissionConstants.Suppliers.View);
 
+        // Gated on Catalog.Inventory.View (not Suppliers.View) deliberately — this is consumed from
+        // the Catalog product/variant editor's Fulfillment section, returns only safe metadata already
+        // classified as such (supplier name, provider type, enabled, credentials-configured boolean,
+        // priority, mapping status), and a Catalog-permission admin should be able to see why a
+        // variant's automated fulfillment is or isn't ready without needing separate Suppliers access.
+        group.MapGet("fulfillment-chain", async Task<IResult> (
+                [FromQuery] Guid productId, [FromQuery] Guid? variantId, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierFulfillmentChainQuery(productId, variantId))))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
         group.MapPost("", async Task<IResult> ([FromBody] CreateSupplierRequest request, ISender sender) =>
             MapResult(await sender.Send(new CreateSupplierCommand(request)), StatusCodes.Status201Created))
             .RequirePermission(PermissionConstants.Suppliers.Create);
@@ -68,6 +78,27 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new TestSupplierConnectionCommand(id))))
             .RequirePermission(PermissionConstants.Suppliers.Edit);
 
+        // Read-only catalog browse for the product-mapping picker — same permission tier as viewing the
+        // supplier itself (Suppliers.View), since it never mutates anything; the actual mapping write
+        // still requires Suppliers.ManageMappings on the mappings endpoints below.
+        group.MapGet("{id:guid}/catalog", async Task<IResult> (
+                Guid id, [FromQuery] string? search, [FromQuery] int page, [FromQuery] int pageSize, ISender sender) =>
+            MapResult(await sender.Send(new SearchSupplierCatalogQuery(id, search, page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
+        // Safe, aggregate-only counts for the supplier detail page's availability status section —
+        // never exposes a per-mapping external id or credential.
+        group.MapGet("{id:guid}/availability-summary", async Task<IResult> (Guid id, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierAvailabilitySummaryQuery(id))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
+        // Admin-triggered refresh — same ISupplierAvailabilityService the recurring background job
+        // calls, just invoked synchronously for one supplier. Gated on ManageMappings (not just View)
+        // since it's a write action (updates SupplierProductAvailability + writes an audit log row).
+        group.MapPost("{id:guid}/availability/sync", async Task<IResult> (Guid id, ISender sender) =>
+            MapResult(await sender.Send(new SyncSupplierAvailabilityCommand(id))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
         group.MapDelete("{id:guid}", async Task<IResult> (Guid id, ISender sender) =>
             MapResult(await sender.Send(new DeleteSupplierCommand(id))))
             .RequirePermission(PermissionConstants.Suppliers.Delete);
@@ -90,10 +121,17 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new UpdateSupplierMappingCommand(supplierId, mappingId, request))))
             .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
 
+        mappings.MapPut("{mappingId:guid}/priority", async Task<IResult> (
+                Guid supplierId, Guid mappingId, [FromBody] UpdateMappingPriorityRequest request, ISender sender) =>
+            MapResult(await sender.Send(new UpdateSupplierMappingPriorityCommand(supplierId, mappingId, request.Priority))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
         mappings.MapDelete("{mappingId:guid}", async Task<IResult> (Guid supplierId, Guid mappingId, ISender sender) =>
             MapResult(await sender.Send(new DeleteSupplierMappingCommand(supplierId, mappingId))))
             .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
     }
+
+    internal sealed record UpdateMappingPriorityRequest(int Priority);
 
     private static IResult MapResult(Result result, int successStatusCode = StatusCodes.Status200OK) =>
         result.IsSuccess ? Results.StatusCode(successStatusCode) : Results.Problem(result.Error.Description, statusCode: StatusCodes.Status400BadRequest);

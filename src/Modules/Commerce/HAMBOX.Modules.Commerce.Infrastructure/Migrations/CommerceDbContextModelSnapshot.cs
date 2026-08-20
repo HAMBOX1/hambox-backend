@@ -23,6 +23,74 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.CustomerAlertSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AlertType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("GuestSessionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("LastObservedPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("NotifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("VariantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_CustomerAlertSubscriptions_UserId");
+
+                    b.HasIndex("AlertType", "VariantId")
+                        .HasDatabaseName("IX_CustomerAlertSubscriptions_AlertType_VariantId")
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("GuestSessionId", "VariantId", "AlertType")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CustomerAlertSubscriptions_GuestSessionId_VariantId_AlertType")
+                        .HasFilter("[GuestSessionId] IS NOT NULL AND [IsActive] = 1");
+
+                    b.HasIndex("UserId", "VariantId", "AlertType")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CustomerAlertSubscriptions_UserId_VariantId_AlertType")
+                        .HasFilter("[UserId] IS NOT NULL AND [IsActive] = 1");
+
+                    b.ToTable("CustomerAlertSubscriptions", "commerce");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.OrderLicenseKey", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1400,6 +1468,114 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasDatabaseName("IX_OrderPaymentCallbacks_OrderId");
 
                     b.ToTable("OrderPaymentCallbacks", "commerce");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Orders.PaymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("ExpectedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ExpectedCurrency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastReasonCode")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("LastReasonDescription")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("MaskedMsisdn")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OperatorId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PartnerTxId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("PendingPromotionsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ProviderReferenceCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("VerifiedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("VerifiedCurrency")
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("IX_PaymentAttempts_OrderId");
+
+                    b.HasIndex("Provider", "PartnerTxId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PaymentAttempts_Provider_PartnerTxId");
+
+                    b.HasIndex("Provider", "ProviderTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PaymentAttempts_Provider_ProviderTransactionId")
+                        .HasFilter("[ProviderTransactionId] IS NOT NULL");
+
+                    b.HasIndex("Status", "ExpiresOnUtc")
+                        .HasDatabaseName("IX_PaymentAttempts_Status_ExpiresOnUtc");
+
+                    b.ToTable("PaymentAttempts", "commerce");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Promotions.CouponCode", b =>

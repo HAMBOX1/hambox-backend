@@ -46,7 +46,8 @@ public sealed record ProductVariantDto(
     int TotalCodesCount,
     bool IsLowStock,
     bool IsOutOfStock,
-    IReadOnlyList<Guid> OptionIds);
+    IReadOnlyList<Guid> OptionIds,
+    string FulfillmentMode);
 
 public sealed record GenerateProductVariantsResultDto(
     int CreatedCount,

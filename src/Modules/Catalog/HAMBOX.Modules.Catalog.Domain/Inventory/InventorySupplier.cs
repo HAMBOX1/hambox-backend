@@ -3,6 +3,18 @@ using HAMBOX.Modules.Catalog.Domain.Enums;
 
 namespace HAMBOX.Modules.Catalog.Domain.Inventory;
 
+/// <summary>
+/// A vendor-contact record used to tag manually-imported inventory (<see cref="InventoryBatch"/>,
+/// <see cref="DigitalInventoryCode"/>) with "who we bought this from" — nothing more. It has no
+/// credentials, provider type, or API integration concept.
+/// </summary>
+/// <remarks>
+/// This is a different, older entity than <c>HAMBOX.Modules.Suppliers.Domain.Suppliers.Supplier</c>
+/// (schema <c>suppliers</c>), which is the canonical registry for any future <em>automated</em>
+/// supplier integration. The two are not merged and have no relationship to each other today. Do not
+/// assume they represent the same "supplier" — see the remarks on <c>Supplier</c> for how they might
+/// be connected later.
+/// </remarks>
 public sealed class InventorySupplier : AggregateRoot, IAuditable, ISoftDeletable
 {
     private InventorySupplier()

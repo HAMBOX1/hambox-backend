@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Domain.Entities;
 using HAMBOX.Infrastructure.Persistence.Conversions;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
+using HAMBOX.Modules.Suppliers.Domain.Fulfillments;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -14,6 +15,8 @@ public sealed class SuppliersDbContext(DbContextOptions<SuppliersDbContext> opti
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<SupplierProductMapping> SupplierProductMappings => Set<SupplierProductMapping>();
     public DbSet<SupplierAuditLog> SupplierAuditLogs => Set<SupplierAuditLog>();
+    public DbSet<SupplierFulfillment> SupplierFulfillments => Set<SupplierFulfillment>();
+    public DbSet<SupplierProductAvailability> SupplierProductAvailabilities => Set<SupplierProductAvailability>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,7 +42,8 @@ public sealed class SuppliersDbContext(DbContextOptions<SuppliersDbContext> opti
         supplier.Property(s => s.ApiSecret).HasConversion(converter).HasMaxLength(2000);
         supplier.Property(s => s.Password).HasConversion(converter).HasMaxLength(2000);
         supplier.Property(s => s.BearerToken).HasConversion(converter).HasMaxLength(2000);
-        supplier.Property(s => s.OAuthSettingsJson).HasConversion(converter).HasColumnType("nvarchar(max)");
+        // No explicit HasColumnType here either — see SupplierConfiguration.SettingsJson's comment.
+        supplier.Property(s => s.OAuthSettingsJson).HasConversion(converter);
     }
 
     private static void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)

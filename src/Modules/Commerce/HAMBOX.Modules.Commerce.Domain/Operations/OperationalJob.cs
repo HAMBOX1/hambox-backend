@@ -27,6 +27,10 @@ public static class OperationalJobTypes
     public const string HealthProbe = "HealthProbe";
     public const string SupplierHealthCheck = "SupplierHealthCheck";
     public const string GenerateOperationalAlerts = "GenerateOperationalAlerts";
+    public const string ScanBackInStockAlerts = "ScanBackInStockAlerts";
+    public const string ScanPriceDropAlerts = "ScanPriceDropAlerts";
+    public const string ReconcileDotPayments = "ReconcileDotPayments";
+    public const string ReconcileDotFawryPayments = "ReconcileDotFawryPayments";
 }
 
 /// <summary>

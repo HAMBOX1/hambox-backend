@@ -4,6 +4,7 @@ using HAMBOX.Application.Idempotency;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
+using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 using HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 using HAMBOX.Modules.Commerce.Infrastructure.Services;
@@ -11,6 +12,7 @@ using HAMBOX.Modules.Commerce.Infrastructure.Services.Reports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Extensions;
 
@@ -47,6 +49,33 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<ICheckoutConfigurationProvider, CheckoutConfigurationProvider>();
         services.AddScoped<IIdempotencyService, IdempotencyService>();
 
+        services.Configure<DotSettings>(configuration.GetSection(DotSettings.SectionName));
+        services.AddSingleton<IValidateOptions<DotSettings>, DotSettingsValidator>();
+        services.AddScoped<IDotPricePointResolver, NotConfiguredDotPricePointResolver>();
+        services.AddHttpClient<IDotPaymentGateway, DotPaymentGateway>((sp, client) =>
+            {
+                var dotSettings = sp.GetRequiredService<IOptions<DotSettings>>().Value;
+                if (!string.IsNullOrWhiteSpace(dotSettings.BaseUrl))
+                {
+                    client.BaseAddress = new Uri(dotSettings.BaseUrl);
+                }
+
+                client.Timeout = TimeSpan.FromSeconds(dotSettings.RequestTimeoutSeconds > 0 ? dotSettings.RequestTimeoutSeconds : 15);
+                client.MaxResponseContentBufferSize = 1024 * 1024;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        services.Configure<DotFawrySettings>(configuration.GetSection(DotFawrySettings.SectionName));
+        services.AddSingleton<IValidateOptions<DotFawrySettings>, DotFawrySettingsValidator>();
+        services.AddScoped<IDotFawryChargeAmountResolver, DotFawryChargeAmountResolver>();
+        services.AddHttpClient<IDotFawryPaymentGateway, DotFawryPaymentGateway>((sp, client) =>
+            {
+                var dotFawrySettings = sp.GetRequiredService<IOptions<DotFawrySettings>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(dotFawrySettings.RequestTimeoutSeconds > 0 ? dotFawrySettings.RequestTimeoutSeconds : 15);
+                client.MaxResponseContentBufferSize = 1024 * 1024;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
         services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly);
 
         services.AddSingleton<IWorkerRuntimeState, WorkerRuntimeState>();
@@ -65,6 +94,10 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<IBackgroundJobHandler, HealthProbeJobHandler>();
         services.AddScoped<IBackgroundJobHandler, GenerateOperationalAlertsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, SupplierHealthCheckJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, BackInStockAlertJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, PriceDropAlertJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ReconcileDotPaymentsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ReconcileDotFawryPaymentsJobHandler>();
 
         services.AddScoped<IOperationsMonitorService, OperationsMonitorService>();
         services.AddScoped<IAnalyticsAggregationService, AnalyticsAggregationService>();

@@ -23,6 +23,106 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Fulfillments.SupplierFulfillment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DeliveredQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FailureCategory")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("FailureDetail")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("HamboxReferenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("LastReconciledOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProviderAccountId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ProviderOrderId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("RequestedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("SubmittedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SupplierProductMappingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HamboxReferenceId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierFulfillments_HamboxReferenceId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_SupplierFulfillments_Status");
+
+                    b.HasIndex("OrderId", "OrderItemId")
+                        .HasDatabaseName("IX_SupplierFulfillments_OrderId_OrderItemId");
+
+                    b.HasIndex("SupplierId", "ProviderOrderId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierFulfillments_SupplierId_ProviderOrderId")
+                        .HasFilter("ProviderOrderId IS NOT NULL");
+
+                    b.ToTable("SupplierFulfillments", "suppliers");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.Supplier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,6 +271,70 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
                     b.ToTable("SupplierAuditLogs", "suppliers");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierProductAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AvailabilityState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("AvailableQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ExternalProductId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("LastCheckedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SupplierProductMappingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierProductMappingId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierProductAvailabilities_SupplierProductMappingId");
+
+                    b.HasIndex("SupplierId", "ExternalProductId")
+                        .HasDatabaseName("IX_SupplierProductAvailabilities_SupplierId_ExternalProductId");
+
+                    b.ToTable("SupplierProductAvailabilities", "suppliers");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierProductMapping", b =>
                 {
                     b.Property<Guid>("Id")
@@ -208,6 +372,9 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
                     b.Property<Guid>("InternalProductId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("InternalProductVariantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
@@ -230,7 +397,17 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
 
                     b.HasIndex("InternalProductId");
 
-                    b.HasIndex("SupplierId", "InternalProductId");
+                    b.HasIndex("InternalProductVariantId");
+
+                    b.HasIndex("SupplierId", "InternalProductId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierProductMappings_SupplierId_InternalProductId_ProductWide")
+                        .HasFilter("[InternalProductVariantId] IS NULL");
+
+                    b.HasIndex("SupplierId", "InternalProductVariantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierProductMappings_SupplierId_InternalProductVariantId_Specific")
+                        .HasFilter("[InternalProductVariantId] IS NOT NULL");
 
                     b.ToTable("SupplierProductMappings", "suppliers");
                 });

@@ -11,7 +11,6 @@ using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
-using HAMBOX.Modules.Commerce.Domain.Promotions;
 using HAMBOX.SharedKernel.Errors;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -28,10 +27,13 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
     private readonly CartResponseBuilder _cartResponseBuilder;
+    private readonly CartLineValidator _cartLineValidator;
+    private readonly PromotionRedemptionService _promotionRedemptionService;
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
     private readonly ICommunicationService _communicationService;
     private readonly IMembershipAccessProvider _membershipAccess;
     private readonly ReferralLifecycleService _referralLifecycle;
+    private readonly OrderFulfillmentService _orderFulfillmentService;
     private readonly ILogger<CheckoutCommandHandler> _logger;
 
     public CheckoutCommandHandler(
@@ -41,10 +43,13 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
         CartResponseBuilder cartResponseBuilder,
+        CartLineValidator cartLineValidator,
+        PromotionRedemptionService promotionRedemptionService,
         IEnumerable<IPaymentProvider> paymentProviders,
         ICommunicationService communicationService,
         IMembershipAccessProvider membershipAccess,
         ReferralLifecycleService referralLifecycle,
+        OrderFulfillmentService orderFulfillmentService,
         ILogger<CheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -53,10 +58,13 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
         _cartResponseBuilder = cartResponseBuilder;
+        _cartLineValidator = cartLineValidator;
+        _promotionRedemptionService = promotionRedemptionService;
         _paymentProviders = paymentProviders;
         _communicationService = communicationService;
         _membershipAccess = membershipAccess;
         _referralLifecycle = referralLifecycle;
+        _orderFulfillmentService = orderFulfillmentService;
         _logger = logger;
     }
 
@@ -114,61 +122,11 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         var productAccess = await _membershipAccess.GetProductsAccessAsync(
             _currentUserService.UserId, productIds, cancellationToken);
 
-        foreach (var item in cart.Items)
+        var lineValidation = await _cartLineValidator.ValidateAsync(
+            cart, products, variants, variantStock, productAccess, access, cancellationToken);
+        if (lineValidation.IsFailure)
         {
-            if (!products.TryGetValue(item.ProductId, out var product))
-            {
-                return Result.Failure<Contracts.OrderDto>(CommerceErrors.ProductNotFound);
-            }
-
-            if (product.Status != ProductStatus.Active)
-            {
-                return Result.Failure<Contracts.OrderDto>(CatalogErrors.ProductNotActive);
-            }
-
-            if (productAccess.TryGetValue(item.ProductId, out var itemAccess) && itemAccess is { IsRestricted: true, HasAccess: false })
-            {
-                return Result.Failure<Contracts.OrderDto>(CommerceErrors.ProductMembersOnly(itemAccess.RequiredPlanNames));
-            }
-
-            if (product.PublicReleaseOnUtc is DateTime releaseOnUtc && releaseOnUtc > DateTime.UtcNow)
-            {
-                var earlyAccessStartsUtc = releaseOnUtc.AddDays(-access.EarlyAccessDays);
-                if (DateTime.UtcNow < earlyAccessStartsUtc)
-                {
-                    return Result.Failure<Contracts.OrderDto>(CommerceErrors.ProductNotYetReleased(releaseOnUtc));
-                }
-            }
-
-            if (item.ProductVariantId is Guid variantId)
-            {
-                if (!variants.TryGetValue(variantId, out var variant) || variant.Status != ProductVariantStatus.Active || !variant.IsVisible)
-                {
-                    return Result.Failure<Contracts.OrderDto>(CatalogErrors.VariantNotFound);
-                }
-
-                if (variant.ProductId != item.ProductId)
-                {
-                    return Result.Failure<Contracts.OrderDto>(CatalogErrors.VariantNotFound);
-                }
-
-                if (!variantStock.TryGetValue(variantId, out var stock) || stock.Available < item.Quantity)
-                {
-                    return Result.Failure<Contracts.OrderDto>(CatalogErrors.InsufficientInventory);
-                }
-            }
-            else if (await _inventoryEngine.ProductHasVariantsAsync(item.ProductId, cancellationToken))
-            {
-                return Result.Failure<Contracts.OrderDto>(CatalogErrors.VariantRequired);
-            }
-            else
-            {
-                // No variant on this cart line and the product has no active, visible variant at
-                // all — there is no inventory-backed way to ever deliver this product. Block the
-                // order instead of falling back to the legacy Product.StockQuantity counter (CSV
-                // import bookkeeping only, not a real digital code) and fabricating a license key.
-                return Result.Failure<Contracts.OrderDto>(CatalogErrors.ProductNotPurchasable);
-            }
+            return Result.Failure<Contracts.OrderDto>(lineValidation.Error);
         }
 
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
@@ -201,7 +159,24 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                 foreach (var item in cart.Items)
                 {
                     var variantId = item.ProductVariantId!.Value;
-                    var reserved = await _inventoryEngine.ReserveCodesAsync(
+                    var mode = variants.TryGetValue(variantId, out var variantForMode)
+                        ? variantForMode.FulfillmentMode
+                        : FulfillmentMode.ManualOnly;
+
+                    if (mode is FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly)
+                    {
+                        // Never reserve manual inventory inline for these modes — CartLineValidator
+                        // already confirmed a READY supplier route exists; the automated-supplier step,
+                        // run strictly after this transaction commits, covers the full quantity.
+                        continue;
+                    }
+
+                    // ManualOnly/ManualFirst: reserve whatever manual stock actually exists, up to the
+                    // requested quantity — never throws on a shortfall. CartLineValidator already
+                    // confirmed the shortfall (if any) is covered by a READY supplier for ManualFirst;
+                    // for ManualOnly a genuine shortfall here would mean CartLineValidator's own stock
+                    // check has a bug, since it required full manual sufficiency for that mode.
+                    var reserved = await _inventoryEngine.ReservePartialCodesAsync(
                         variantId,
                         item.Quantity,
                         _currentUserService.UserId,
@@ -272,85 +247,8 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                 OrderPaymentCallbackRecorder.Record(_commerceDbContext, order.Id, paymentResult);
                 order.Complete();
 
-                foreach (var applied in evaluation.AppliedPromotions)
-                {
-                    _commerceDbContext.OrderAppliedPromotions.Add(OrderAppliedPromotion.Create(
-                        order.Id,
-                        applied.PromotionId,
-                        applied.CouponCodeId,
-                        applied.Name,
-                        applied.Type,
-                        applied.DiscountAmount,
-                        applied.CouponCode));
-
-                    _commerceDbContext.PromotionRedemptions.Add(PromotionRedemption.Create(
-                        applied.PromotionId,
-                        applied.CouponCodeId,
-                        _currentUserService.UserId,
-                        order.Id,
-                        applied.DiscountAmount,
-                        applied.Name));
-
-                    var promotion = await _commerceDbContext.Promotions
-                        .Include(p => p.Conditions)
-                        .FirstOrDefaultAsync(p => p.Id == applied.PromotionId, ct);
-
-                    if (promotion is not null)
-                    {
-                        var promotionId = promotion.Id;
-                        var usageLimit = promotion.GetConditionInt(PromotionConditionType.UsageLimit);
-                        var perUserLimit = promotion.GetConditionInt(PromotionConditionType.PerUserLimit);
-                        var redeemingUserId = _currentUserService.UserId!;
-
-                        // Same atomic, condition-guarded UPDATE pattern as coupon redemption below:
-                        // the row lock on the matched Promotion row serializes concurrent checkouts
-                        // against it, so a redemption that would exceed UsageLimit/PerUserLimit blocks
-                        // until the earlier transaction commits, then re-evaluates the WHERE clause
-                        // and affects 0 rows instead of over-redeeming.
-                        var promotionUpdated = await _commerceDbContext.Promotions
-                            .Where(p => p.Id == promotionId
-                                && (usageLimit == null || p.TotalRedemptions < usageLimit.Value)
-                                && (perUserLimit == null || _commerceDbContext.PromotionRedemptions
-                                    .Count(r => r.PromotionId == promotionId && r.UserId == redeemingUserId) < perUserLimit.Value))
-                            .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalRedemptions, p => p.TotalRedemptions + 1), ct);
-
-                        if (promotionUpdated == 0)
-                        {
-                            throw new InvalidOperationException("Promotion usage limit reached.");
-                        }
-                    }
-
-                    if (applied.CouponCodeId is not null)
-                    {
-                        var couponId = applied.CouponCodeId.Value;
-                        var userId = _currentUserService.UserId!;
-
-                        // Atomic, condition-guarded UPDATE: SQL Server's row lock on the matched
-                        // row serializes concurrent checkouts, so a second redemption that would
-                        // exceed MaxUses/IsSingleUse/PerUserMaxUses blocks until the first commits,
-                        // then re-evaluates the WHERE clause and affects 0 rows instead of over-redeeming.
-                        var couponUpdated = await _commerceDbContext.CouponCodes
-                            .Where(c => c.Id == couponId
-                                && c.IsActive
-                                && (c.MaxUses == null || c.UsedCount < c.MaxUses.Value)
-                                && (!c.IsSingleUse || c.UsedCount == 0)
-                                && (c.PerUserMaxUses == null || _commerceDbContext.PromotionRedemptions
-                                    .Count(r => r.CouponCodeId == couponId && r.UserId == userId) < c.PerUserMaxUses.Value))
-                            .ExecuteUpdateAsync(s => s.SetProperty(c => c.UsedCount, c => c.UsedCount + 1), ct);
-
-                        if (couponUpdated == 0)
-                        {
-                            throw new InvalidOperationException("Coupon usage limit reached.");
-                        }
-
-                        _commerceDbContext.PromotionAuditLogs.Add(PromotionAuditLog.Create(
-                            applied.PromotionId,
-                            applied.CouponCodeId,
-                            PromotionAuditAction.CouponRedeemed,
-                            _currentUserService.UserId,
-                            $"Coupon {applied.CouponCode} redeemed on order {order.OrderNumber}"));
-                    }
-                }
+                await _promotionRedemptionService.RedeemAsync(
+                    order, evaluation.AppliedPromotions, _currentUserService.UserId, ct);
 
                 // Awards the referrer's points if this order qualifies (the referred user's first
                 // completed order) — points-only, nothing priced into this order depends on the outcome.
@@ -447,6 +345,14 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             return Result.Failure<Contracts.OrderDto>(
                 new Error("Checkout.Failed", ex.Message));
         }
+
+        // Strictly after the payment transaction above has committed — see
+        // OrderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync's remarks for why this must
+        // never move inside _transactionService.ExecuteAsync. Covers whatever manual inventory could
+        // not: every cart line was already fully reserved against real stock earlier in this handler,
+        // so today this is normally a no-op, but it becomes load-bearing the moment manual stock for a
+        // mapped product runs out.
+        await _orderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync(createdOrder!, cancellationToken);
 
         await _communicationService.SendAsync(new CommunicationRequest(
             UserId: _currentUserService.UserId!,

@@ -14,8 +14,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HAMBOX.Modules.Suppliers.Domain\HAMBOX.Modules.Suppliers.Domain.csproj" />
+    <ProjectReference Include="..\..\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
+    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
   </ItemGroup>
 
 </Project>

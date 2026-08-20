@@ -33,6 +33,12 @@ using HAMBOX.Modules.Legal.Application.Features.Legal;
 using HAMBOX.Modules.Legal.Infrastructure.Extensions;
 using HAMBOX.Modules.Legal.Infrastructure.Persistence;
 using HAMBOX.Modules.Legal.Presentation.Extensions;
+using HAMBOX.Modules.Messaging.Application.Features.BotConfiguration.GetWhatsAppBotConfiguration;
+using HAMBOX.Modules.Messaging.Infrastructure.Extensions;
+using HAMBOX.Modules.Messaging.Infrastructure.Persistence;
+using HAMBOX.Modules.Messaging.Presentation.Extensions;
+using HAMBOX.Modules.Suppliers.Application.BackgroundJobs;
+using HAMBOX.Modules.Suppliers.Application.Extensions;
 using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Extensions;
 using HAMBOX.Modules.Suppliers.Infrastructure.Persistence;
@@ -91,6 +97,7 @@ try
         config.RegisterServicesFromAssembly(typeof(GetCommunicationDashboardStatsQuery).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetLandingPageTemplatesQuery).Assembly);
         config.RegisterServicesFromAssembly(typeof(GetTicketsQuery).Assembly);
+        config.RegisterServicesFromAssembly(typeof(GetWhatsAppBotConfigurationQuery).Assembly);
         config.AddOpenBehavior(typeof(LoggingBehavior<,>));
         config.AddOpenBehavior(typeof(ValidationBehavior<,>));
         config.AddOpenBehavior(typeof(IdempotencyBehavior<,>));
@@ -110,10 +117,12 @@ try
     builder.Services.AddThemesInfrastructure(builder.Configuration);
     builder.Services.AddLegalInfrastructure(builder.Configuration);
     builder.Services.AddSuppliersInfrastructure(builder.Configuration);
+    builder.Services.AddSuppliersApplication();
     builder.Services.AddCommunicationInfrastructure(builder.Configuration);
     builder.Services.AddContentInfrastructure(builder.Configuration);
     builder.Services.AddSupportInfrastructure(builder.Configuration);
     builder.Services.AddSupportRealtime();
+    builder.Services.AddMessagingInfrastructure(builder.Configuration);
 
     builder.Services.Configure<FormOptions>(options =>
     {
@@ -135,6 +144,11 @@ try
         "security.cleanup-expired-ip-bans", SecurityJobTypes.CleanupExpiredIpBans, TimeSpan.FromMinutes(15)));
     recurringJobScheduler.Register(new RecurringJobDefinition(
         "security.cleanup-expired-email-bans", SecurityJobTypes.CleanupExpiredEmailBans, TimeSpan.FromMinutes(15)));
+    recurringJobScheduler.Register(new RecurringJobDefinition(
+        "suppliers.fulfillment-sweep", SupplierFulfillmentJobTypes.Sweep, TimeSpan.FromMinutes(2), Priority: BackgroundJobPriority.High));
+    var availabilitySyncIntervalMinutes = app.Configuration.GetValue("SupplierAvailability:SyncIntervalMinutes", 5);
+    recurringJobScheduler.Register(new RecurringJobDefinition(
+        "suppliers.availability-sync", SupplierAvailabilityJobTypes.Sync, TimeSpan.FromMinutes(availabilitySyncIntervalMinutes)));
 
     app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
@@ -153,6 +167,7 @@ try
         await app.ApplyMigrationsAsync<CommunicationDbContext>();
         await app.ApplyMigrationsAsync<ContentDbContext>();
         await app.ApplyMigrationsAsync<SupportDbContext>();
+        await app.ApplyMigrationsAsync<MessagingDbContext>();
         await PermissionSynchronizer.SyncAsync(app.Services);
         await InventoryCodeEncryptionMigrator.SeedAsync(app.Services);
         await LicenseKeyEncryptionMigrator.SeedAsync(app.Services);
@@ -164,6 +179,8 @@ try
         await CommunicationDataSeeder.SeedAsync(app.Services);
         await LandingPageDataSeeder.SeedAsync(app.Services);
         await SupportDataSeeder.SeedAsync(app.Services);
+        await MessagingCommunicationTemplateSeeder.SeedAsync(app.Services);
+        await WhatsAppBotConfigurationSeeder.SeedAsync(app.Services);
         await app.SeedIdentityDevelopmentDataAsync();
         app.UseHamboxSwagger();
     }
@@ -231,6 +248,7 @@ try
     app.MapContentEndpoints();
     app.MapSupportEndpoints();
     app.MapSupportHub();
+    app.MapMessagingEndpoints();
     app.MapNotificationHub();
     app.MapLocalizationEndpoints();
     app.MapHealthChecks("/health");

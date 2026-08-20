@@ -53,6 +53,12 @@
     <Project Path="src/Modules/Support/HAMBOX.Modules.Support.Infrastructure/HAMBOX.Modules.Support.Infrastructure.csproj" />
     <Project Path="src/Modules/Support/HAMBOX.Modules.Support.Presentation/HAMBOX.Modules.Support.Presentation.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Messaging/">
+    <Project Path="src/Modules/Messaging/HAMBOX.Modules.Messaging.Application/HAMBOX.Modules.Messaging.Application.csproj" />
+    <Project Path="src/Modules/Messaging/HAMBOX.Modules.Messaging.Domain/HAMBOX.Modules.Messaging.Domain.csproj" />
+    <Project Path="src/Modules/Messaging/HAMBOX.Modules.Messaging.Infrastructure/HAMBOX.Modules.Messaging.Infrastructure.csproj" />
+    <Project Path="src/Modules/Messaging/HAMBOX.Modules.Messaging.Presentation/HAMBOX.Modules.Messaging.Presentation.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/HAMBOX.IntegrationTests/HAMBOX.IntegrationTests.csproj" />
     <Project Path="tests/HAMBOX.UnitTests/HAMBOX.UnitTests.csproj" />

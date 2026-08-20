@@ -23,7 +23,10 @@ public static class CommerceEndpointExtensions
             .Build();
 
         app.MapCartEndpoints(apiVersionSet);
+        app.MapDotPaymentEndpoints(apiVersionSet);
+        app.MapDotFawryPaymentEndpoints(apiVersionSet);
         app.MapAccountEndpoints(apiVersionSet);
+        app.MapCustomerAlertEndpoints(apiVersionSet);
         app.MapPromotionEndpoints(apiVersionSet);
         app.MapMembershipEndpoints(apiVersionSet);
         app.MapOrderManagementEndpoints(apiVersionSet);

@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -17,6 +18,7 @@ internal sealed class UpdateCartItemCommandHandler : IRequestHandler<UpdateCartI
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly CartResponseBuilder _cartResponseBuilder;
 
     public UpdateCartItemCommandHandler(
@@ -24,12 +26,14 @@ internal sealed class UpdateCartItemCommandHandler : IRequestHandler<UpdateCartI
         ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
+        IFulfillmentRouter fulfillmentRouter,
         CartResponseBuilder cartResponseBuilder)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
+        _fulfillmentRouter = fulfillmentRouter;
         _cartResponseBuilder = cartResponseBuilder;
     }
 
@@ -75,7 +79,8 @@ internal sealed class UpdateCartItemCommandHandler : IRequestHandler<UpdateCartI
             unitPrice = variant.PriceOverride ?? product.Price;
 
             var stock = await _inventoryEngine.GetVariantStockAsync(variantId, cancellationToken);
-            if (stock.Available < request.Quantity)
+            var readiness = await _fulfillmentRouter.GetReadinessAsync(variantId, cancellationToken);
+            if (!FulfillmentAvailability.IsAvailable(readiness.Mode, stock.Available >= request.Quantity, readiness.SupplierReady))
             {
                 return Result.Failure<Contracts.CartDto>(
                     CatalogErrors.InsufficientInventoryQuantity(

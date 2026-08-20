@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Domain\HAMBOX.Modules.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Application\HAMBOX.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Infrastructure\HAMBOX.Modules.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Domain\HAMBOX.Modules.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Infrastructure\HAMBOX.Modules.Catalog.Infrastructure.csproj" />
@@ -37,6 +38,9 @@
     <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Domain\HAMBOX.Modules.Content.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Application\HAMBOX.Modules.Content.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Content\HAMBOX.Modules.Content.Infrastructure\HAMBOX.Modules.Content.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Domain\HAMBOX.Modules.Messaging.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Application\HAMBOX.Modules.Messaging.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Infrastructure\HAMBOX.Modules.Messaging.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

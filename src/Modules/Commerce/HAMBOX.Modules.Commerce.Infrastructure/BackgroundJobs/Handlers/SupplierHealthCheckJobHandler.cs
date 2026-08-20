@@ -7,6 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 
+/// <summary>
+/// Checks <c>Catalog.InventorySupplier</c> — the manual-inventory vendor-contact list — not the newer
+/// <c>Suppliers.Supplier</c> registry (schema <c>suppliers</c>) used for automated integrations. The
+/// job's name predates that module; it was not renamed to avoid implying a monitoring capability for
+/// automated suppliers that doesn't exist yet. Disabling/enabling a <c>Suppliers.Supplier</c> row has
+/// no effect on this check.
+/// </summary>
 internal sealed class SupplierHealthCheckJobHandler(
     IBackgroundJobSerializer serializer,
     ICatalogDbContext catalogDb,
@@ -23,9 +30,9 @@ internal sealed class SupplierHealthCheckJobHandler(
         {
             await OperationalAlertUpsert.UpsertAsync(
                 commerceDb,
-                "SUPPLIER_INACTIVE",
-                "Inactive suppliers",
-                $"{inactive} supplier(s) are not Active.",
+                "INVENTORY_SUPPLIER_INACTIVE",
+                "Inactive inventory vendors",
+                $"{inactive} inventory vendor(s) are not Active.",
                 OperationalAlertSeverity.Info,
                 cancellationToken);
             await commerceDb.SaveChangesAsync(cancellationToken);

@@ -5,6 +5,7 @@ public enum InventoryAuditAction
     VariantCreated = 0,
     VariantUpdated = 1,
     VariantDeleted = 2,
+    FulfillmentModeChanged = 100,
     CodeAdded = 3,
     CodeImported = 4,
     CodeExported = 5,

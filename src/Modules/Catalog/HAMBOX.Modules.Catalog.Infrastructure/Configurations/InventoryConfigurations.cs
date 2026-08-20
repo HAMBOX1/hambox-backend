@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -94,6 +95,10 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         builder.Property(x => x.PriceOverride).HasColumnType("decimal(18,2)");
         builder.Property(x => x.ComparePrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        // Explicit DB-level default so every existing row gets ManualOnly (never an empty string that
+        // Enum.Parse would throw on) — the safe, non-spending default this column must never be blank for.
+        builder.Property(x => x.FulfillmentMode).HasConversion<string>().HasMaxLength(20)
+            .HasDefaultValue(FulfillmentMode.ManualOnly);
         // Filtered so a permanently-deleted (soft-deleted) variant's SKU frees up for reuse —
         // SoftDelete() deliberately leaves Sku untouched (see its doc comment), so without this
         // filter a regenerated variant with the same option combination collides with the

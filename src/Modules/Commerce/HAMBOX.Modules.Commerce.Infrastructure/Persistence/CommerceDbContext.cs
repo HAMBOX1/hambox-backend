@@ -34,6 +34,7 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     /// <inheritdoc />
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
+    public DbSet<CustomerAlertSubscription> CustomerAlertSubscriptions => Set<CustomerAlertSubscription>();
 
     /// <inheritdoc />
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
@@ -79,6 +80,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     public DbSet<OrderAuditEntry> OrderAuditEntries => Set<OrderAuditEntry>();
 
     public DbSet<OrderPaymentCallback> OrderPaymentCallbacks => Set<OrderPaymentCallback>();
+
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
 
     public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
     public DbSet<MembershipBenefit> MembershipBenefits => Set<MembershipBenefit>();

@@ -68,6 +68,26 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
             throw new InvalidOperationException("Insufficient inventory codes.");
         }
 
+        return Task.FromResult(ReserveInternal(variantId, quantity));
+    }
+
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ReservePartialCodesAsync(
+        Guid variantId, int maxQuantity, string? userId, Guid? cartId, CancellationToken cancellationToken = default)
+    {
+        if (ThrowOnReserve is not null)
+        {
+            throw ThrowOnReserve;
+        }
+
+        var available = AvailableStockByVariant.GetValueOrDefault(variantId);
+        var toReserve = Math.Min(available, maxQuantity);
+        return Task.FromResult(toReserve <= 0
+            ? (IReadOnlyList<ReservedCodeSnapshot>)[]
+            : ReserveInternal(variantId, toReserve));
+    }
+
+    private IReadOnlyList<ReservedCodeSnapshot> ReserveInternal(Guid variantId, int quantity)
+    {
         var pool = CodesByVariant.TryGetValue(variantId, out var queue) ? queue : new Queue<string>();
         var reserved = new List<ReservedCodeSnapshot>();
         for (var i = 0; i < quantity; i++)
@@ -78,8 +98,8 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
             reserved.Add(new ReservedCodeSnapshot(codeId, variantId, code, DateTimeOffset.UtcNow.AddMinutes(15)));
         }
 
-        AvailableStockByVariant[variantId] = available - quantity;
-        return Task.FromResult<IReadOnlyList<ReservedCodeSnapshot>>(reserved);
+        AvailableStockByVariant[variantId] = AvailableStockByVariant.GetValueOrDefault(variantId) - quantity;
+        return reserved;
     }
 
     public Task ReleaseReservationsForCartAsync(Guid cartId, CancellationToken cancellationToken = default) =>

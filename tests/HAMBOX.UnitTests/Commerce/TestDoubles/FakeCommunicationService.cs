@@ -5,6 +5,14 @@ namespace HAMBOX.UnitTests.Commerce.TestDoubles;
 
 internal sealed class FakeCommunicationService : ICommunicationService
 {
-    public Task<Result> SendAsync(CommunicationRequest request, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Result.Success());
+    /// <summary>Every request handed to <see cref="SendAsync"/>, in call order — lets a test assert
+    /// exactly who was notified, how many times, and with what template/category, without a real
+    /// Communication module dependency.</summary>
+    public List<CommunicationRequest> SentRequests { get; } = [];
+
+    public Task<Result> SendAsync(CommunicationRequest request, CancellationToken cancellationToken = default)
+    {
+        SentRequests.Add(request);
+        return Task.FromResult(Result.Success());
+    }
 }

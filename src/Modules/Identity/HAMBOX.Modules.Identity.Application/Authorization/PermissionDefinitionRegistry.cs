@@ -57,6 +57,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid PageBuilder = new("15000000-0000-0000-0000-000000000032");
         public static readonly Guid Campaigns = new("15000000-0000-0000-0000-000000000033");
         public static readonly Guid Faq = new("15000000-0000-0000-0000-000000000034");
+        public static readonly Guid WhatsAppBot = new("15000000-0000-0000-0000-000000000035");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -95,6 +96,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.PageBuilder, "PageBuilder", "Page Builder", "Platform", 149, "Storefront homepage landing page templates and section arrangement"),
         new(GroupIds.Campaigns, "Campaigns", "Theme Campaigns", "Platform", 141, "Time-boxed, storefront-wide marketing theme overrides (Black Friday, Ramadan, ...)"),
         new(GroupIds.Faq, "Faq", "FAQ", "Platform", 150, "Global, product, and category scoped frequently-asked-question entries"),
+        new(GroupIds.WhatsAppBot, "WhatsAppBot", "WhatsApp Bot", "Platform", 151, "WhatsApp menu-bot presentation: welcome/fallback text and menu item labels/order"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -311,6 +313,10 @@ public static class PermissionDefinitionRegistry
         new(new Guid("20000000-0000-0000-0000-000000000278"), GroupIds.Faq, PermissionConstants.Faq.Edit, 3),
         new(new Guid("20000000-0000-0000-0000-000000000279"), GroupIds.Faq, PermissionConstants.Faq.Delete, 4),
         new(new Guid("20000000-0000-0000-0000-000000000280"), GroupIds.Faq, PermissionConstants.Faq.Publish, 5),
+
+        // WhatsApp Bot (281-282) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000281"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000282"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.Edit, 2),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

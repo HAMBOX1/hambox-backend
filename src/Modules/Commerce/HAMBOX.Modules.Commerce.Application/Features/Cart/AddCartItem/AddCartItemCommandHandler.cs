@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -18,6 +19,7 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly CartResponseBuilder _cartResponseBuilder;
     private readonly IMembershipAccessProvider _membershipAccess;
 
@@ -26,6 +28,7 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
         ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
+        IFulfillmentRouter fulfillmentRouter,
         CartResponseBuilder cartResponseBuilder,
         IMembershipAccessProvider membershipAccess)
     {
@@ -33,6 +36,7 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
+        _fulfillmentRouter = fulfillmentRouter;
         _cartResponseBuilder = cartResponseBuilder;
         _membershipAccess = membershipAccess;
     }
@@ -111,8 +115,12 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
 
         // A ProductVariantId is guaranteed at this point: the block above already rejected
         // any request that didn't resolve to one, so there is no variant-less stock branch here.
+        // Same combined manual/supplier-readiness rule CartLineValidator uses at checkout, so a
+        // supplier-backed variant with zero manual codes isn't rejected here only to be accepted
+        // later at checkout (or vice versa).
         var stock = await _inventoryEngine.GetVariantStockAsync(request.ProductVariantId!.Value, cancellationToken);
-        if (stock.Available < newQuantity)
+        var readiness = await _fulfillmentRouter.GetReadinessAsync(request.ProductVariantId!.Value, cancellationToken);
+        if (!FulfillmentAvailability.IsAvailable(readiness.Mode, stock.Available >= newQuantity, readiness.SupplierReady))
         {
             return Result.Failure<Contracts.CartDto>(
                 CatalogErrors.InsufficientInventoryQuantity(

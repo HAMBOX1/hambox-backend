@@ -76,6 +76,70 @@ public static class VariantCombinationHelper
     public static string NormalizeCombinationKey(IEnumerable<Guid> optionIds) =>
         string.Join("|", optionIds.OrderBy(id => id));
 
+    /// <summary>
+    /// The full set of normalized combination keys <see cref="Expand"/> would generate for this
+    /// product's option-group tree right now — the single authoritative definition of "a complete,
+    /// purchasable variant combination" (every reachable group filled, exactly one option each,
+    /// regardless of <c>IsRequired</c> — see <see cref="Expand"/>'s own remarks). Compute once per
+    /// product and reuse across every variant, rather than re-expanding per variant.
+    /// </summary>
+    public static HashSet<string> BuildValidCombinationKeys(IReadOnlyList<ProductOptionGroup> allGroups) =>
+        Expand(allGroups).Select(NormalizeCombinationKey).ToHashSet();
+
+    /// <summary>
+    /// True when <paramref name="optionIds"/> is an exact, complete combination per
+    /// <see cref="BuildValidCombinationKeys"/> — a product with no option groups at all has no
+    /// combinations to complete, so any (empty) selection is trivially complete.
+    /// </summary>
+    public static bool IsCompleteCombination(IReadOnlyList<Guid> optionIds, HashSet<string> validCombinationKeys, IReadOnlyList<ProductOptionGroup> allGroups) =>
+        allGroups.Count == 0 || validCombinationKeys.Contains(NormalizeCombinationKey(optionIds));
+
+    /// <summary>
+    /// Walks the option-group tree along <paramref name="optionIds"/>' own selections and returns
+    /// every reachable group (root groups, plus a child group once its parent option is among
+    /// <paramref name="optionIds"/>) that has no option selected — i.e. exactly what a variant would
+    /// need to add to become a complete combination. Used to build a specific, actionable validation
+    /// error; <see cref="IsCompleteCombination"/> remains the authoritative pass/fail check since it
+    /// also catches malformed extra/orphaned option ids that this walk wouldn't flag.
+    /// </summary>
+    public static IReadOnlyList<ProductOptionGroup> FindMissingGroups(
+        IReadOnlyList<Guid> optionIds,
+        IReadOnlyList<ProductOptionGroup> allGroups)
+    {
+        var selected = optionIds.ToHashSet();
+        var rootGroups = allGroups.Where(g => g.ParentOptionId is null).OrderBy(g => g.SortOrder).ToList();
+        var childGroupsByParentOptionId = allGroups
+            .Where(g => g.ParentOptionId is not null)
+            .ToLookup(g => g.ParentOptionId!.Value);
+
+        var missing = new List<ProductOptionGroup>();
+        WalkMissingGroups(rootGroups, selected, childGroupsByParentOptionId, missing);
+        return missing;
+    }
+
+    private static void WalkMissingGroups(
+        IReadOnlyList<ProductOptionGroup> groups,
+        HashSet<Guid> selected,
+        ILookup<Guid, ProductOptionGroup> childGroupsByParentOptionId,
+        List<ProductOptionGroup> missing)
+    {
+        foreach (var group in groups.Where(g => g.Options.Count > 0))
+        {
+            var chosenOption = group.Options.FirstOrDefault(o => selected.Contains(o.Id));
+            if (chosenOption is null)
+            {
+                missing.Add(group);
+                continue;
+            }
+
+            var childGroups = childGroupsByParentOptionId[chosenOption.Id].Where(g => g.Options.Count > 0).ToList();
+            if (childGroups.Count > 0)
+            {
+                WalkMissingGroups(childGroups, selected, childGroupsByParentOptionId, missing);
+            }
+        }
+    }
+
     public static string BuildSku(string productPrefix, IReadOnlyList<string> optionValues, HashSet<string> usedSkus)
     {
         var slugParts = optionValues

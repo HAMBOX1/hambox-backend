@@ -1101,6 +1101,13 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("FulfillmentMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("ManualOnly");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 

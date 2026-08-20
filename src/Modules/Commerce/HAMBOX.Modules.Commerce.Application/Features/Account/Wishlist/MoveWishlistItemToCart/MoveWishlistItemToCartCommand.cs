@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -20,6 +21,7 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
     private readonly ICatalogDbContext _catalogDbContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly CartResponseBuilder _cartResponseBuilder;
     private readonly IMembershipAccessProvider _membershipAccess;
 
@@ -28,6 +30,7 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
         ICatalogDbContext catalogDbContext,
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
+        IFulfillmentRouter fulfillmentRouter,
         CartResponseBuilder cartResponseBuilder,
         IMembershipAccessProvider membershipAccess)
     {
@@ -35,6 +38,7 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
         _catalogDbContext = catalogDbContext;
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
+        _fulfillmentRouter = fulfillmentRouter;
         _cartResponseBuilder = cartResponseBuilder;
         _membershipAccess = membershipAccess;
     }
@@ -125,7 +129,8 @@ internal sealed class MoveWishlistItemToCartCommandHandler : IRequestHandler<Mov
         if (productVariantId is Guid stockVariantId)
         {
             var stock = await _inventoryEngine.GetVariantStockAsync(stockVariantId, cancellationToken);
-            if (stock.Available < newQuantity)
+            var readiness = await _fulfillmentRouter.GetReadinessAsync(stockVariantId, cancellationToken);
+            if (!FulfillmentAvailability.IsAvailable(readiness.Mode, stock.Available >= newQuantity, readiness.SupplierReady))
             {
                 return Result.Failure<Contracts.CartDto>(
                     CatalogErrors.InsufficientInventoryQuantity(

@@ -2,6 +2,7 @@ using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.UnitTests.Commerce.TestDoubles;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HAMBOX.UnitTests.Commerce.Checkout;
 
@@ -46,7 +47,8 @@ public sealed class OrderFulfillmentServiceTests
         inventoryEngine.AvailableStockByVariant[variantId] = 1;
         inventoryEngine.CodesByVariant[variantId] = new Queue<string>(["REAL-GAME-KEY-0001"]);
 
-        var service = new OrderFulfillmentService(commerceDb, inventoryEngine);
+        var service = new OrderFulfillmentService(
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -67,8 +69,13 @@ public sealed class OrderFulfillmentServiceTests
     }
 
     [Fact]
-    public async Task FulfillMissingAsync_InsufficientInventory_ThrowsAndDeliversNothing()
+    public async Task FulfillMissingAsync_InsufficientInventory_DeliversNothingWithoutThrowing()
     {
+        // Phase 7 routing change: FulfillMissingAsync now reserves manual stock via the
+        // never-throwing ReservePartialCodesAsync (0 up to the requested quantity) instead of the
+        // all-or-nothing ReserveCodesAsync — a single short line no longer throws and blocks every
+        // other line in the same order from being processed. Zero available stock now means zero
+        // delivered, not an exception.
         var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
         var productId = Guid.NewGuid();
         var variantId = Guid.NewGuid();
@@ -80,11 +87,13 @@ public sealed class OrderFulfillmentServiceTests
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
         inventoryEngine.AvailableStockByVariant[variantId] = 0;
 
-        var service = new OrderFulfillmentService(commerceDb, inventoryEngine);
+        var service = new OrderFulfillmentService(
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.FulfillMissingAsync(order, CancellationToken.None));
+        var result = await service.FulfillMissingAsync(order, CancellationToken.None);
 
+        Assert.Equal(0, result.CodesDelivered);
+        Assert.False(result.OrderCompleted);
         Assert.Empty(commerceDb.OrderLicenseKeys.Where(k => k.OrderId == order.Id));
     }
 
@@ -102,7 +111,8 @@ public sealed class OrderFulfillmentServiceTests
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
-        var service = new OrderFulfillmentService(commerceDb, inventoryEngine);
+        var service = new OrderFulfillmentService(
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
 
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
@@ -132,7 +142,8 @@ public sealed class OrderFulfillmentServiceTests
         inventoryEngine.AvailableStockByVariant[variantId] = 1;
         inventoryEngine.CodesByVariant[variantId] = new Queue<string>(["REAL-GAME-KEY-0002"]);
 
-        var service = new OrderFulfillmentService(commerceDb, inventoryEngine);
+        var service = new OrderFulfillmentService(
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -166,7 +177,8 @@ public sealed class OrderFulfillmentServiceTests
         // Deliberately not calling RecordPayment — PaymentStatus stays unpaid.
 
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
-        var service = new OrderFulfillmentService(commerceDb, inventoryEngine);
+        var service = new OrderFulfillmentService(
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.FulfillMissingAsync(order, CancellationToken.None));

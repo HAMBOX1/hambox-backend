@@ -1,3 +1,4 @@
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Application.Membership;
 using HAMBOX.Application.Referrals;
 using HAMBOX.Application.Variants;
@@ -7,6 +8,7 @@ using HAMBOX.Modules.Commerce.Application.Promotions.Evaluators;
 using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Application.Variants;
+using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HAMBOX.Modules.Commerce.Application.Extensions;
@@ -35,6 +37,12 @@ public static class CommerceApplicationExtensions
         services.AddScoped<IPromotionTypeEvaluator, FlashSalePromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, CouponPromotionEvaluator>();
         services.AddScoped<CartResponseBuilder>();
+        services.AddScoped<CartLineValidator>();
+        services.AddScoped<PromotionRedemptionService>();
+        services.AddScoped<DotPaymentVerificationService>();
+        services.AddScoped<DotFawryPaymentVerificationService>();
+        services.AddScoped<ISupplierFulfillmentDeliverySink, CommerceOrderLicenseKeyDeliverySink>();
+        services.AddScoped<IFulfillmentRouter, FulfillmentRouter>();
 
         return services;
     }

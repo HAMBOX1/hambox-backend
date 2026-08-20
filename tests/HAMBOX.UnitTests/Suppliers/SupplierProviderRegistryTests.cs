@@ -66,6 +66,12 @@ public sealed class SupplierProviderRegistryTests
         public Task<SupplierProductSyncResult> SyncProductsAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SupplierProductSyncResult(true, 0, null));
 
+        public Task<SupplierAvailabilityResult> GetAvailabilityAsync(SupplierAvailabilityQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SupplierAvailabilityResult(true, [], null));
+
+        public Task<SupplierCatalogSearchResult> SearchCatalogAsync(SupplierCatalogQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SupplierCatalogSearchResult(true, [], null));
+
         public Task<SupplierInventorySyncResult> SyncInventoryAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SupplierInventorySyncResult(true, 0, null));
 
@@ -76,12 +82,12 @@ public sealed class SupplierProviderRegistryTests
             Task.FromResult(new SupplierReservationResult(true, null, null));
 
         public Task<SupplierPurchaseResult> PurchaseAsync(SupplierPurchaseRequest request, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new SupplierPurchaseResult(true, null, null, null));
+            Task.FromResult(new SupplierPurchaseResult(true, null, null, null, null));
 
         public Task<SupplierCancellationResult> CancelAsync(SupplierCancellationRequest request, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SupplierCancellationResult(true, null));
 
-        public Task<SupplierOrderStatusResult> GetOrderStatusAsync(string providerOrderId, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new SupplierOrderStatusResult(true, "Unknown", null));
+        public Task<SupplierOrderStatusResult> GetOrderStatusAsync(SupplierOrderStatusQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SupplierOrderStatusResult(SupplierProviderOrderStatus.Unknown, null, null, null, null));
     }
 }

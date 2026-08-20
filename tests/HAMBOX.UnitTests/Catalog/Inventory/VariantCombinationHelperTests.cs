@@ -298,6 +298,54 @@ public class VariantCombinationHelperTests
     }
 
     /// <summary>
+    /// The reported bug, at the helper level: "Value" is a second, independent root group added
+    /// after "Global"/"US" variants already existed. Those variants' option-id sets (region only)
+    /// are not among the valid complete combinations, which always include one Value option too.
+    /// </summary>
+    [Fact]
+    public void IsCompleteCombination_VariantMissingASecondRequiredGroup_IsNotComplete()
+    {
+        var productId = Guid.NewGuid();
+        var region = ProductOptionGroup.Create(productId, "region", "Region", sortOrder: 0);
+        var global = region.AddOption("global", "Global", 0);
+        var us = region.AddOption("us", "US", 1);
+
+        var value = ProductOptionGroup.Create(productId, "value", "Value", sortOrder: 1);
+        var value100 = value.AddOption("100", "100", 0);
+
+        var allGroups = new[] { region, value };
+        var validKeys = VariantCombinationHelper.BuildValidCombinationKeys(allGroups);
+
+        Assert.False(VariantCombinationHelper.IsCompleteCombination([global.Id], validKeys, allGroups));
+        Assert.False(VariantCombinationHelper.IsCompleteCombination([us.Id], validKeys, allGroups));
+        Assert.True(VariantCombinationHelper.IsCompleteCombination([us.Id, value100.Id], validKeys, allGroups));
+    }
+
+    [Fact]
+    public void IsCompleteCombination_ProductWithNoOptionGroups_AnySelectionIsTriviallyComplete()
+    {
+        Assert.True(VariantCombinationHelper.IsCompleteCombination([], [], []));
+    }
+
+    [Fact]
+    public void FindMissingGroups_ReportsExactlyTheUnfilledReachableGroups()
+    {
+        var productId = Guid.NewGuid();
+        var region = ProductOptionGroup.Create(productId, "region", "Region", sortOrder: 0);
+        var global = region.AddOption("global", "Global", 0);
+        region.AddOption("us", "US", 1);
+
+        var value = ProductOptionGroup.Create(productId, "value", "Value", sortOrder: 1);
+        value.AddOption("100", "100", 0);
+
+        var allGroups = new[] { region, value };
+
+        var missing = VariantCombinationHelper.FindMissingGroups([global.Id], allGroups);
+
+        Assert.Equal(["Value"], missing.Select(g => g.DisplayName));
+    }
+
+    /// <summary>
     /// Independently recomputes the expected total (product of each root group's own leaf-path
     /// count, where an option's leaf-path count is 1 if it has no non-empty child groups, or the
     /// sum over its child groups' cross-product otherwise — always mandatory, regardless of

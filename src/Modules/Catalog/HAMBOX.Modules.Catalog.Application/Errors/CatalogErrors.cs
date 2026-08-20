@@ -150,6 +150,11 @@ public static class CatalogErrors
         "Inventory.DuplicateVariantCombination",
         "A variant with this option combination already exists.");
 
+    public static Error IncompleteVariantCombination(IReadOnlyList<string> missingGroupNames) =>
+        new(
+            "Inventory.IncompleteVariantCombination",
+            $"This variant is missing a selection for: {string.Join(", ", missingGroupNames)}.");
+
     public static readonly Error VariantBulkEmpty = new(
         "Inventory.VariantBulkEmpty",
         "Select at least one variant for bulk actions.");

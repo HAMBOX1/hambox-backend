@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
+using HAMBOX.Modules.Suppliers.Domain.Fulfillments;
 
 namespace HAMBOX.Modules.Suppliers.Infrastructure.Services;
 
@@ -24,6 +25,12 @@ internal sealed class ManualSupplierProvider : ISupplierProvider
     public Task<SupplierProductSyncResult> SyncProductsAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SupplierProductSyncResult(false, 0, "Manual supplier — products must be entered via Catalog inventory."));
 
+    public Task<SupplierCatalogSearchResult> SearchCatalogAsync(SupplierCatalogQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SupplierCatalogSearchResult(false, [], "Manual supplier has no browsable catalog — map products by entering the external product id directly."));
+
+    public Task<SupplierAvailabilityResult> GetAvailabilityAsync(SupplierAvailabilityQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SupplierAvailabilityResult(false, [], "Manual supplier has no automated availability signal — availability is whatever Catalog inventory says."));
+
     public Task<SupplierInventorySyncResult> SyncInventoryAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SupplierInventorySyncResult(false, 0, "Manual supplier — inventory is managed via Catalog inventory batches."));
 
@@ -34,11 +41,13 @@ internal sealed class ManualSupplierProvider : ISupplierProvider
         Task.FromResult(new SupplierReservationResult(false, null, "Manual supplier — reservations are not supported."));
 
     public Task<SupplierPurchaseResult> PurchaseAsync(SupplierPurchaseRequest request, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new SupplierPurchaseResult(false, null, null, "Manual supplier — purchases are not supported."));
+        Task.FromResult(new SupplierPurchaseResult(
+            false, null, null, SupplierFulfillmentFailureCategory.InvalidConfiguration, "Manual supplier — purchases are not supported."));
 
     public Task<SupplierCancellationResult> CancelAsync(SupplierCancellationRequest request, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SupplierCancellationResult(false, "Manual supplier — nothing to cancel externally."));
 
-    public Task<SupplierOrderStatusResult> GetOrderStatusAsync(string providerOrderId, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
-        Task.FromResult(new SupplierOrderStatusResult(false, "Unknown", "Manual supplier — no external order status."));
+    public Task<SupplierOrderStatusResult> GetOrderStatusAsync(SupplierOrderStatusQuery query, SupplierProviderContext context, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SupplierOrderStatusResult(
+            SupplierProviderOrderStatus.Unknown, null, null, SupplierFulfillmentFailureCategory.InvalidConfiguration, "Manual supplier — no external order status."));
 }

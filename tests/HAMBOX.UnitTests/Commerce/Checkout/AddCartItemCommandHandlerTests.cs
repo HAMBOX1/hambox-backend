@@ -1,11 +1,18 @@
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
 using HAMBOX.Modules.Commerce.Application.Services;
+using HAMBOX.Modules.Suppliers.Application.Options;
+using HAMBOX.Modules.Suppliers.Domain.Suppliers;
+using HAMBOX.Modules.Suppliers.Infrastructure.Services;
 using HAMBOX.UnitTests.Commerce.TestDoubles;
+using HAMBOX.UnitTests.Suppliers.TestDoubles;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.UnitTests.Commerce.Checkout;
 
@@ -35,13 +42,15 @@ public sealed class AddCartItemCommandHandlerTests
         HAMBOX.Modules.Commerce.Infrastructure.Persistence.CommerceDbContext commerceDb,
         HAMBOX.Modules.Catalog.Infrastructure.Persistence.CatalogDbContext catalogDb,
         FakeInventoryEngine inventoryEngine,
-        FakeCurrentUserService currentUser)
+        FakeCurrentUserService currentUser,
+        FakeFulfillmentRouter? fulfillmentRouter = null)
     {
         var cartResponseBuilder = new CartResponseBuilder(
             commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
 
         return new AddCartItemCommandHandler(
-            commerceDb, catalogDb, currentUser, inventoryEngine, cartResponseBuilder, new FakeMembershipAccessProvider());
+            commerceDb, catalogDb, currentUser, inventoryEngine, fulfillmentRouter ?? new FakeFulfillmentRouter(),
+            cartResponseBuilder, new FakeMembershipAccessProvider());
     }
 
     [Fact]
@@ -183,5 +192,194 @@ public sealed class AddCartItemCommandHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal(CatalogErrors.VariantNotFound.Code, result.Error.Code);
         Assert.Empty(commerceDb.ShoppingCarts.SelectMany(c => c.Items));
+    }
+
+    /// <summary>
+    /// Regression test for the reported bug, reproduced live against a real Bamboo-mapped product
+    /// (see the investigation's DB verification): a SupplierFirst/SupplierOnly variant with zero
+    /// manual codes but a READY automated-supplier route must be addable to the cart — before this
+    /// fix, this call returned 400 InsufficientInventory even though the storefront correctly showed
+    /// it as in stock, because AddCartItemCommandHandler only ever consulted manual stock.
+    /// </summary>
+    [Fact]
+    public async Task Handle_SupplierOnly_ZeroManualStock_ReadySupplier_Succeeds()
+    {
+        var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
+        var (product, category) = CreateActiveProduct();
+        var variant = CreateActiveVariant(product.Id);
+        variant.SetFulfillmentMode(FulfillmentMode.SupplierOnly);
+
+        catalogDb.Categories.Add(category);
+        catalogDb.Products.Add(product);
+        catalogDb.ProductVariants.Add(variant);
+        await catalogDb.SaveChangesAsync(CancellationToken.None);
+
+        var inventoryEngine = new FakeInventoryEngine(catalogDb); // 0 manual stock
+        var router = new FakeFulfillmentRouter();
+        router.SetReadiness(variant.Id, new FulfillmentReadiness(
+            FulfillmentMode.SupplierOnly, false, new FulfillmentSupplierCandidate(Guid.NewGuid(), Guid.NewGuid())));
+        var currentUser = new FakeCurrentUserService(userId: "user-1");
+        var handler = CreateHandler(commerceDb, catalogDb, inventoryEngine, currentUser, router);
+
+        var result = await handler.Handle(
+            new AddCartItemCommand(product.Id, Quantity: 1, GuestSessionId: null, ProductVariantId: variant.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value.Items);
+    }
+
+    [Fact]
+    public async Task Handle_SupplierOnly_SupplierNotReady_StillFails()
+    {
+        var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
+        var (product, category) = CreateActiveProduct();
+        var variant = CreateActiveVariant(product.Id);
+        variant.SetFulfillmentMode(FulfillmentMode.SupplierOnly);
+
+        catalogDb.Categories.Add(category);
+        catalogDb.Products.Add(product);
+        catalogDb.ProductVariants.Add(variant);
+        await catalogDb.SaveChangesAsync(CancellationToken.None);
+
+        var inventoryEngine = new FakeInventoryEngine(catalogDb);
+        var router = new FakeFulfillmentRouter();
+        router.SetReadiness(variant.Id, new FulfillmentReadiness(FulfillmentMode.SupplierOnly, false, null));
+        var currentUser = new FakeCurrentUserService(userId: "user-1");
+        var handler = CreateHandler(commerceDb, catalogDb, inventoryEngine, currentUser, router);
+
+        var result = await handler.Handle(
+            new AddCartItemCommand(product.Id, Quantity: 1, GuestSessionId: null, ProductVariantId: variant.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(CatalogErrors.InsufficientInventoryQuantity(0, 1, 0).Code, result.Error.Code);
+    }
+
+    // ===================== Server-side enforcement against the REAL FulfillmentRouter =====================
+    // Everything above uses FakeFulfillmentRouter to isolate this handler's own logic. These use the
+    // real production router + a real persisted SupplierProductAvailability row, proving end-to-end that
+    // "Add to Cart" is blocked at the server boundary — not merely hidden by the storefront UI — for
+    // every one of the availability states the phase introduces (Available/Unavailable/stale/Unknown).
+
+    private static AddCartItemCommandHandler CreateHandlerWithRealRouter(
+        HAMBOX.Modules.Commerce.Infrastructure.Persistence.CommerceDbContext commerceDb,
+        HAMBOX.Modules.Catalog.Infrastructure.Persistence.CatalogDbContext catalogDb,
+        HAMBOX.Modules.Suppliers.Infrastructure.Persistence.SuppliersDbContext suppliersDb,
+        FakeInventoryEngine inventoryEngine,
+        FakeCurrentUserService currentUser,
+        int staleAfterMinutes = 10)
+    {
+        var router = new FulfillmentRouter(
+            catalogDb, suppliersDb, new SupplierProviderRegistry([new FakeSupplierProvider("Fake")]),
+            Options.Create(new SupplierAvailabilityOptions { StaleAfterMinutes = staleAfterMinutes }));
+        var cartResponseBuilder = new CartResponseBuilder(
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+        return new AddCartItemCommandHandler(
+            commerceDb, catalogDb, currentUser, inventoryEngine, router, cartResponseBuilder, new FakeMembershipAccessProvider());
+    }
+
+    [Fact]
+    public async Task Handle_RealRouter_SupplierOnly_UnavailableInPersistedCache_RejectsAtServerBoundary()
+    {
+        var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
+        var suppliersDb = SuppliersTestDbContextFactory.Create();
+        var (product, category) = CreateActiveProduct();
+        var variant = CreateActiveVariant(product.Id);
+        variant.SetFulfillmentMode(FulfillmentMode.SupplierOnly);
+        catalogDb.Categories.Add(category);
+        catalogDb.Products.Add(product);
+        catalogDb.ProductVariants.Add(variant);
+        await catalogDb.SaveChangesAsync(CancellationToken.None);
+
+        var supplier = Supplier.Create("Fake Supplier", $"SUP-{Guid.NewGuid():N}", "Fake", SupplierAuthenticationType.None, null, 0);
+        suppliersDb.Suppliers.Add(supplier);
+        var mapping = SupplierProductMapping.Create(supplier.Id, product.Id, "EXT-1", null, null, 5m, "USD", 0, variant.Id);
+        suppliersDb.SupplierProductMappings.Add(mapping);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+        var availability = SupplierProductAvailability.CreateUnknown(supplier.Id, mapping.Id, "EXT-1");
+        availability.RecordChecked(SupplierAvailabilityState.Unavailable, null, DateTimeOffset.UtcNow, "EXT-1");
+        suppliersDb.SupplierProductAvailabilities.Add(availability);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+
+        var inventoryEngine = new FakeInventoryEngine(catalogDb); // 0 manual stock
+        var currentUser = new FakeCurrentUserService(userId: "user-1");
+        var handler = CreateHandlerWithRealRouter(commerceDb, catalogDb, suppliersDb, inventoryEngine, currentUser);
+
+        var result = await handler.Handle(
+            new AddCartItemCommand(product.Id, Quantity: 1, GuestSessionId: null, ProductVariantId: variant.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(commerceDb.ShoppingCarts.SelectMany(c => c.Items));
+    }
+
+    [Fact]
+    public async Task Handle_RealRouter_SupplierOnly_StaleAvailability_RejectsAtServerBoundary()
+    {
+        var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
+        var suppliersDb = SuppliersTestDbContextFactory.Create();
+        var (product, category) = CreateActiveProduct();
+        var variant = CreateActiveVariant(product.Id);
+        variant.SetFulfillmentMode(FulfillmentMode.SupplierOnly);
+        catalogDb.Categories.Add(category);
+        catalogDb.Products.Add(product);
+        catalogDb.ProductVariants.Add(variant);
+        await catalogDb.SaveChangesAsync(CancellationToken.None);
+
+        var supplier = Supplier.Create("Fake Supplier", $"SUP-{Guid.NewGuid():N}", "Fake", SupplierAuthenticationType.None, null, 0);
+        suppliersDb.Suppliers.Add(supplier);
+        var mapping = SupplierProductMapping.Create(supplier.Id, product.Id, "EXT-1", null, null, 5m, "USD", 0, variant.Id);
+        suppliersDb.SupplierProductMappings.Add(mapping);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+        var availability = SupplierProductAvailability.CreateUnknown(supplier.Id, mapping.Id, "EXT-1");
+        // Available, but the check happened 1 hour ago against a 10-minute freshness window.
+        availability.RecordChecked(SupplierAvailabilityState.Available, null, DateTimeOffset.UtcNow.AddHours(-1), "EXT-1");
+        suppliersDb.SupplierProductAvailabilities.Add(availability);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+
+        var inventoryEngine = new FakeInventoryEngine(catalogDb);
+        var currentUser = new FakeCurrentUserService(userId: "user-1");
+        var handler = CreateHandlerWithRealRouter(commerceDb, catalogDb, suppliersDb, inventoryEngine, currentUser, staleAfterMinutes: 10);
+
+        var result = await handler.Handle(
+            new AddCartItemCommand(product.Id, Quantity: 1, GuestSessionId: null, ProductVariantId: variant.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+    }
+
+    [Fact]
+    public async Task Handle_RealRouter_SupplierOnly_FreshAvailable_SucceedsAtServerBoundary()
+    {
+        var (commerceDb, catalogDb) = CommerceTestDbContextFactory.Create();
+        var suppliersDb = SuppliersTestDbContextFactory.Create();
+        var (product, category) = CreateActiveProduct();
+        var variant = CreateActiveVariant(product.Id);
+        variant.SetFulfillmentMode(FulfillmentMode.SupplierOnly);
+        catalogDb.Categories.Add(category);
+        catalogDb.Products.Add(product);
+        catalogDb.ProductVariants.Add(variant);
+        await catalogDb.SaveChangesAsync(CancellationToken.None);
+
+        var supplier = Supplier.Create("Fake Supplier", $"SUP-{Guid.NewGuid():N}", "Fake", SupplierAuthenticationType.None, null, 0);
+        suppliersDb.Suppliers.Add(supplier);
+        var mapping = SupplierProductMapping.Create(supplier.Id, product.Id, "EXT-1", null, null, 5m, "USD", 0, variant.Id);
+        suppliersDb.SupplierProductMappings.Add(mapping);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+        var availability = SupplierProductAvailability.CreateUnknown(supplier.Id, mapping.Id, "EXT-1");
+        availability.RecordChecked(SupplierAvailabilityState.Available, null, DateTimeOffset.UtcNow, "EXT-1");
+        suppliersDb.SupplierProductAvailabilities.Add(availability);
+        await suppliersDb.SaveChangesAsync(CancellationToken.None);
+
+        var inventoryEngine = new FakeInventoryEngine(catalogDb);
+        var currentUser = new FakeCurrentUserService(userId: "user-1");
+        var handler = CreateHandlerWithRealRouter(commerceDb, catalogDb, suppliersDb, inventoryEngine, currentUser);
+
+        var result = await handler.Handle(
+            new AddCartItemCommand(product.Id, Quantity: 1, GuestSessionId: null, ProductVariantId: variant.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 }

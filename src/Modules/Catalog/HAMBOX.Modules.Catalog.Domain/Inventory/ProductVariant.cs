@@ -31,6 +31,7 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         LowStockThreshold = lowStockThreshold;
         Status = ProductVariantStatus.Draft;
         IsVisible = false;
+        FulfillmentMode = FulfillmentMode.ManualOnly;
     }
 
     public Guid ProductId { get; private set; }
@@ -43,6 +44,12 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
     public bool IsVisible { get; private set; }
     public Guid? MembershipPlanId { get; private set; }
     public int LowStockThreshold { get; private set; }
+
+    /// <summary>
+    /// How a shortfall for this variant is sourced. Defaults to <see cref="FulfillmentMode.ManualOnly"/>
+    /// for every variant, existing or new — see <see cref="FulfillmentMode"/> for the full contract.
+    /// </summary>
+    public FulfillmentMode FulfillmentMode { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTimeOffset? DeletedOnUtc { get; private set; }
     public string? CreatedBy { get; set; }
@@ -90,6 +97,18 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         IsVisible = isVisible;
         MembershipPlanId = membershipPlanId;
         LowStockThreshold = lowStockThreshold;
+    }
+
+    /// <summary>
+    /// Changes how a shortfall for this variant is sourced. Kept as its own method (not folded into
+    /// <see cref="Update"/>) so callers can audit the before/after value distinctly — this is a
+    /// business-critical, real-money-adjacent configuration change, not routine metadata editing.
+    /// </summary>
+    public FulfillmentMode SetFulfillmentMode(FulfillmentMode mode)
+    {
+        var previous = FulfillmentMode;
+        FulfillmentMode = mode;
+        return previous;
     }
 
     public void SetOptions(IEnumerable<Guid> optionIds)

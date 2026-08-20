@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Application.Contracts;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
 
@@ -41,10 +42,30 @@ public static class SupplierMapper
         supplier.CreatedOnUtc,
         supplier.ModifiedOnUtc);
 
-    public static SupplierMappingDto ToMappingDto(SupplierProductMapping mapping) => new(
+    public static SupplierFulfillmentChainCandidateDto ToFulfillmentChainCandidate(
+        SupplierProductMapping mapping, Supplier supplier, bool providerRegistered) => new(
+        mapping.Id,
+        supplier.Id,
+        supplier.Name,
+        supplier.ProviderType,
+        mapping.InternalProductVariantId is null ? "ProductWide" : "VariantSpecific",
+        mapping.ExternalProductId,
+        mapping.Priority,
+        mapping.Status.ToString(),
+        supplier.IsEnabled,
+        supplier.HasCredentialsConfigured,
+        providerRegistered,
+        supplier.IsEnabled && supplier.HasCredentialsConfigured && providerRegistered);
+
+    public static SupplierMappingDto ToMappingDto(
+        SupplierProductMapping mapping,
+        string? internalProductName = null,
+        string? internalVariantSku = null,
+        SupplierProductAvailability? availability = null) => new(
         mapping.Id,
         mapping.SupplierId,
         mapping.InternalProductId,
+        mapping.InternalProductVariantId,
         mapping.ExternalProductId,
         mapping.ExternalSku,
         mapping.ExternalName,
@@ -52,5 +73,19 @@ public static class SupplierMapper
         mapping.Currency,
         mapping.Priority,
         mapping.Status.ToString(),
-        mapping.CreatedOnUtc);
+        mapping.CreatedOnUtc,
+        internalProductName,
+        internalVariantSku,
+        availability?.AvailabilityState.ToString(),
+        availability?.AvailableQuantity,
+        availability?.LastCheckedAtUtc);
+
+    public static SupplierCatalogItemDto ToCatalogItemDto(SupplierCatalogItem item) => new(
+        item.ExternalProductId,
+        item.Name,
+        item.BrandName,
+        item.Currency,
+        item.MinFaceValue,
+        item.MaxFaceValue,
+        item.Available);
 }

@@ -39,4 +39,5 @@ public enum SupplierAuditAction
     MappingCreated = 8,
     MappingUpdated = 9,
     MappingDeleted = 10,
+    AvailabilitySynced = 11,
 }

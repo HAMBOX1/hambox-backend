@@ -76,6 +76,34 @@ public static class CommunicationDataSeeder
                 "<p>Your referral completed their first order and <strong>{{Points}} points</strong> were added to your referral balance.</p>");
         }
 
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "BackInStockAlert"))
+        {
+            SeedTemplate(db, "BackInStockAlert", CommunicationChannels.InApp, CommunicationCategory.BackInStock,
+                "{{ProductName}} is back in stock",
+                "{{VariantLabel}} is available again. Get it before it's gone.",
+                subjectAr: "{{ProductName}} متوفر الآن",
+                bodyAr: "{{VariantLabel}} متوفر مجددًا. احصل عليه قبل نفاد الكمية.");
+            SeedTemplate(db, "BackInStockAlert", CommunicationChannels.Email, CommunicationCategory.BackInStock,
+                "{{ProductName}} is back in stock",
+                "<p><strong>{{ProductName}}</strong> ({{VariantLabel}}) is available again. Get it before it's gone.</p>",
+                subjectAr: "{{ProductName}} متوفر الآن",
+                bodyAr: "<p><strong>{{ProductName}}</strong> ({{VariantLabel}}) متوفر مجددًا. احصل عليه قبل نفاد الكمية.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "PriceDropAlert"))
+        {
+            SeedTemplate(db, "PriceDropAlert", CommunicationChannels.InApp, CommunicationCategory.PriceDrop,
+                "Price drop: {{ProductName}}",
+                "{{VariantLabel}} dropped from {{OldPrice}} to {{NewPrice}}.",
+                subjectAr: "انخفاض السعر: {{ProductName}}",
+                bodyAr: "انخفض سعر {{VariantLabel}} من {{OldPrice}} إلى {{NewPrice}}.");
+            SeedTemplate(db, "PriceDropAlert", CommunicationChannels.Email, CommunicationCategory.PriceDrop,
+                "Price drop: {{ProductName}}",
+                "<p><strong>{{ProductName}}</strong> ({{VariantLabel}}) dropped from {{OldPrice}} to <strong>{{NewPrice}}</strong>.</p>",
+                subjectAr: "انخفاض السعر: {{ProductName}}",
+                bodyAr: "<p>انخفض سعر <strong>{{ProductName}}</strong> ({{VariantLabel}}) من {{OldPrice}} إلى <strong>{{NewPrice}}</strong>.</p>");
+        }
+
         await db.SaveChangesAsync();
     }
 
@@ -83,10 +111,17 @@ public static class CommunicationDataSeeder
     public const string EmailProviderKey = "Smtp";
 
     private static void SeedTemplate(
-        CommunicationDbContext db, string key, string channel, CommunicationCategory category, string subjectEn, string bodyEn)
+        CommunicationDbContext db,
+        string key,
+        string channel,
+        CommunicationCategory category,
+        string subjectEn,
+        string bodyEn,
+        string? subjectAr = null,
+        string? bodyAr = null)
     {
         var template = CommunicationTemplate.Create(key, channel, category);
-        var version = template.CreateDraftVersion(subjectEn, null, bodyEn, null, null);
+        var version = template.CreateDraftVersion(subjectEn, subjectAr, bodyEn, bodyAr, null);
         template.PublishVersion(version.Id, "system");
         db.CommunicationTemplates.Add(template);
     }

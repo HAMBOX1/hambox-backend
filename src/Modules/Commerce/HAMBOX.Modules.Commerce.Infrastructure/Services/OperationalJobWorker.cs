@@ -103,6 +103,14 @@ internal sealed class OperationalJobWorker(
             "commerce.health-probe", OperationalJobTypes.HealthProbe, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.Low));
         recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.generate-operational-alerts", OperationalJobTypes.GenerateOperationalAlerts, TimeSpan.FromMinutes(5)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.scan-back-in-stock-alerts", OperationalJobTypes.ScanBackInStockAlerts, TimeSpan.FromMinutes(5)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.scan-price-drop-alerts", OperationalJobTypes.ScanPriceDropAlerts, TimeSpan.FromMinutes(5)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.reconcile-dot-payments", OperationalJobTypes.ReconcileDotPayments, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.High));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.reconcile-dot-fawry-payments", OperationalJobTypes.ReconcileDotFawryPayments, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.High));
     }
 
     /// <summary>

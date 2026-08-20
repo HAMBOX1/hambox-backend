@@ -1431,6 +1431,24 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Name = "Faq.Publish",
                             NormalizedName = "FAQ.PUBLISH",
                             SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000281"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000035"),
+                            Name = "WhatsAppBot.View",
+                            NormalizedName = "WHATSAPPBOT.VIEW",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0000-000000000282"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            GroupId = new Guid("15000000-0000-0000-0000-000000000035"),
+                            Name = "WhatsAppBot.Edit",
+                            NormalizedName = "WHATSAPPBOT.EDIT",
+                            SortOrder = 2
                         });
                 });
 
@@ -1789,6 +1807,16 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Module = "Platform",
                             Name = "FAQ",
                             SortOrder = 150
+                        },
+                        new
+                        {
+                            Id = new Guid("15000000-0000-0000-0000-000000000035"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "WhatsApp menu-bot presentation: welcome/fallback text and menu item labels/order",
+                            Key = "WhatsAppBot",
+                            Module = "Platform",
+                            Name = "WhatsApp Bot",
+                            SortOrder = 151
                         });
                 });
 
@@ -2933,6 +2961,20 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Id = new Guid("30000000-0000-0000-0000-000000000140"),
                             CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             PermissionId = new Guid("20000000-0000-0000-0000-000000000280"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000141"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000281"),
+                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            Id = new Guid("30000000-0000-0000-0000-000000000142"),
+                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            PermissionId = new Guid("20000000-0000-0000-0000-000000000282"),
                             RoleId = new Guid("10000000-0000-0000-0000-000000000002")
                         });
                 });

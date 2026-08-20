@@ -6,7 +6,7 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Checkout;
 
 public sealed record GetCheckoutConfigurationQuery : IRequest<Result<CheckoutConfigurationDto>>;
 
-public sealed record CheckoutConfigurationDto(bool DevelopmentCheckoutEnabled);
+public sealed record CheckoutConfigurationDto(bool DevelopmentCheckoutEnabled, bool DotCheckoutEnabled, bool DotFawryCheckoutEnabled);
 
 internal sealed class GetCheckoutConfigurationQueryHandler(ICheckoutConfigurationProvider configuration)
     : IRequestHandler<GetCheckoutConfigurationQuery, Result<CheckoutConfigurationDto>>
@@ -15,5 +15,8 @@ internal sealed class GetCheckoutConfigurationQueryHandler(ICheckoutConfiguratio
         GetCheckoutConfigurationQuery request,
         CancellationToken cancellationToken) =>
         Task.FromResult(Result.Success(
-            new CheckoutConfigurationDto(configuration.IsDevelopmentCheckoutEnabled)));
+            new CheckoutConfigurationDto(
+                configuration.IsDevelopmentCheckoutEnabled,
+                configuration.IsDotCheckoutEnabled,
+                configuration.IsDotFawryCheckoutEnabled)));
 }

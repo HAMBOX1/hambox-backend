@@ -14,4 +14,5 @@ public sealed record StorefrontVariantDto(
     int AvailableStock,
     bool IsLowStock,
     bool IsOutOfStock,
-    IReadOnlyList<Guid> OptionIds);
+    IReadOnlyList<Guid> OptionIds,
+    bool IsCompleteCombination);

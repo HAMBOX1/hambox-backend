@@ -41,6 +41,11 @@ public interface ICommerceDbContext
     DbSet<WishlistItem> WishlistItems { get; }
 
     /// <summary>
+    /// Gets the customer back-in-stock/price-drop alert subscriptions database set.
+    /// </summary>
+    DbSet<CustomerAlertSubscription> CustomerAlertSubscriptions { get; }
+
+    /// <summary>
     /// Gets the product reviews database set.
     /// </summary>
     DbSet<ProductReview> ProductReviews { get; }
@@ -110,6 +115,8 @@ public interface ICommerceDbContext
     DbSet<OrderAuditEntry> OrderAuditEntries { get; }
 
     DbSet<OrderPaymentCallback> OrderPaymentCallbacks { get; }
+
+    DbSet<PaymentAttempt> PaymentAttempts { get; }
 
     DbSet<MembershipPlan> MembershipPlans { get; }
     DbSet<MembershipBenefit> MembershipBenefits { get; }

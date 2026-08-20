@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -19,17 +20,20 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
 {
     private readonly ICatalogDbContext _db;
     private readonly IInventoryEngine _inventoryEngine;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<GetStorefrontProductConfigurationQueryHandler> _logger;
 
     public GetStorefrontProductConfigurationQueryHandler(
         ICatalogDbContext db,
         IInventoryEngine engine,
+        IFulfillmentRouter fulfillmentRouter,
         ICurrentUserService currentUser,
         ILogger<GetStorefrontProductConfigurationQueryHandler> logger)
     {
         _db = db;
         _inventoryEngine = engine;
+        _fulfillmentRouter = fulfillmentRouter;
         _currentUser = currentUser;
         _logger = logger;
     }
@@ -66,12 +70,16 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
             ? await _inventoryEngine.GetVariantStockBulkAsync(variants.Select(v => v.Id), cancellationToken)
             : new Dictionary<Guid, VariantStockSnapshot>();
 
+        var readiness = variants.Count > 0
+            ? await _fulfillmentRouter.GetReadinessBulkAsync(variants.Select(v => v.Id), cancellationToken)
+            : new Dictionary<Guid, FulfillmentReadiness>();
+
         if (!request.AllowUnpublished)
         {
             await TryLogProductViewAsync(request.ProductId, cancellationToken);
         }
 
-        return Result.Success(StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock));
+        return Result.Success(StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock, readiness));
     }
 
     private async Task TryLogProductViewAsync(Guid productId, CancellationToken cancellationToken)

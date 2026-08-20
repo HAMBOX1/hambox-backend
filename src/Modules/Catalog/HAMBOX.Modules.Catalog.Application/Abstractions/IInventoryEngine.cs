@@ -17,6 +17,22 @@ public interface IInventoryEngine
         Guid? cartId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Same locking/reservation mechanism as <see cref="ReserveCodesAsync"/> (the same pessimistic
+    /// <c>UPDLOCK, ROWLOCK</c> row selection — two concurrent callers can never reserve the same code),
+    /// but reserves whatever is actually available up to <paramref name="maxQuantity"/> instead of
+    /// throwing when fewer than requested exist. Returns an empty list (never throws) when nothing is
+    /// available. Used by fulfillment-routing modes that must consume only the manual stock that
+    /// genuinely exists and let the remainder be sourced elsewhere, rather than treating "not enough
+    /// manual stock" as a hard failure.
+    /// </summary>
+    Task<IReadOnlyList<ReservedCodeSnapshot>> ReservePartialCodesAsync(
+        Guid variantId,
+        int maxQuantity,
+        string? userId,
+        Guid? cartId,
+        CancellationToken cancellationToken = default);
+
     Task ReleaseReservationsForCartAsync(Guid cartId, CancellationToken cancellationToken = default);
 
     Task ReleaseReservationsAsync(IEnumerable<Guid> codeIds, CancellationToken cancellationToken = default);

@@ -127,6 +127,22 @@ internal static class AccountMapper
         string? productImageUrl = null) =>
         new(item.Id, item.ProductId, productNameEn, unitPrice, productImageUrl, item.AddedOnUtc);
 
+    public static Contracts.Account.CustomerAlertSubscriptionDto ToAlertSubscriptionDto(
+        CustomerAlertSubscription subscription,
+        string productNameEn,
+        string? variantSku,
+        string? productImageUrl = null) =>
+        new(
+            subscription.Id,
+            subscription.AlertType.ToString(),
+            subscription.ProductId,
+            productNameEn,
+            subscription.VariantId,
+            variantSku,
+            productImageUrl,
+            subscription.LastObservedPrice,
+            subscription.CreatedOnUtc);
+
     public static Contracts.Account.ProductReviewDto ToProductReviewDto(ProductReview review) =>
         new(
             review.Id,

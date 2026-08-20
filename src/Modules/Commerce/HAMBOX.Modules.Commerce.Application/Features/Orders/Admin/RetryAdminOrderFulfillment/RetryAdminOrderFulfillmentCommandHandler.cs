@@ -93,6 +93,16 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
 
             if (ex.Message == CommerceErrors.OrderFulfillmentNothingToRetry.Description)
             {
+                // Manual stock had nothing to offer — try an automated supplier for the shortfall
+                // before falling back to the generic retry job. Best-effort: this call never throws
+                // (it catches its own exceptions internally), and its outcome does not change the
+                // response below — the existing retry-job safety net still fires unconditionally, so
+                // an automated-supplier failure here is never worse than today's behavior.
+                if (order is not null)
+                {
+                    await _fulfillmentService.QueueAutomatedSupplierFulfillmentAsync(order, cancellationToken);
+                }
+
                 await _jobQueue.EnqueueAsync(
                     OperationalJobTypes.RetryOrderFulfillment,
                     JsonSerializer.Serialize(new { orderId = command.OrderId }),
@@ -107,6 +117,11 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
             return Result.Failure<RetryAdminOrderFulfillmentResultDto>(
                 CommerceErrors.OrderFulfillmentFailed);
         }
+
+        // Manual retry delivered something but possibly not everything (e.g. one product line still
+        // short) — top up via an automated supplier for whatever remains, strictly after the
+        // transaction above has committed. See QueueAutomatedSupplierFulfillmentAsync's remarks.
+        await _fulfillmentService.QueueAutomatedSupplierFulfillmentAsync(order!, cancellationToken);
 
         if (result!.OrderCompleted)
         {

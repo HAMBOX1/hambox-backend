@@ -71,6 +71,38 @@ public static class CommerceErrors
         "The specified product is already in the wishlist.");
 
     /// <summary>
+    /// Gets the error for when an alert subscription is not found (or does not belong to the caller —
+    /// deliberately the same error either way, matching the Wishlist ownership idiom of never
+    /// revealing that a differently-owned row exists).
+    /// </summary>
+    public static readonly Error AlertSubscriptionNotFound = new(
+        "CustomerAlerts.NotFound",
+        "The specified alert subscription was not found.");
+
+    /// <summary>
+    /// Gets the error for when an identical active alert subscription already exists.
+    /// </summary>
+    public static readonly Error AlertSubscriptionExists = new(
+        "CustomerAlerts.AlreadyExists",
+        "You already have an active alert for this product and variant.");
+
+    /// <summary>
+    /// Gets the error for when neither an authenticated user nor a guest session identifier is
+    /// available to own a new alert subscription.
+    /// </summary>
+    public static readonly Error AlertSubscriptionOwnerRequired = new(
+        "CustomerAlerts.OwnerRequired",
+        "Sign in or provide a guest session to create an alert.");
+
+    /// <summary>
+    /// Gets the error for subscribing to a back-in-stock alert on a variant that is already
+    /// purchasable — there is no "became available" transition left to notify on.
+    /// </summary>
+    public static readonly Error VariantAlreadyAvailable = new(
+        "CustomerAlerts.VariantAlreadyAvailable",
+        "This variant is already available to purchase.");
+
+    /// <summary>
     /// Gets the error for when a review is not found.
     /// </summary>
     public static readonly Error ReviewNotFound = new(
@@ -191,4 +223,74 @@ public static class CommerceErrors
     public static readonly Error InstructionsNotAccessible = new(
         "Library.InstructionsNotAccessible",
         "These instructions are not available.");
+
+    /// <summary>
+    /// Gets the error returned when DOT checkout is attempted before the client has confirmed
+    /// DOT's pricing model (fixed price point vs. arbitrary amount) for the configured service_id.
+    /// See <c>IDotPricePointResolver</c>.
+    /// </summary>
+    public static readonly Error DotPricingNotConfigured = new(
+        "Dot.PricingNotConfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error DotGatewayMisconfigured = new(
+        "Dot.GatewayMisconfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error DotPaymentAttemptNotFound = new(
+        "Dot.PaymentAttemptNotFound",
+        "The payment attempt was not found.");
+
+    /// <summary>
+    /// Gets the single, deliberately non-specific error for every way a DOT callback/notification
+    /// fails to correspond to a known, still-open payment attempt (unknown partner_txid, wrong
+    /// operator/service context, already-finalized attempt) — collapsed to one code so the response
+    /// never reveals which check failed to an unauthenticated caller.
+    /// </summary>
+    public static readonly Error DotCallbackInvalid = new(
+        "Dot.CallbackInvalid",
+        "The payment callback could not be processed.");
+
+    public static readonly Error DotVerificationFailed = new(
+        "Dot.VerificationFailed",
+        "The payment could not be verified.");
+
+    public static readonly Error DotProviderUnavailable = new(
+        "Dot.ProviderUnavailable",
+        "The payment provider is temporarily unavailable. Please try again shortly.");
+
+    /// <summary>
+    /// Gets the error returned when DOT Fawry checkout is attempted before the client has confirmed
+    /// the currency DOT expects for the configured Fawry service_id. See
+    /// <c>IDotFawryChargeAmountResolver</c>. A distinct DOT product from carrier-billing OTP
+    /// (<see cref="DotPricingNotConfigured"/>) — do not conflate the two.
+    /// </summary>
+    public static readonly Error DotFawryPricingNotConfigured = new(
+        "DotFawry.PricingNotConfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error DotFawryGatewayMisconfigured = new(
+        "DotFawry.GatewayMisconfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error DotFawryPaymentAttemptNotFound = new(
+        "DotFawry.PaymentAttemptNotFound",
+        "The payment attempt was not found.");
+
+    /// <summary>
+    /// Gets the single, deliberately non-specific error for every way a DOT Fawry notification
+    /// fails to correspond to a known, still-open payment attempt — collapsed to one code so the
+    /// response never reveals which check failed to an unauthenticated caller.
+    /// </summary>
+    public static readonly Error DotFawryNotificationInvalid = new(
+        "DotFawry.NotificationInvalid",
+        "The payment notification could not be processed.");
+
+    public static readonly Error DotFawryVerificationFailed = new(
+        "DotFawry.VerificationFailed",
+        "The payment could not be verified.");
+
+    public static readonly Error DotFawryProviderUnavailable = new(
+        "DotFawry.ProviderUnavailable",
+        "The payment provider is temporarily unavailable. Please try again shortly.");
 }

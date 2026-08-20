@@ -72,7 +72,7 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 v.SortOrder, v.Status.ToString(), v.IsVisible, v.MembershipPlanId, v.LowStockThreshold,
                 s?.Available ?? 0, s?.Reserved ?? 0, s?.Sold ?? 0, totalCodes,
                 s?.IsLowStock ?? false, s?.IsOutOfStock ?? true,
-                v.SelectedOptions.Select(o => o.OptionId).ToList());
+                v.SelectedOptions.Select(o => o.OptionId).ToList(), v.FulfillmentMode.ToString());
         }).ToList();
 
         return Result.Success<IReadOnlyList<ProductVariantDto>>(dtos);
@@ -107,6 +107,19 @@ internal sealed class CreateProductVariantCommandHandler : IRequestHandler<Creat
         if (!productExists)
         {
             return Result.Failure<Guid>(CatalogErrors.ProductNotFound);
+        }
+
+        var optionGroups = await _db.ProductOptionGroups
+            .AsNoTracking()
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == request.ProductId)
+            .ToListAsync(cancellationToken);
+
+        var missingGroups = VariantCombinationHelper.FindMissingGroups(request.OptionIds, optionGroups);
+        if (missingGroups.Count > 0)
+        {
+            return Result.Failure<Guid>(CatalogErrors.IncompleteVariantCombination(
+                missingGroups.Select(g => g.DisplayName).ToList()));
         }
 
         var variant = ProductVariant.Create(

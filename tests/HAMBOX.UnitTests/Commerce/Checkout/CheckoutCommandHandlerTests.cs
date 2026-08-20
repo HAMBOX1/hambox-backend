@@ -64,10 +64,14 @@ public sealed class CheckoutCommandHandlerTests
             currentUser,
             inventoryEngine,
             cartResponseBuilder,
+            new CartLineValidator(inventoryEngine, new FakeFulfillmentRouter()),
+            new PromotionRedemptionService(commerceDb),
             [new FakePaymentProvider()],
             new FakeCommunicationService(),
             new FakeMembershipAccessProvider(),
             referralLifecycle,
+            new OrderFulfillmentService(
+                commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance),
             NullLogger<CheckoutCommandHandler>.Instance);
 
         var result = await handler.Handle(

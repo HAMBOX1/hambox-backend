@@ -38,6 +38,8 @@
     <ProjectReference Include="..\..\Modules\Content\HAMBOX.Modules.Content.Presentation\HAMBOX.Modules.Content.Presentation.csproj" />
     <ProjectReference Include="..\..\Modules\Support\HAMBOX.Modules.Support.Infrastructure\HAMBOX.Modules.Support.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Support\HAMBOX.Modules.Support.Presentation\HAMBOX.Modules.Support.Presentation.csproj" />
+    <ProjectReference Include="..\..\Modules\Messaging\HAMBOX.Modules.Messaging.Infrastructure\HAMBOX.Modules.Messaging.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Messaging\HAMBOX.Modules.Messaging.Presentation\HAMBOX.Modules.Messaging.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

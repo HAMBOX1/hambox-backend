@@ -11,6 +11,8 @@ public enum CommunicationCategory
     Supplier = 6,
     Marketing = 7,
     General = 8,
+    BackInStock = 9,
+    PriceDrop = 10,
 }
 
 public enum CommunicationPriority

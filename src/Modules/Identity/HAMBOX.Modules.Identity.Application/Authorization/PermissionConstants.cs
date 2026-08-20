@@ -283,6 +283,12 @@ public static class PermissionConstants
         public const string Publish = "Faq.Publish";
     }
 
+    public static class WhatsAppBot
+    {
+        public const string View = "WhatsAppBot.View";
+        public const string Edit = "WhatsAppBot.Edit";
+    }
+
     /// <summary>
     /// Every non-obsolete permission name declared anywhere in this class, discovered by reflection
     /// so a new <c>public const string</c> added under any nested group is automatically included —

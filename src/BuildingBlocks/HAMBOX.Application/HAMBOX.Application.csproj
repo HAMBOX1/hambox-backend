@@ -14,6 +14,13 @@
   <ItemGroup>
     <ProjectReference Include="..\HAMBOX.Domain\HAMBOX.Domain.csproj" />
     <ProjectReference Include="..\HAMBOX.SharedKernel\HAMBOX.SharedKernel.csproj" />
+    <!-- FulfillmentMode (Catalog.Domain) is the one real, persisted domain vocabulary this contract
+         needs — Catalog.Domain has zero dependencies of its own (see HAMBOX.Modules.Catalog.Domain.csproj),
+         so this reference is non-circular. Reusing the real enum here (rather than a BuildingBlocks
+         mirror, as HAMBOX.Application/Communication/CommunicationContracts.cs does for CommunicationCategory)
+         was deliberate: FulfillmentMode is already used directly, unmirrored, by both Catalog.Application
+         and Commerce.Application/tests, and a mirror+mapping layer would have fragmented that. -->
+    <ProjectReference Include="..\..\Modules\Catalog\HAMBOX.Modules.Catalog.Domain\HAMBOX.Modules.Catalog.Domain.csproj" />
   </ItemGroup>
 
 </Project>
