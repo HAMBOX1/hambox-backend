@@ -94,8 +94,12 @@ internal sealed class DotFawryPaymentGateway(
         return Result.Success(new DotFawryTransactionStatusResult(
             body.ResultCode ?? string.Empty,
             body.ResultDesc ?? string.Empty,
-            body.BillingTransactionResultCode,
-            body.BillingTransactionResultDesc,
+            // DOT sends "" rather than omitting the field when it's not populated (e.g. ResultCode
+            // != "0") — normalize to null here so every ?? fallback onto ResultCode/ResultDesc
+            // downstream (DotFawryPaymentVerificationService) actually fires instead of silently
+            // keeping an empty string.
+            string.IsNullOrWhiteSpace(body.BillingTransactionResultCode) ? null : body.BillingTransactionResultCode,
+            string.IsNullOrWhiteSpace(body.BillingTransactionResultDesc) ? null : body.BillingTransactionResultDesc,
             body.DotTransId));
     }
 
