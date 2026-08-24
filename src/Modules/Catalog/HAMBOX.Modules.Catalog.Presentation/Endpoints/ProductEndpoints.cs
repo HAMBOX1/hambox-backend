@@ -49,14 +49,12 @@ internal static class ProductEndpoints
             [FromQuery] ProductSortBy? sortBy,
             [FromQuery] string? attributes,
             [FromQuery] Guid? collectionId,
-            [FromQuery] Guid[]? productIds,
             ISender sender) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize <= 0 ? 10 : pageSize;
             var query = new GetProductsQuery(
-                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId,
-                productIds is { Length: > 0 } ? productIds : null);
+                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId);
             var result = await sender.Send(query);
 
             if (result.IsSuccess)

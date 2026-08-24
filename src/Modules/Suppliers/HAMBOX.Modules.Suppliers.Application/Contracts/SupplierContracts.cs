@@ -9,8 +9,7 @@ public sealed record SupplierListItemDto(
     int Priority,
     bool IsEnabled,
     string? BaseUrl,
-    DateTimeOffset CreatedOnUtc,
-    bool SupportsOrderStatus = false);
+    DateTimeOffset CreatedOnUtc);
 
 public sealed record SupplierDetailDto(
     Guid Id,
@@ -167,77 +166,3 @@ public sealed record SupplierCatalogSearchResultDto(
     bool IsSuccess,
     IReadOnlyList<SupplierCatalogItemDto> Items,
     string? Message);
-
-// ─── Map Products workspace ─────────────────────────────────────
-
-/// <summary>One eligible HAMBOX product variant, alongside this supplier's own mapping for it (if any) —
-/// the Map Products table's row shape. <see cref="ExistingMappingId"/> null means unmapped.</summary>
-public sealed record SupplierMappingCandidateDto(
-    Guid ProductId,
-    string ProductName,
-    string CategoryName,
-    Guid VariantId,
-    string VariantDisplayName,
-    string VariantSku,
-    Guid? ExistingMappingId,
-    string? ExternalProductId,
-    string? ExternalName,
-    decimal? BuyingPrice,
-    string? Currency,
-    string? AvailabilityState);
-
-/// <summary>Stat-card counts for the Map Products header and the supplier detail page's Fulfillment
-/// Health block — always computed from the same eligibility/mapping rules as
-/// <see cref="SupplierMappingCandidateDto"/>, never a separate calculation.</summary>
-public sealed record SupplierMappingCandidatesSummaryDto(int EligibleCount, int MappedCount, int UnmappedCount);
-
-/// <summary>
-/// Live auto-match result for one candidate. <see cref="BestMatch"/> is null exactly when
-/// <see cref="ConfidenceTier"/> is <c>"None"</c> — never auto-created as a mapping, only ever a
-/// suggestion the admin reviews or confirms.
-/// </summary>
-public sealed record SupplierMappingSuggestionDto(
-    Guid ProductId,
-    Guid VariantId,
-    SupplierCatalogItemDto? BestMatch,
-    int ConfidenceScore,
-    string ConfidenceTier);
-
-public sealed record BulkMappingFailureDto(Guid ProductId, Guid? VariantId, string ErrorCode, string ErrorMessage);
-
-/// <summary>Result of the "Confirm N Mappings" bulk action — partial success is expected and normal (one
-/// duplicate among several valid rows should never block the rest), so both lists are always populated
-/// rather than an all-or-nothing outcome.</summary>
-public sealed record BulkCreateSupplierMappingsResultDto(
-    IReadOnlyList<Guid> CreatedMappingIds,
-    IReadOnlyList<BulkMappingFailureDto> Failures);
-
-/// <summary>Cross-supplier, business-friendly mapping status for one product on the admin product list —
-/// see <c>GetSupplierMappingStatusForProductsQueryHandler</c> for the derivation rules.</summary>
-public sealed record ProductSupplierMappingStatusDto(
-    string Status,
-    int MappedVariantCount,
-    int TotalVariantCount,
-    string? PrimarySupplierName);
-
-/// <summary>
-/// One variant's resolved mapping (if any), across every supplier — the product-centric counterpart to
-/// <see cref="SupplierFulfillmentChainCandidateDto"/> (which is variant-centric, across suppliers, but
-/// only ever one variant at a time). Backs both the product edit page's Supplier Fulfillment summary and
-/// the product-centric mapping drawer's per-variant list, so the two can never disagree.
-/// <see cref="MappingId"/> null means <see cref="MappingStatus"/> is <c>"Unmapped"</c>.
-/// </summary>
-public sealed record ProductVariantSupplierMappingDto(
-    Guid VariantId,
-    string VariantDisplayName,
-    string VariantSku,
-    Guid? MappingId,
-    Guid? SupplierId,
-    string? SupplierName,
-    string? ExternalProductId,
-    string? ExternalName,
-    decimal? BuyingPrice,
-    string? Currency,
-    int? Priority,
-    string? AvailabilityState,
-    string MappingStatus);

@@ -14,5 +14,4 @@ public record GetProductsQuery(
     Guid? CategoryId,
     ProductSortBy? SortBy,
     IReadOnlyDictionary<string, IReadOnlyList<string>>? AttributeFilters = null,
-    Guid? CollectionId = null,
-    IReadOnlyList<Guid>? ProductIds = null) : IRequest<Result<PagedResult<ProductDto>>>;
+    Guid? CollectionId = null) : IRequest<Result<PagedResult<ProductDto>>>;

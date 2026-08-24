@@ -1,7 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.DotFawry;
-using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -34,7 +33,7 @@ internal static class DotFawryPaymentEndpoints
             ISender sender) =>
         {
             var result = await sender.Send(new InitiateDotFawryCheckoutCommand(
-                request.Email, request.Country, request.PhoneNumber, request.CustomerName, request.Wallet));
+                request.Email, request.Country, request.PhoneNumber, request.CustomerName));
 
             if (result.IsSuccess)
             {
@@ -51,8 +50,7 @@ internal static class DotFawryPaymentEndpoints
         })
         .WithName("InitiateDotFawryCheckout")
         .RequireAuthorization()
-        .RequireCustomerContext()
-        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
+        .RequireCustomerContext();
 
         group.MapGet("payments/dot-fawry/{paymentAttemptId:guid}/status", async Task<Results<Ok<DotFawryPaymentStatusDto>, BadRequest<ProblemDetails>>> (
             Guid paymentAttemptId,
@@ -107,14 +105,11 @@ internal static class DotFawryPaymentEndpoints
             return Results.Text("1", "text/plain");
         })
         .WithName("DotFawryNotification")
-        .AllowAnonymous()
-        .RequireRateLimiting(CommerceRateLimitPolicies.PaymentCallback);
+        .AllowAnonymous();
     }
 }
 
-/// <param name="Wallet">One of "Fawry", "OrangeCash", "VodafoneCash" (a <c>DotFawryWalletOperator</c> member name) — defaults to "Fawry" for any caller that predates the Egyptian mobile wallet extension.</param>
-internal sealed record InitiateDotFawryCheckoutRequest(
-    string Email, string Country, string PhoneNumber, string? CustomerName, string Wallet = "Fawry");
+internal sealed record InitiateDotFawryCheckoutRequest(string Email, string Country, string PhoneNumber, string? CustomerName);
 
 internal sealed record DotFawryNotificationRequest(
     string? DotTransId,

@@ -11,31 +11,6 @@ namespace HAMBOX.Infrastructure.Services;
 /// </summary>
 public sealed class LocalFileStorage : IFileStorage
 {
-    /// <summary>
-    /// The only source of truth for a stored file's on-disk extension. Deliberately does not fall
-    /// back to the client-supplied file name for anything: the static-file middleware
-    /// (<c>UseStaticFiles</c> in <c>Program.cs</c>) serves a file's <c>Content-Type</c> by its
-    /// on-disk extension, so a client-controlled extension (e.g. a file named <c>x.html</c>
-    /// uploaded with an otherwise-allowed content type) would let a stored file be served back as
-    /// executable HTML/SVG/JS — stored XSS against whoever opens it. A content type with no entry
-    /// here (including anything not covered by this map) falls through to <c>.bin</c>, which the
-    /// default <see cref="Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider"/> maps
-    /// to <c>application/octet-stream</c> — never renderable as a page by a browser.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> ContentTypeExtensions =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["image/jpeg"] = ".jpg",
-            ["image/png"] = ".png",
-            ["image/webp"] = ".webp",
-            ["image/gif"] = ".gif",
-            ["application/zip"] = ".zip",
-            ["application/x-zip-compressed"] = ".zip",
-            ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = ".xlsx",
-            ["application/vnd.ms-excel.sheet.macroEnabled.12"] = ".xlsm",
-            ["text/csv"] = ".csv",
-        };
-
     private readonly FileStorageSettings _settings;
     private readonly string _rootPath;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -81,9 +56,20 @@ public sealed class LocalFileStorage : IFileStorage
             throw new InvalidOperationException($"File exceeds the maximum size of {MaxFileSizeBytes} bytes.");
         }
 
-        var extension = ContentTypeExtensions.GetValueOrDefault(contentType, ".bin");
+        var extension = Path.GetExtension(fileName);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            extension = contentType switch
+            {
+                "image/jpeg" => ".jpg",
+                "image/png" => ".png",
+                "image/webp" => ".webp",
+                "image/gif" => ".gif",
+                _ => ".bin"
+            };
+        }
 
-        var storageKey = $"{folder.Trim('/')}/{Guid.NewGuid():N}{extension}";
+        var storageKey = $"{folder.Trim('/')}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
         var absolutePath = Path.Combine(_rootPath, storageKey.Replace('/', Path.DirectorySeparatorChar));
         var directory = Path.GetDirectoryName(absolutePath);
 

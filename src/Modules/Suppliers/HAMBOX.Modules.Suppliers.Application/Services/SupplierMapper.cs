@@ -15,8 +15,7 @@ public static class SupplierMapper
         supplier.Priority,
         supplier.IsEnabled,
         supplier.BaseUrl,
-        supplier.CreatedOnUtc,
-        supplier.SupportsOrderStatus);
+        supplier.CreatedOnUtc);
 
     public static SupplierDetailDto ToDetail(Supplier supplier) => new(
         supplier.Id,

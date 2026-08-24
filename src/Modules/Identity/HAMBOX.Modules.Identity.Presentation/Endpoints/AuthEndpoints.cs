@@ -1,6 +1,5 @@
 using HAMBOX.Infrastructure.Localization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
-using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
@@ -16,18 +15,13 @@ using HAMBOX.Modules.Identity.Application.Features.ResetPassword;
 using HAMBOX.Modules.Identity.Application.Features.Sessions;
 using HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 using HAMBOX.Modules.Identity.Application.Features.VerifyEmail;
-using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Application.RateLimiting;
-using HAMBOX.Modules.Identity.Presentation.Authentication;
-using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Presentation.Endpoints;
 
@@ -66,8 +60,7 @@ public static class AuthEndpoints
                 ipAddress,
                 userAgent,
                 language,
-                request.ReferralCode,
-                request.TurnstileToken);
+                request.ReferralCode);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -77,9 +70,6 @@ public static class AuthEndpoints
             [FromBody] LoginRequest request,
             HttpContext httpContext,
             ISender sender,
-            ITokenGenerator tokenGenerator,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -96,16 +86,13 @@ public static class AuthEndpoints
                 request.RememberMe);
 
             var result = await sender.Send(command, ct);
-            return ToAuthCookieResult(httpContext, result, tokenGenerator, cookieSettings.Value, environment);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("google", async (
             [FromBody] GoogleLoginRequest request,
             HttpContext httpContext,
             ISender sender,
-            ITokenGenerator tokenGenerator,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -120,16 +107,13 @@ public static class AuthEndpoints
                 geoLocation?.City);
 
             var result = await sender.Send(command, ct);
-            return ToAuthCookieResult(httpContext, result, tokenGenerator, cookieSettings.Value, environment);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/login", async (
             [FromBody] LoginRequest request,
             HttpContext httpContext,
             ISender sender,
-            ITokenGenerator tokenGenerator,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -145,37 +129,13 @@ public static class AuthEndpoints
                 geoLocation?.City);
 
             var result = await sender.Send(command, ct);
-            if (!result.IsSuccess)
-            {
-                return LocalizedEndpointResults.FromResult(httpContext, result);
-            }
-
-            // Admin OTP disabled via Platform Settings bypasses the challenge and issues tokens
-            // immediately — same cookie treatment as every other token-issuing branch below.
-            AccessTokenResponse? accessResponse = null;
-            if (result.Value.Token is { } tokens)
-            {
-                AuthCookieWriter.WriteRefreshTokenCookie(
-                    httpContext, cookieSettings.Value, environment, tokens.RefreshToken, tokens.RefreshExpiresAt);
-                CsrfCookieWriter.WriteCsrfCookie(httpContext, cookieSettings.Value, environment, tokenGenerator);
-                accessResponse = new AccessTokenResponse(tokens.AccessToken, tokens.ExpiresAt);
-            }
-
-            return Results.Ok(new AdminLoginChallengeApiResponse(
-                result.Value.ChallengeId,
-                result.Value.ExpiresAt,
-                result.Value.ResendAvailableAt,
-                result.Value.MaskedEmail,
-                accessResponse));
+            return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/verify-otp", async (
             [FromBody] VerifyAdminOtpRequest request,
             HttpContext httpContext,
             ISender sender,
-            ITokenGenerator tokenGenerator,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -188,7 +148,7 @@ public static class AuthEndpoints
                 userAgent);
 
             var result = await sender.Send(command, ct);
-            return ToAuthCookieResult(httpContext, result, tokenGenerator, cookieSettings.Value, environment);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
         });
 
         group.MapPost("admin/resend-otp", async (
@@ -212,64 +172,28 @@ public static class AuthEndpoints
             var command = new VerifyMaintenanceBypassCommand(request.Password);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        }).RequireRateLimiting(RateLimitPolicies.Login);
+        });
 
         group.MapPost("refresh", async (
+            [FromBody] RefreshRequest request,
             HttpContext httpContext,
             ISender sender,
-            ITokenGenerator tokenGenerator,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
-            if (!httpContext.Request.Cookies.TryGetValue(cookieSettings.Value.CookieName, out var refreshToken)
-                || string.IsNullOrWhiteSpace(refreshToken))
-            {
-                return Results.Unauthorized();
-            }
-
-            if (!CsrfCookieWriter.ValidateCsrfToken(httpContext))
-            {
-                return Results.Forbid();
-            }
-
-            var command = new RefreshTokenCommand(refreshToken);
+            var command = new RefreshTokenCommand(request.RefreshToken);
             var result = await sender.Send(command, ct);
-
-            if (!result.IsSuccess)
-            {
-                // The presented refresh token was invalid/expired/reused — never leave a stale
-                // cookie behind for a token that no longer works.
-                AuthCookieWriter.ClearRefreshTokenCookie(httpContext, cookieSettings.Value, environment);
-            }
-
-            return ToAuthCookieResult(httpContext, result, tokenGenerator, cookieSettings.Value, environment);
-        }).RequireRateLimiting(RateLimitPolicies.Login);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        });
 
         group.MapPost("logout", async (
+            [FromBody] LogoutRequest request,
             HttpContext httpContext,
             ISender sender,
-            IOptions<RefreshCookieSettings> cookieSettings,
-            IHostEnvironment environment,
             CancellationToken ct) =>
         {
-            var hasCookie = httpContext.Request.Cookies.TryGetValue(
-                cookieSettings.Value.CookieName, out var refreshToken) && !string.IsNullOrWhiteSpace(refreshToken);
-
-            if (hasCookie)
-            {
-                if (!CsrfCookieWriter.ValidateCsrfToken(httpContext))
-                {
-                    return Results.Forbid();
-                }
-
-                var command = new LogoutCommand(refreshToken!);
-                await sender.Send(command, ct);
-            }
-
-            AuthCookieWriter.ClearRefreshTokenCookie(httpContext, cookieSettings.Value, environment);
-            CsrfCookieWriter.ClearCsrfCookie(httpContext, cookieSettings.Value, environment);
-            return Results.Ok();
+            var command = new LogoutCommand(request.RefreshToken);
+            var result = await sender.Send(command, ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
         });
 
         group.MapPost("verify-email", async (
@@ -289,8 +213,7 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var command = new ForgotPasswordCommand(request.Email, ipAddress, request.TurnstileToken);
+            var command = new ForgotPasswordCommand(request.Email);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -312,8 +235,7 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var command = new ResendVerificationCommand(request.Email, ipAddress, request.TurnstileToken);
+            var command = new ResendVerificationCommand(request.Email);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -383,45 +305,12 @@ public static class AuthEndpoints
         httpContext.Items.TryGetValue(GeoLocationHttpContextKeys.ResolvedGeoLocation, out var value)
             ? value as GeoLocationResult
             : null;
-
-    /// <summary>
-    /// Shared success/failure mapping for every endpoint that issues tokens (login, google,
-    /// admin/verify-otp, refresh): on failure, behaves exactly like the existing
-    /// <see cref="LocalizedEndpointResults.FromResult{T}"/> convention used everywhere else in this
-    /// file. On success, the refresh token is written as an HttpOnly cookie (never serialized), a
-    /// matching CSRF/XSRF cookie is issued alongside it, and only the slim
-    /// <see cref="AccessTokenResponse"/> goes into the JSON body.
-    /// </summary>
-    private static IResult ToAuthCookieResult(
-        HttpContext httpContext,
-        Result<AuthTokenResponse> result,
-        ITokenGenerator tokenGenerator,
-        RefreshCookieSettings cookieSettings,
-        IHostEnvironment environment)
-    {
-        if (!result.IsSuccess)
-        {
-            return LocalizedEndpointResults.FromResult(httpContext, result);
-        }
-
-        AuthCookieWriter.WriteRefreshTokenCookie(
-            httpContext, cookieSettings, environment, result.Value.RefreshToken, result.Value.RefreshExpiresAt);
-        CsrfCookieWriter.WriteCsrfCookie(httpContext, cookieSettings, environment, tokenGenerator);
-
-        return Results.Ok(new AccessTokenResponse(result.Value.AccessToken, result.Value.ExpiresAt));
-    }
 }
 
 /// <summary>
 /// Represents a registration request.
 /// </summary>
-public sealed record RegisterRequest(
-    string Email,
-    string Password,
-    string FirstName,
-    string LastName,
-    string TurnstileToken,
-    string? ReferralCode = null);
+public sealed record RegisterRequest(string Email, string Password, string FirstName, string LastName, string? ReferralCode = null);
 
 /// <summary>
 /// Represents a login request.
@@ -434,29 +323,19 @@ public sealed record LoginRequest(string Email, string Password, bool RememberMe
 public sealed record GoogleLoginRequest(string IdToken);
 
 /// <summary>
-/// The public response shape for every endpoint that issues tokens — deliberately does not include
-/// the refresh token, which is transported exclusively as an HttpOnly cookie (see
-/// <see cref="AuthCookieWriter"/>) and must never appear in a JSON response body.
+/// Represents a refresh token request.
 /// </summary>
-public sealed record AccessTokenResponse(string AccessToken, DateTimeOffset ExpiresAt);
+public sealed record RefreshRequest(string RefreshToken);
 
 /// <summary>
-/// The public response shape for <c>admin/login</c> — mirrors the internal
-/// <see cref="AdminLoginChallengeResponse"/> but with <see cref="AccessTokenResponse"/> in place of
-/// the internal <see cref="AuthTokenResponse"/>, for the same reason as <see cref="AccessTokenResponse"/>
-/// itself.
+/// Represents a logout request.
 /// </summary>
-public sealed record AdminLoginChallengeApiResponse(
-    Guid ChallengeId,
-    DateTimeOffset ExpiresAt,
-    DateTimeOffset ResendAvailableAt,
-    string MaskedEmail,
-    AccessTokenResponse? Token);
+public sealed record LogoutRequest(string RefreshToken);
 
 /// <summary>
 /// Represents a forgot password request.
 /// </summary>
-public sealed record ForgotPasswordRequest(string Email, string TurnstileToken);
+public sealed record ForgotPasswordRequest(string Email);
 
 /// <summary>
 /// Represents a reset password request.
@@ -466,7 +345,7 @@ public sealed record ResetPasswordRequest(string Token, string NewPassword);
 /// <summary>
 /// Represents a resend verification email request.
 /// </summary>
-public sealed record ResendVerificationRequest(string Email, string TurnstileToken);
+public sealed record ResendVerificationRequest(string Email);
 
 /// <summary>
 /// Represents an update profile request.

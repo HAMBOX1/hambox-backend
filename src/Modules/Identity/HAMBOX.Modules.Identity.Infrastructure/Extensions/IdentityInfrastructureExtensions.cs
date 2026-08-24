@@ -68,18 +68,6 @@ public static class IdentityInfrastructureExtensions
         services.Configure<LockoutSettings>(configuration.GetSection(LockoutSettings.SectionName));
         services.Configure<AdminOtpSettings>(configuration.GetSection(AdminOtpSettings.SectionName));
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
-        services.Configure<RefreshCookieSettings>(configuration.GetSection(RefreshCookieSettings.SectionName));
-
-        // CSRF defense for the two endpoints that authenticate via the ambient refresh cookie
-        // (refresh, logout) lives in CsrfCookieWriter (Identity.Presentation) — a plain
-        // double-submit cookie built on the existing ITokenGenerator, deliberately not
-        // Microsoft.AspNetCore.Antiforgery: that service pairs a cookie token with a
-        // cryptographically-derived (not equal) header token, which Angular's built-in
-        // withXsrfConfiguration interceptor — designed for the classic double-submit pattern, where
-        // the header simply echoes the cookie verbatim — cannot produce without extra glue code.
-        // Every other endpoint is Bearer-header-authenticated and therefore not CSRF-exposed (a
-        // cross-site page can't make the victim's browser send an Authorization header it doesn't
-        // already have), so nothing else needs this.
 
         // 2b. Rate limiting for brute-force/abuse-prone auth endpoints (per-client-IP, fixed window).
         // Complements the existing per-account lockout — this is a per-IP defense-in-depth layer.

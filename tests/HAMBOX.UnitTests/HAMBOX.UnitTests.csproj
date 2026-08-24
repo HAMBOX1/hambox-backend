@@ -22,11 +22,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BuildingBlocks\HAMBOX.Domain\HAMBOX.Domain.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
-    <ProjectReference Include="..\..\src\BuildingBlocks\HAMBOX.Infrastructure\HAMBOX.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Domain\HAMBOX.Modules.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Application\HAMBOX.Modules.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Infrastructure\HAMBOX.Modules.Identity.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Identity\HAMBOX.Modules.Identity.Presentation\HAMBOX.Modules.Identity.Presentation.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Domain\HAMBOX.Modules.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\HAMBOX.Modules.Catalog.Infrastructure\HAMBOX.Modules.Catalog.Infrastructure.csproj" />

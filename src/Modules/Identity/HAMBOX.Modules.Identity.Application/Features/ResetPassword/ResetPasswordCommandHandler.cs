@@ -1,6 +1,5 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
-using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -17,9 +16,8 @@ internal sealed class ResetPasswordCommandHandler(
     /// <inheritdoc />
     public async Task<Result> Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
-        var tokenHash = PasswordResetToken.GetLookupHash(request.Token);
         var token = await dbContext.PasswordResetTokens
-            .FirstOrDefaultAsync(t => t.Token == tokenHash, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == request.Token, cancellationToken);
 
         if (token is null)
         {

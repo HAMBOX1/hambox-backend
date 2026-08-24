@@ -106,38 +106,16 @@ public sealed class UpdateSupplierPriorityCommandValidator : AbstractValidator<U
     }
 }
 
-/// <summary>The field-level rules for one mapping request — shared by the single-create and bulk-create
-/// validators below so the two never drift apart.</summary>
-public sealed class CreateSupplierMappingRequestValidator : AbstractValidator<CreateSupplierMappingRequest>
-{
-    public CreateSupplierMappingRequestValidator()
-    {
-        RuleFor(x => x.InternalProductId).NotEmpty();
-        RuleFor(x => x.ExternalProductId).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Currency).NotEmpty().Length(3);
-        RuleFor(x => x.BuyingPrice).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.Priority).GreaterThanOrEqualTo(0);
-    }
-}
-
 public sealed class CreateSupplierMappingCommandValidator : AbstractValidator<CreateSupplierMappingCommand>
 {
     public CreateSupplierMappingCommandValidator()
     {
         RuleFor(x => x.SupplierId).NotEmpty();
-        RuleFor(x => x.Request).SetValidator(new CreateSupplierMappingRequestValidator());
-    }
-}
-
-public sealed class BulkCreateSupplierMappingsCommandValidator : AbstractValidator<BulkCreateSupplierMappingsCommand>
-{
-    public BulkCreateSupplierMappingsCommandValidator()
-    {
-        RuleFor(x => x.SupplierId).NotEmpty();
-        RuleFor(x => x.Requests).NotEmpty();
-        RuleFor(x => x.Requests.Count).LessThanOrEqualTo(100)
-            .WithMessage("A bulk mapping confirmation is limited to 100 products at a time.");
-        RuleForEach(x => x.Requests).SetValidator(new CreateSupplierMappingRequestValidator());
+        RuleFor(x => x.Request.InternalProductId).NotEmpty();
+        RuleFor(x => x.Request.ExternalProductId).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.Request.Currency).NotEmpty().Length(3);
+        RuleFor(x => x.Request.BuyingPrice).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Request.Priority).GreaterThanOrEqualTo(0);
     }
 }
 

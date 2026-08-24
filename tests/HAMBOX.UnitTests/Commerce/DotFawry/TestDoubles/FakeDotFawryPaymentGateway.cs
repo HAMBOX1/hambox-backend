@@ -17,9 +17,6 @@ internal sealed class FakeDotFawryPaymentGateway : IDotFawryPaymentGateway
 
     public List<string> StatusCheckCalls { get; } = [];
 
-    /// <summary>The <c>operatorId</c> passed on each Check Transaction Status call, in call order — parallel to <see cref="StatusCheckCalls"/>.</summary>
-    public List<string> StatusCheckOperatorIds { get; } = [];
-
     public DotFawryChargeResult ChargeResult { get; set; } =
         new("1000", "the transaction is being processed", "dot-trans-1", "9638322189");
 
@@ -40,20 +37,18 @@ internal sealed class FakeDotFawryPaymentGateway : IDotFawryPaymentGateway
     }
 
     public Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
-        string partnerTxId, string operatorId, CancellationToken cancellationToken = default)
+        string partnerTxId, CancellationToken cancellationToken = default)
     {
         StatusCheckCalls.Add(partnerTxId);
-        StatusCheckOperatorIds.Add(operatorId);
         return Task.FromResult(FailStatusCheck
             ? Result.Failure<DotFawryTransactionStatusResult>(CommerceErrors.DotFawryProviderUnavailable)
             : Result.Success(StatusResult));
     }
 
     public Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByDotTxIdAsync(
-        string dotTxId, string operatorId, CancellationToken cancellationToken = default)
+        string dotTxId, CancellationToken cancellationToken = default)
     {
         StatusCheckCalls.Add(dotTxId);
-        StatusCheckOperatorIds.Add(operatorId);
         return Task.FromResult(FailStatusCheck
             ? Result.Failure<DotFawryTransactionStatusResult>(CommerceErrors.DotFawryProviderUnavailable)
             : Result.Success(StatusResult));

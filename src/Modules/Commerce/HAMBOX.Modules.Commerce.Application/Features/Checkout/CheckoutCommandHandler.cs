@@ -245,6 +245,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 
                 order.RecordPayment(paymentResult!.Provider, paymentResult.TransactionId!);
                 OrderPaymentCallbackRecorder.Record(_commerceDbContext, order.Id, paymentResult);
+                order.Complete();
 
                 await _promotionRedemptionService.RedeemAsync(
                     order, evaluation.AppliedPromotions, _currentUserService.UserId, ct);
@@ -278,7 +279,6 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     }
                 }
 
-                var deliveredKeyCount = 0;
                 if (commitAssignments.Count > 0)
                 {
                     var committed = await _inventoryEngine.CommitReservationsAsync(order.Id, commitAssignments, ct);
@@ -294,27 +294,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                             code.CodeId);
 
                         _commerceDbContext.OrderLicenseKeys.Add(licenseKey);
-                        deliveredKeyCount++;
                     }
-                }
-
-                // Same completion criterion OrderFulfillmentService.FulfillMissingAsync/
-                // CommerceOrderLicenseKeyDeliverySink use (required product quantity vs. actual
-                // license keys) — payment success alone is never enough. SupplierFirst/SupplierOnly
-                // lines have no key yet at this point (reservation is deliberately skipped above),
-                // so this leaves the order Processing until QueueAutomatedSupplierFulfillmentAsync
-                // (or the delivery sink it feeds) completes it for real.
-                var requiredKeyCount = order.Items
-                    .Where(i => i.LineItemType == OrderLineItemType.Product)
-                    .Sum(i => i.Quantity);
-
-                if (requiredKeyCount > 0 && deliveredKeyCount >= requiredKeyCount)
-                {
-                    order.Complete();
-                }
-                else
-                {
-                    order.MarkProcessing();
                 }
 
                 _commerceDbContext.Orders.Add(order);

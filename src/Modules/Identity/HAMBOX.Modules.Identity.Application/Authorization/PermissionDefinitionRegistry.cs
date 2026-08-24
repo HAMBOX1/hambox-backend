@@ -317,11 +317,6 @@ public static class PermissionDefinitionRegistry
         // WhatsApp Bot (281-282) appended to preserve RolePermission seed indices
         new(new Guid("20000000-0000-0000-0000-000000000281"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.View, 1),
         new(new Guid("20000000-0000-0000-0000-000000000282"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.Edit, 2),
-
-        // Orders.RevealLicenseKeys (283) appended to preserve RolePermission seed indices — split out
-        // of the broad Orders.View permission so routine order-lookup access no longer implies the
-        // ability to reveal plaintext digital codes.
-        new(new Guid("20000000-0000-0000-0000-000000000283"), GroupIds.Orders, PermissionConstants.Orders.RevealLicenseKeys, 4),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

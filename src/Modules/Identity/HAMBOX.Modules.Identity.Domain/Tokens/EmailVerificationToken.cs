@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using HAMBOX.Domain.Entities;
 
 namespace HAMBOX.Modules.Identity.Domain.Tokens;
@@ -17,11 +15,11 @@ public sealed class EmailVerificationToken : Entity
     {
     }
 
-    private EmailVerificationToken(Guid id, Guid userId, string tokenHash, DateTimeOffset expiresOnUtc)
+    private EmailVerificationToken(Guid id, Guid userId, string token, DateTimeOffset expiresOnUtc)
         : base(id)
     {
         UserId = userId;
-        Token = tokenHash;
+        Token = token;
         ExpiresOnUtc = expiresOnUtc;
     }
 
@@ -31,8 +29,7 @@ public sealed class EmailVerificationToken : Entity
     public Guid UserId { get; private set; }
 
     /// <summary>
-    /// Gets the SHA-256 hash of the plaintext token value. The plaintext is never persisted —
-    /// only whoever received it (e.g. via the verification email) can produce a matching lookup hash.
+    /// Gets the token value.
     /// </summary>
     public string Token { get; private set; } = string.Empty;
 
@@ -58,44 +55,31 @@ public sealed class EmailVerificationToken : Entity
     public bool IsUsed => UsedOnUtc.HasValue;
 
     /// <summary>
-    /// Creates a new email verification token. Only the SHA-256 hash of <paramref name="plaintextToken"/>
-    /// is persisted; the caller is responsible for delivering the plaintext value (e.g. via email).
+    /// Creates a new email verification token.
     /// </summary>
     /// <param name="userId">The identifier of the user.</param>
-    /// <param name="plaintextToken">The plaintext token value to be delivered to the user.</param>
+    /// <param name="token">The token value.</param>
     /// <param name="expiresOnUtc">The expiration date and time in UTC.</param>
     /// <returns>A new <see cref="EmailVerificationToken"/> instance.</returns>
     /// <exception cref="ArgumentException">
     /// Thrown when the user identifier is empty or the token is null or whitespace.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the expiration is not in the future.</exception>
-    public static EmailVerificationToken Create(Guid userId, string plaintextToken, DateTimeOffset expiresOnUtc)
+    public static EmailVerificationToken Create(Guid userId, string token, DateTimeOffset expiresOnUtc)
     {
         if (userId == Guid.Empty)
         {
             throw new ArgumentException("User identifier is required.", nameof(userId));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(plaintextToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
 
         if (expiresOnUtc <= DateTimeOffset.UtcNow)
         {
             throw new ArgumentOutOfRangeException(nameof(expiresOnUtc), "Expiration must be in the future.");
         }
 
-        return new EmailVerificationToken(Guid.NewGuid(), userId, GetLookupHash(plaintextToken), expiresOnUtc);
-    }
-
-    /// <summary>
-    /// Computes the stored lookup hash for a plaintext email verification token.
-    /// </summary>
-    /// <param name="plaintextToken">The plaintext token supplied by the client.</param>
-    /// <returns>The SHA-256 hash used for database lookups.</returns>
-    public static string GetLookupHash(string plaintextToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(plaintextToken);
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(plaintextToken));
-        return Convert.ToHexString(hashBytes);
+        return new EmailVerificationToken(Guid.NewGuid(), userId, token, expiresOnUtc);
     }
 
     /// <summary>

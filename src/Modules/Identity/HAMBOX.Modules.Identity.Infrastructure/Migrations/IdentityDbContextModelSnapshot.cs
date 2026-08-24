@@ -1449,15 +1449,6 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             Name = "WhatsAppBot.Edit",
                             NormalizedName = "WHATSAPPBOT.EDIT",
                             SortOrder = 2
-                        },
-                        new
-                        {
-                            Id = new Guid("20000000-0000-0000-0000-000000000283"),
-                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            GroupId = new Guid("15000000-0000-0000-0000-000000000007"),
-                            Name = "Orders.RevealLicenseKeys",
-                            NormalizedName = "ORDERS.REVEALLICENSEKEYS",
-                            SortOrder = 4
                         });
                 });
 
@@ -2985,13 +2976,6 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                             CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             PermissionId = new Guid("20000000-0000-0000-0000-000000000282"),
                             RoleId = new Guid("10000000-0000-0000-0000-000000000002")
-                        },
-                        new
-                        {
-                            Id = new Guid("30000000-0000-0000-0000-000000000143"),
-                            CreatedOnUtc = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
-                            PermissionId = new Guid("20000000-0000-0000-0000-000000000283"),
-                            RoleId = new Guid("10000000-0000-0000-0000-000000000002")
                         });
                 });
 
@@ -3723,11 +3707,6 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("RevokedOnUtc")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("SessionId")
                         .HasColumnType("uniqueidentifier");

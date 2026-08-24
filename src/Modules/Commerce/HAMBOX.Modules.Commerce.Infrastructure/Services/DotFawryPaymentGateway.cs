@@ -33,7 +33,7 @@ internal sealed class DotFawryPaymentGateway(
         var body = new ChargeRequestBody
         {
             PartnerTransId = request.PartnerTxId,
-            OpId = ParseOperatorId(request.OperatorId),
+            OpId = ParseOperatorId(settings.OperatorId),
             Msisdn = request.Msisdn,
             Amount = request.Amount.ToString(CultureInfo.InvariantCulture),
             ServiceId = settings.ServiceId,
@@ -66,20 +66,20 @@ internal sealed class DotFawryPaymentGateway(
     }
 
     public Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
-        string partnerTxId, string operatorId, CancellationToken cancellationToken = default) =>
-        CheckTransactionStatusAsync("get-by-partnertransid", partnerTxId, operatorId, cancellationToken);
+        string partnerTxId, CancellationToken cancellationToken = default) =>
+        CheckTransactionStatusAsync("get-by-partnertransid", partnerTxId, cancellationToken);
 
     public Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByDotTxIdAsync(
-        string dotTxId, string operatorId, CancellationToken cancellationToken = default) =>
-        CheckTransactionStatusAsync("get-by-dottransid", dotTxId, operatorId, cancellationToken);
+        string dotTxId, CancellationToken cancellationToken = default) =>
+        CheckTransactionStatusAsync("get-by-dottransid", dotTxId, cancellationToken);
 
     private async Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusAsync(
-        string lookupSegment, string transactionIdentifier, string operatorId, CancellationToken cancellationToken)
+        string lookupSegment, string transactionIdentifier, CancellationToken cancellationToken)
     {
         var settings = optionsAccessor.Value;
         var basePath = BuildUrl(settings.BaseUrl, settings.CheckTransactionStatusPath);
         var path = $"{basePath.TrimEnd('/')}/{lookupSegment}/" +
-            $"{Uri.EscapeDataString(operatorId)}/{Uri.EscapeDataString(settings.ServiceId)}/{Uri.EscapeDataString(transactionIdentifier)}";
+            $"{Uri.EscapeDataString(settings.OperatorId)}/{Uri.EscapeDataString(settings.ServiceId)}/{Uri.EscapeDataString(transactionIdentifier)}";
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, path);
         ApplyAuthHeaders(httpRequest, settings);
@@ -105,7 +105,7 @@ internal sealed class DotFawryPaymentGateway(
 
     private static string BuildUrl(string baseUrl, string path) => $"{baseUrl.TrimEnd('/')}/{path.Trim('/')}/";
 
-    /// <summary>DOT's docs type <c>opId</c> as an Integer in the Direct Billing request body but as a path/string segment elsewhere — the caller-supplied opId is a string (matching <c>PaymentAttempt.OperatorId</c>, where it's persisted) and is parsed here only where the wire format demands a number.</summary>
+    /// <summary>DOT's docs type <c>opId</c> as an Integer in the Direct Billing request body but as a path/string segment elsewhere — <see cref="DotFawrySettings.OperatorId"/> is stored as a string (matching every other configured id) and parsed here only where the wire format demands a number.</summary>
     private static int ParseOperatorId(string operatorId) =>
         int.TryParse(operatorId, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
 

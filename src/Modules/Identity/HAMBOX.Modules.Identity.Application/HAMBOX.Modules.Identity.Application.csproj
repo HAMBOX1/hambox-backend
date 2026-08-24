@@ -21,9 +21,4 @@
     <ProjectReference Include="..\..\Legal\HAMBOX.Modules.Legal.Application\HAMBOX.Modules.Legal.Application.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
-    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
-  </ItemGroup>
-
 </Project>

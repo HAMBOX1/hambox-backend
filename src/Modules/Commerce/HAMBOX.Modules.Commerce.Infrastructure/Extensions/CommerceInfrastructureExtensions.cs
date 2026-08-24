@@ -49,15 +49,6 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<ICheckoutConfigurationProvider, CheckoutConfigurationProvider>();
         services.AddScoped<IIdempotencyService, IdempotencyService>();
 
-        // The AddRateLimiter() call for Commerce's checkout/payment-callback policies lives in
-        // HAMBOX.API's Program.cs (the host project) rather than here — a plain class library
-        // project referencing only FrameworkReference="Microsoft.AspNetCore.App" doesn't reliably
-        // resolve Microsoft.AspNetCore.RateLimiting's extension methods in this solution's current
-        // package graph (confirmed empirically: Identity.Infrastructure only compiles the identical
-        // call because it happens to reference Microsoft.AspNetCore.Authentication.JwtBearer for
-        // unrelated JWT setup, which incidentally pulls in the missing piece). Registering it in the
-        // host project sidesteps that without adding a nonsensical package dependency here.
-
         services.Configure<DotSettings>(configuration.GetSection(DotSettings.SectionName));
         services.AddSingleton<IValidateOptions<DotSettings>, DotSettingsValidator>();
         services.AddScoped<IDotPricePointResolver, NotConfiguredDotPricePointResolver>();

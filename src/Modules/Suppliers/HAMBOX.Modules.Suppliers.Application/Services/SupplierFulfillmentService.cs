@@ -467,10 +467,14 @@ internal sealed class SupplierFulfillmentService(
         if (result.DeliveredCodes is null)
         {
             // Accepted, outcome not yet known — the documented async-provider shape (e.g. Bamboo's
-            // Place Order). Needs a later reconciliation call to resolve. ProviderOrderId may
-            // legitimately be null here (some providers, e.g. Bamboo, issue no distinct order
-            // reference until reconciliation) — HamboxReferenceId alone is always enough to track and
-            // reconcile this attempt, so a missing ProviderOrderId is not itself untrustworthy.
+            // Place Order). Needs a later reconciliation call to resolve.
+            if (string.IsNullOrWhiteSpace(result.ProviderOrderId))
+            {
+                // Malformed: success with nothing to track it by afterward. Cannot trust it.
+                fulfillment.MarkUnknown();
+                return;
+            }
+
             fulfillment.MarkSubmitted(result.ProviderOrderId);
             return;
         }
