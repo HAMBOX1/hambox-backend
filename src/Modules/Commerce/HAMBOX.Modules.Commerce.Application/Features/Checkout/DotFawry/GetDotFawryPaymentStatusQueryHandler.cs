@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -50,8 +51,11 @@ internal sealed class GetDotFawryPaymentStatusQueryHandler(
         };
 
         var completedOrderId = attempt.Status == PaymentAttemptStatus.Succeeded ? order.Id : (Guid?)null;
+        var walletName = DotFawryWalletOperatorExtensions.TryParseOperatorId(attempt.OperatorId, out var wallet)
+            ? wallet.ToString()
+            : attempt.OperatorId;
 
         return Result.Success(new DotFawryPaymentStatusDto(
-            attempt.Id, order.Id, status, attempt.ProviderReferenceCode, completedOrderId));
+            attempt.Id, order.Id, status, attempt.ProviderReferenceCode, completedOrderId, walletName));
     }
 }

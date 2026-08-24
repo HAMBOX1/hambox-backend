@@ -55,7 +55,6 @@ internal sealed class DotFawryTestHarness
             BaseUrl = "https://dot-jo.biz",
             PartnerId = "partner_test",
             ServiceId = "1",
-            OperatorId = "141",
             Username = "test-user",
             Password = "test-pass",
         };

@@ -9,10 +9,13 @@ namespace HAMBOX.Modules.Commerce.Application.Abstractions;
 /// (mandatory), <c>extraField2</c> = customer name (optional), <c>extraField3</c> = JSON array of
 /// order line items. This is a distinct DOT product from the carrier-billing OTP flow
 /// (<c>IDotPaymentGateway</c>) — it has its own endpoint, request/response shape, and does not share
-/// an implementation with it.
+/// an implementation with it. Reused for Egyptian mobile wallets beyond Fawry (Orange Cash, Vodafone
+/// Cash) — same request/response shape and credentials, only <c>opId</c> differs (see
+/// <c>DotFawryWalletOperator</c>).
 /// <para>
-/// partner_id / service_id / op_id are single configured values (see <c>DotFawrySettings</c>) and
-/// are not parameters here — only what genuinely varies per attempt is.
+/// partner_id / service_id are single configured values (see <c>DotFawrySettings</c>) and are not
+/// parameters here; op_id varies per attempt by selected wallet, so it is a parameter on every call
+/// below.
 /// </para>
 /// </summary>
 public interface IDotFawryPaymentGateway
@@ -27,16 +30,26 @@ public interface IDotFawryPaymentGateway
     Task<Result<DotFawryChargeResult>> ChargeAsync(
         DotFawryChargeRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Calls Check Transaction Status using DOT's <c>partnerTransId</c> lookup. Authoritative — the only source of truth for whether a charge actually succeeded.</summary>
+    /// <summary>
+    /// Calls Check Transaction Status using DOT's <c>partnerTransId</c> lookup. Authoritative — the
+    /// only source of truth for whether a charge actually succeeded. <paramref name="operatorId"/>
+    /// must be the same <c>opId</c> sent in the original Direct Billing request for this attempt
+    /// (<c>PaymentAttempt.OperatorId</c>) — the spec requires it to match.
+    /// </summary>
     Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
-        string partnerTxId, CancellationToken cancellationToken = default);
+        string partnerTxId, string operatorId, CancellationToken cancellationToken = default);
 
-    /// <summary>Calls Check Transaction Status using DOT's <c>dotTransId</c> lookup.</summary>
+    /// <summary>Calls Check Transaction Status using DOT's <c>dotTransId</c> lookup. See <see cref="CheckTransactionStatusByPartnerTxIdAsync"/> for <paramref name="operatorId"/>.</summary>
     Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusByDotTxIdAsync(
-        string dotTxId, CancellationToken cancellationToken = default);
+        string dotTxId, string operatorId, CancellationToken cancellationToken = default);
 }
 
 /// <param name="PartnerTxId">HAMBOX-generated unique transaction id.</param>
+/// <param name="OperatorId">
+/// The DOT <c>opId</c> for the wallet the customer selected at checkout
+/// (<see cref="DotFawryWalletOperator.ToOperatorId"/>) — the only field that varies between Fawry,
+/// Orange Cash, and Vodafone Cash; everything else in this request/the auth headers is identical.
+/// </param>
 /// <param name="Msisdn">The customer's mobile number — Fawry SMS's the reference number to this number.</param>
 /// <param name="Amount">The amount to charge, from <c>IDotFawryChargeAmountResolver</c>.</param>
 /// <param name="CustomerEmail">Sent as <c>extraField1</c> — mandatory for this DOT service/operator.</param>
@@ -44,6 +57,7 @@ public interface IDotFawryPaymentGateway
 /// <param name="Items">Sent as the <c>extraField3</c> JSON array — built from the authoritative Order/OrderItems, never client-supplied prices.</param>
 public sealed record DotFawryChargeRequest(
     string PartnerTxId,
+    string OperatorId,
     string Msisdn,
     decimal Amount,
     string CustomerEmail,

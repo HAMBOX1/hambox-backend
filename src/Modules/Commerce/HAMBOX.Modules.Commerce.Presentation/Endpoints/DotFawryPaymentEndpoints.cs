@@ -33,7 +33,7 @@ internal static class DotFawryPaymentEndpoints
             ISender sender) =>
         {
             var result = await sender.Send(new InitiateDotFawryCheckoutCommand(
-                request.Email, request.Country, request.PhoneNumber, request.CustomerName));
+                request.Email, request.Country, request.PhoneNumber, request.CustomerName, request.Wallet));
 
             if (result.IsSuccess)
             {
@@ -109,7 +109,9 @@ internal static class DotFawryPaymentEndpoints
     }
 }
 
-internal sealed record InitiateDotFawryCheckoutRequest(string Email, string Country, string PhoneNumber, string? CustomerName);
+/// <param name="Wallet">One of "Fawry", "OrangeCash", "VodafoneCash" (a <c>DotFawryWalletOperator</c> member name) — defaults to "Fawry" for any caller that predates the Egyptian mobile wallet extension.</param>
+internal sealed record InitiateDotFawryCheckoutRequest(
+    string Email, string Country, string PhoneNumber, string? CustomerName, string Wallet = "Fawry");
 
 internal sealed record DotFawryNotificationRequest(
     string? DotTransId,

@@ -111,12 +111,18 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
 
         var settings = dotFawryOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.PartnerId)
-            || string.IsNullOrWhiteSpace(settings.ServiceId)
-            || string.IsNullOrWhiteSpace(settings.OperatorId))
+            || string.IsNullOrWhiteSpace(settings.ServiceId))
         {
             logger.LogError("DOT Fawry checkout attempted but DOT Fawry configuration is incomplete.");
             return Result.Failure<DotFawryCheckoutInitiationDto>(CommerceErrors.DotFawryGatewayMisconfigured);
         }
+
+        // Guaranteed to parse — InitiateDotFawryCheckoutCommandValidator only lets a valid
+        // DotFawryWalletOperator member name through before this handler ever runs.
+        var wallet = Enum.Parse<DotFawryWalletOperator>(request.Wallet, ignoreCase: true);
+        logger.LogInformation(
+            "DOT Fawry checkout initiated: requested wallet {RequestedWallet}, resolved opId {OpId}",
+            request.Wallet, wallet.ToOperatorId());
 
         var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
         var orderItems = cart.Items
@@ -165,7 +171,7 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
         var paymentAttempt = PaymentAttempt.CreatePendingDotFawry(
             order.Id,
             partnerTxId,
-            settings.OperatorId,
+            wallet.ToOperatorId(),
             settings.ServiceId,
             chargeAmountResult.Value.Amount,
             chargeAmountResult.Value.Currency,
@@ -192,6 +198,7 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
 
         var chargeRequest = new DotFawryChargeRequest(
             partnerTxId,
+            wallet.ToOperatorId(),
             request.PhoneNumber,
             chargeAmountResult.Value.Amount,
             request.Email,
@@ -223,7 +230,7 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
             // the reconciliation sweep, via DotFawryPaymentVerificationService, can move this
             // forward.
             return Result.Success(new DotFawryCheckoutInitiationDto(
-                paymentAttempt.Id, order.Id, charge.FawryReferenceNumber, expiresOnUtc));
+                paymentAttempt.Id, order.Id, charge.FawryReferenceNumber, expiresOnUtc, wallet.ToString()));
         }
 
         // Any other resultCode — including "0" immediate success, which the docs say some operators
@@ -233,6 +240,6 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
         // place. The frontend's status poll will already see the terminal state on its first tick.
         await verificationService.VerifyAndFinalizeAsync(paymentAttempt.Id, cancellationToken);
 
-        return Result.Success(new DotFawryCheckoutInitiationDto(paymentAttempt.Id, order.Id, null, expiresOnUtc));
+        return Result.Success(new DotFawryCheckoutInitiationDto(paymentAttempt.Id, order.Id, null, expiresOnUtc, wallet.ToString()));
     }
 }

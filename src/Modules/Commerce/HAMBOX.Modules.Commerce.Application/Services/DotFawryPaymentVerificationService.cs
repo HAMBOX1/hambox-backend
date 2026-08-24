@@ -103,13 +103,16 @@ public sealed class DotFawryPaymentVerificationService(
         }
 
         // DOT's Check Transaction Status spec states the partnerTransId lookup is "available only
-        // for limited cases" — this operator/service combo rejects it outright (every production
-        // attempt observed resultCode 1005/1008, the check-status call's own error codes, never a
-        // real billing result). dotTransId lookup has no such caveat and is always available once
-        // the charge call has returned one, which happens before verification is ever reached.
+        // for limited cases" — the Fawry operator/service combo (opId 141) rejects it outright
+        // (every production attempt observed resultCode 1005/1008, the check-status call's own
+        // error codes, never a real billing result); whether Orange Cash (117)/Vodafone Cash (114)
+        // behave the same way is not yet confirmed. dotTransId lookup has no such caveat and is
+        // always available once the charge call has returned one, which happens before verification
+        // is ever reached — so this branch only actually exercises partnerTransId lookup in the
+        // narrow window where a charge call succeeded without yet recording a dotTransId.
         var statusResult = string.IsNullOrWhiteSpace(attempt.ProviderTransactionId)
-            ? await dotFawryGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, cancellationToken)
-            : await dotFawryGateway.CheckTransactionStatusByDotTxIdAsync(attempt.ProviderTransactionId, cancellationToken);
+            ? await dotFawryGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, attempt.OperatorId, cancellationToken)
+            : await dotFawryGateway.CheckTransactionStatusByDotTxIdAsync(attempt.ProviderTransactionId, attempt.OperatorId, cancellationToken);
 
         if (statusResult.IsFailure)
         {

@@ -26,13 +26,15 @@ internal sealed class CheckoutConfigurationProvider(
         && !string.IsNullOrWhiteSpace(dotOptions.Value.PublicRedirectUrl)
         && !string.IsNullOrWhiteSpace(dotOptions.Value.FrontendResultUrl);
 
-    // Same gate, for the separate DOT Fawry Direct Billing product. The charge currency (EGP) is
+    // Same gate, for the separate DOT Fawry Direct Billing product — now shared by all three
+    // Egyptian mobile wallets (Fawry, Orange Cash, Vodafone Cash), since they use the same
+    // partner/service credentials and only differ by opId (DotFawryWalletOperator, a fixed
+    // provider-confirmed constant, not per-environment config). The charge currency (EGP) is
     // resolved (DotFawryChargeAmountResolver) — this now just confirms real partner credentials are
-    // configured, and still lets ops force-disable Fawry by registering
+    // configured, and still lets ops force-disable all three wallets at once by registering
     // NotConfiguredDotFawryChargeAmountResolver in its place without touching anything else.
     public bool IsDotFawryCheckoutEnabled =>
         dotFawryChargeAmountResolver is not NotConfiguredDotFawryChargeAmountResolver
         && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.PartnerId)
-        && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.ServiceId)
-        && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.OperatorId);
+        && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.ServiceId);
 }
