@@ -150,10 +150,19 @@ try
     recurringJobScheduler.Register(new RecurringJobDefinition(
         "suppliers.availability-sync", SupplierAvailabilityJobTypes.Sync, TimeSpan.FromMinutes(availabilitySyncIntervalMinutes)));
 
-    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    // nginx runs on the host and proxies to this container's published port; Docker's own NAT makes
+    // that connection appear to originate from the bridge network's gateway (not from loopback), so
+    // the default KnownIPNetworks (loopback-only) never trusts nginx's X-Forwarded-For — every
+    // request then reports RemoteIpAddress as the docker bridge gateway. This breaks anything keyed
+    // on the real client IP, notably DotNotificationIpAllowlist (DOT/DOT Fawry payment webhooks —
+    // every real call gets rejected with 403). Trust the private Docker bridge range so the
+    // forwarded header is honored.
+    var forwardedHeadersOptions = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-    });
+    };
+    forwardedHeadersOptions.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+    app.UseForwardedHeaders(forwardedHeadersOptions);
 
     // ──── Database Migrations (Dev-Only) ──────────────────────
     if (app.Environment.IsDevelopment())
