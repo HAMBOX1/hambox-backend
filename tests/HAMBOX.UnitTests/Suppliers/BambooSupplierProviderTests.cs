@@ -55,7 +55,10 @@ public sealed class BambooSupplierProviderTests
         var result = await provider.PurchaseAsync(CreatePurchaseRequest(), CreateContext());
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("71ac2817-e51a-438a-bb7b-5ffdda23603c", result.ProviderOrderId);
+        // The RequestId echo is not a distinct Bamboo order reference (it's our own GUID reflected
+        // back) — must not be recorded as ProviderOrderId, or the domain's immutability guard rejects
+        // the real, different orderId GetOrderStatusAsync reports later during reconciliation.
+        Assert.Null(result.ProviderOrderId);
         Assert.Null(result.DeliveredCodes); // Place Order never returns codes synchronously — must reconcile
         Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
         Assert.EndsWith("/orders/checkout", handler.LastRequest.RequestUri!.AbsolutePath);

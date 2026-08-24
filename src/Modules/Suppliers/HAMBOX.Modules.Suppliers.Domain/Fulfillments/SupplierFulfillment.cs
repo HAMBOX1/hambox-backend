@@ -165,17 +165,20 @@ public sealed class SupplierFulfillment : AggregateRoot, IAuditable
         Attempts++;
     }
 
-    /// <summary>The provider confirmed acceptance of the purchase request; outcome still pending.</summary>
-    public void MarkSubmitted(string providerOrderId)
+    /// <summary>
+    /// The provider confirmed acceptance of the purchase request; outcome still pending.
+    /// <paramref name="providerOrderId"/> is optional — some providers (e.g. Bamboo) issue no distinct
+    /// order reference at accept time, only later during reconciliation; <see cref="HamboxReferenceId"/>
+    /// alone is always sufficient to track and reconcile a submitted attempt.
+    /// </summary>
+    public void MarkSubmitted(string? providerOrderId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(providerOrderId);
-
         if (Status != SupplierFulfillmentStatus.Submitting)
         {
             throw new InvalidOperationException($"Cannot mark submitted from status '{Status}'.");
         }
 
-        ProviderOrderId = providerOrderId.Trim();
+        SetProviderOrderIdIfKnown(providerOrderId);
         Status = SupplierFulfillmentStatus.Submitted;
         SubmittedOnUtc = DateTimeOffset.UtcNow;
     }

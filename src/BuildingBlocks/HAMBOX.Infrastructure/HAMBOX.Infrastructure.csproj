@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Update="Resources\SharedResources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
     </EmbeddedResource>

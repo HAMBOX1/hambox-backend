@@ -2,12 +2,16 @@ namespace HAMBOX.Modules.Commerce.Application.Options;
 
 /// <summary>
 /// Configuration for DOT's Fawry Direct Billing product (server-to-server cash payment via Fawry
-/// reference number) — a distinct DOT integration from the carrier-billing OTP flow configured
-/// under <see cref="DotSettings"/>. Non-secret shape (BaseUrl, paths, timeout) lives in tracked
-/// appsettings; <see cref="Username"/>, <see cref="Password"/>, <see cref="PartnerId"/>,
-/// <see cref="ServiceId"/> are real DOT-partner-account values and must only ever be supplied via
-/// environment variables / untracked <c>appsettings.Production.json</c> — never committed. See
-/// <c>DotFawrySettingsValidator</c> for startup fail-fast format checks.
+/// reference number, and — as of the Egyptian mobile wallet extension — Orange Cash/Vodafone Cash
+/// through the same product) — a distinct DOT integration from the carrier-billing OTP flow
+/// configured under <see cref="DotSettings"/>. Non-secret shape (BaseUrl, paths, timeout) lives in
+/// tracked appsettings; <see cref="Username"/>, <see cref="Password"/>, <see cref="PartnerId"/>,
+/// <see cref="ServiceId"/> are real DOT-partner-account values, identical across every wallet, and
+/// must only ever be supplied via environment variables / untracked
+/// <c>appsettings.Production.json</c> — never committed. See <c>DotFawrySettingsValidator</c> for
+/// startup fail-fast format checks. The per-wallet <c>opId</c> is not part of this settings object —
+/// it is provider-confirmed, fixed, network-wide data, not a per-environment secret — see
+/// <see cref="DotFawryWalletOperator"/>.
 /// </summary>
 public sealed class DotFawrySettings
 {
@@ -36,12 +40,6 @@ public sealed class DotFawrySettings
 
     /// <summary>The DOT-provided service identifier for HAMBOX's Fawry product configuration.</summary>
     public string ServiceId { get; init; } = string.Empty;
-
-    /// <summary>
-    /// The DOT operator ID for the Fawry integration (confirmed by DOT as <c>141</c>). Sent as
-    /// <c>opId</c> in every Direct Billing / Check Transaction Status call.
-    /// </summary>
-    public string OperatorId { get; init; } = string.Empty;
 
     /// <summary>Basic-auth username for the Direct Billing / Check Transaction Status APIs.</summary>
     public string Username { get; init; } = string.Empty;

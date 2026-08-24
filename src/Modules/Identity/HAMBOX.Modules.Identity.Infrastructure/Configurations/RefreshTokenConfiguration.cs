@@ -52,6 +52,13 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
 
         builder.Property(t => t.ModifiedOnUtc);
 
+        // Concurrency — see RefreshTokenCommandHandler: guards against two simultaneous refresh
+        // requests both rotating the same still-active token (a plain read-then-write race that a
+        // unique index on Token alone cannot catch, since both requests are UPDATing the same
+        // existing row, not INSERTing a duplicate).
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         // Computed properties are not mapped
         builder.Ignore(t => t.IsExpired);
         builder.Ignore(t => t.IsRevoked);

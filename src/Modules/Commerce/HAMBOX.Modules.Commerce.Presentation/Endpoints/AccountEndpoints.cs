@@ -159,13 +159,13 @@ internal static class AccountEndpoints
         }).WithName("DeleteReview");
 
         group.MapGet("notifications", async (
-            [FromQuery] int pageNumber,
-            [FromQuery] int pageSize,
-            [FromQuery] bool includeArchived,
-            [FromQuery] bool? isRead,
-            [FromQuery] string? category,
-            [FromQuery] string? search,
-            ISender sender) =>
+            ISender sender,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] bool includeArchived = false,
+            [FromQuery] bool? isRead = null,
+            [FromQuery] string? category = null,
+            [FromQuery] string? search = null) =>
         {
             var result = await sender.Send(new GetNotificationsQuery(
                 pageNumber <= 0 ? 1 : pageNumber,

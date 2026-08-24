@@ -2,6 +2,7 @@ using FluentValidation;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Application.Referrals;
+using HAMBOX.Application.Security;
 
 namespace HAMBOX.Modules.Identity.Application.Features.Register;
 
@@ -10,8 +11,15 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// </summary>
 public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
 {
-    public RegisterCommandValidator(IPlatformSettingsProvider platformSettings, IReferralRedemptionService referralRedemption)
+    public RegisterCommandValidator(
+        IPlatformSettingsProvider platformSettings,
+        IReferralRedemptionService referralRedemption,
+        ITurnstileVerificationService turnstile)
     {
+        RuleFor(x => x.TurnstileToken)
+            .MustAsync((command, token, cancellation) => turnstile.VerifyAsync(token, command.IpAddress, "register", cancellation))
+            .WithMessage("Security verification failed. Please try again.");
+
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("A valid email address is required.")

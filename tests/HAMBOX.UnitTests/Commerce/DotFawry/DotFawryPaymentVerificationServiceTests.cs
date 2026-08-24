@@ -10,14 +10,14 @@ namespace HAMBOX.UnitTests.Commerce.DotFawry;
 public sealed class DotFawryPaymentVerificationServiceTests
 {
     private static async Task<(DotFawryTestHarness Harness, Guid PaymentAttemptId, Guid OrderId)> InitiateAsync(
-        int stock = 5, decimal price = 10m)
+        int stock = 5, decimal price = 10m, string wallet = "Fawry")
     {
         var harness = DotFawryTestHarness.Create();
         var (product, variant) = await harness.SeedProductAsync(stock, price);
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -191,7 +191,7 @@ public sealed class DotFawryPaymentVerificationServiceTests
         harness.Gateway.StatusResult = new("1006", "Transaction Not Found", null, null, "dot-trans-1");
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);

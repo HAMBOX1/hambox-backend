@@ -17,7 +17,8 @@ internal static class ProductQueryFilters
         string? searchTerm,
         Guid? categoryId,
         ProductStatus? status,
-        Guid? collectionId = null)
+        Guid? collectionId = null,
+        IReadOnlyList<Guid>? productIds = null)
     {
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -44,6 +45,14 @@ internal static class ProductQueryFilters
         if (collectionId.HasValue)
         {
             query = query.Where(p => p.Collections.Any(pc => pc.CollectionId == collectionId.Value));
+        }
+
+        // Populated only by the admin product list's Supplier Mapping filter (GetProductsQuery), which
+        // resolves the matching id-set from the Suppliers module first, then narrows here so pagination
+        // stays correct — see GetSupplierMappingStatusForProductsQueryHandler.
+        if (productIds is { Count: > 0 })
+        {
+            query = query.Where(p => productIds.Contains(p.Id));
         }
 
         return query;

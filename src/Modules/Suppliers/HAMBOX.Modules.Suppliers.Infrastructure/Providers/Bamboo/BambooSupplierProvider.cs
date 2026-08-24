@@ -251,13 +251,19 @@ internal sealed class BambooSupplierProvider(BambooHttpClient httpClient, ILogge
         // documented ambiguity contract: an exception here means "unknown, resolve via GetOrderStatusAsync."
         try
         {
-            var providerRequestId = await httpClient.PlaceOrderAsync(
+            // Bamboo's Place Order response only ever echoes back the RequestId we sent (see
+            // BambooContracts.cs) — it is not a distinct Bamboo-assigned order reference, so it must
+            // never be recorded as ProviderOrderId (SupplierFulfillment.HamboxReferenceId already
+            // carries this GUID). Bamboo's real, distinct orderId only becomes known later, from
+            // GetOrderStatusAsync — recording the RequestId echo here would make the domain's
+            // ProviderOrderId-immutability guard reject that later, genuinely different value.
+            await httpClient.PlaceOrderAsync(
                 context.Credentials, referenceGuid, accountId, productId, request.Quantity, faceValue, cancellationToken);
 
             // Documented behavior: Place Order only confirms acceptance, never delivers codes
             // synchronously — DeliveredCodes stays null, driving the orchestrator's Submitted state
             // (not Succeeded) until GetOrderStatusAsync confirms an actual outcome.
-            return new SupplierPurchaseResult(true, providerRequestId, DeliveredCodes: null, FailureCategory: null, Message: null);
+            return new SupplierPurchaseResult(true, ProviderOrderId: null, DeliveredCodes: null, FailureCategory: null, Message: null);
         }
         catch (BambooApiException ex)
         {

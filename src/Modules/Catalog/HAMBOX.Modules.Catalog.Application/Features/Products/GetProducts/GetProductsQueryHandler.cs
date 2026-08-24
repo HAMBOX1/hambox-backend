@@ -39,7 +39,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
     public async Task<Result<PagedResult<ProductDto>>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
         var query = ProductQueryFilters.ApplyBaseFilters(
-            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, request.Status, request.CollectionId);
+            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, request.Status,
+            request.CollectionId, request.ProductIds);
 
         query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 

@@ -64,7 +64,7 @@ internal sealed class AuthTokenIssuer(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AuthTokenResponse(accessToken, refreshTokenValue, expiresAt));
+        return Result.Success(new AuthTokenResponse(accessToken, refreshTokenValue, expiresAt, refreshExpiresAt));
     }
 
     private async Task<DateTimeOffset> ResolveRefreshExpirationAsync(bool rememberMe, CancellationToken cancellationToken)

@@ -479,30 +479,18 @@ internal sealed class CreateSupplierMappingCommandHandler(ISuppliersDbContext db
             return Result.Failure<Guid>(SupplierErrors.SupplierDisabled);
         }
 
-        var r = request.Request;
-
-        // NULL InternalProductVariantId is compared with `==` here (not `.Value ==`) deliberately —
-        // this must match the exact "product-wide vs this-specific-variant" pair the DB unique index
-        // enforces, so two NULLs correctly collide as a duplicate product-wide mapping while two
-        // different non-null variant ids never do.
-        var duplicateExists = await dbContext.SupplierProductMappings.AsNoTracking()
-            .AnyAsync(m => m.SupplierId == request.SupplierId
-                && m.InternalProductId == r.InternalProductId
-                && m.InternalProductVariantId == r.InternalProductVariantId, cancellationToken);
-        if (duplicateExists)
+        var creationResult = await SupplierMappingCreator.TryCreate(
+            dbContext, request.SupplierId, request.Request, [], cancellationToken);
+        if (creationResult.IsFailure)
         {
-            return Result.Failure<Guid>(SupplierErrors.MappingAlreadyExists);
+            return Result.Failure<Guid>(creationResult.Error);
         }
 
-        var mapping = SupplierProductMapping.Create(
-            request.SupplierId, r.InternalProductId, r.ExternalProductId, r.ExternalSku, r.ExternalName, r.BuyingPrice, r.Currency, r.Priority,
-            r.InternalProductVariantId);
-
-        dbContext.SupplierProductMappings.Add(mapping);
+        dbContext.SupplierProductMappings.Add(creationResult.Value);
         SupplierAuditWriter.Record(dbContext, request.SupplierId, SupplierAuditAction.MappingCreated, currentUser.UserId);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(mapping.Id);
+        return Result.Success(creationResult.Value.Id);
     }
 }
 

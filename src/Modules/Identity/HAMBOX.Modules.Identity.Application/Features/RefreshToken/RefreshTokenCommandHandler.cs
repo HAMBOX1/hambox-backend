@@ -99,9 +99,22 @@ internal sealed class RefreshTokenCommandHandler(
 
         dbContext.RefreshTokens.Add(newRefreshToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request rotated this exact token between our read and our write (two
+            // simultaneous refreshes racing the same still-active token — e.g. two browser tabs
+            // booting at once). The RowVersion concurrency token on RefreshToken makes the loser's
+            // UPDATE affect zero rows, so EF throws here instead of both requests silently
+            // succeeding. This is a benign race, not evidence of token theft, so it must not trigger
+            // WasReused()'s account-wide revocation — it simply loses the race.
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+        }
 
-        return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt));
+        return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt, refreshExpiresAt));
     }
 
     private async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken)

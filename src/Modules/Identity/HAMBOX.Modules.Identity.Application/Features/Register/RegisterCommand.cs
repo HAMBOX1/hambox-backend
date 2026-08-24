@@ -14,6 +14,7 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// <param name="UserAgent">The client user agent, used to record legal acceptance.</param>
 /// <param name="Language">The client's preferred language, used to record legal acceptance.</param>
 /// <param name="ReferralCode">Optional referral code the registrant was invited with.</param>
+/// <param name="TurnstileToken">Cloudflare Turnstile token proving the client passed the security widget.</param>
 public sealed record RegisterCommand(
     string Email,
     string Password,
@@ -22,4 +23,5 @@ public sealed record RegisterCommand(
     string IpAddress,
     string UserAgent,
     string Language,
-    string? ReferralCode = null) : IRequest<Result>;
+    string? ReferralCode,
+    string TurnstileToken) : IRequest<Result>;

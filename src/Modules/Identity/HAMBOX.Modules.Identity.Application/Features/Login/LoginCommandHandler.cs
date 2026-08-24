@@ -87,7 +87,10 @@ internal sealed class LoginCommandHandler(
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email not confirmed", context);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
-            return Result.Failure<AuthTokenResponse>(IdentityErrors.EmailNotConfirmed);
+            // Externally indistinguishable from a wrong password — distinguishing this from
+            // InvalidCredentials would let an attacker enumerate registered emails without ever
+            // guessing a password. Internal LoginHistory/audit trail above still records the real reason.
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (user.Status != UserStatus.Active)
@@ -113,7 +116,8 @@ internal sealed class LoginCommandHandler(
                     cancellationToken: cancellationToken);
             }
 
-            return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountNotActive);
+            // Externally indistinguishable from a wrong password — see the EmailNotConfirmed branch above.
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
@@ -121,7 +125,8 @@ internal sealed class LoginCommandHandler(
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked", context);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
-            return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountLocked);
+            // Externally indistinguishable from a wrong password — see the EmailNotConfirmed branch above.
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
         var isPasswordValid = passwordHasher.VerifyPassword(user.PasswordHash, request.Password);
@@ -149,11 +154,9 @@ internal sealed class LoginCommandHandler(
                 city: request.City,
                 cancellationToken: cancellationToken);
 
-            if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
-            {
-                return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountLocked);
-            }
-
+            // Whether this failed attempt just triggered a lockout is recorded above (LoginHistory +
+            // SecurityEventLogger) but never surfaced in the response — externally indistinguishable
+            // from any other wrong password, see the EmailNotConfirmed branch above.
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 

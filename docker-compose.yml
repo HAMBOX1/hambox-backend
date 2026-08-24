@@ -41,6 +41,10 @@ services:
       - EmailSettings__FromAddress=noreply@hambox.local
       - EmailSettings__FromName=HAMBOX
       - EmailSettings__ApplicationBaseUrl=http://localhost:4200
+      # Cloudflare's official public testing credentials (always pass) — not secrets, safe to commit.
+      # https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+      - Turnstile__SiteKey=1x00000000000000000000AA
+      - Turnstile__SecretKey=1x0000000000000000000000000000000AA
     depends_on:
       sqlserver:
         condition: service_healthy

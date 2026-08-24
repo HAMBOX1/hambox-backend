@@ -103,6 +103,32 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new DeleteSupplierCommand(id))))
             .RequirePermission(PermissionConstants.Suppliers.Delete);
 
+        // Task-first "Map Products" workspace — every eligible HAMBOX product/variant next to this
+        // supplier's own mapping (if any), for the primary bulk-mapping workflow. Same permission tier
+        // as the catalog browse endpoint above (read-only, never mutates).
+        group.MapGet("{id:guid}/mapping-candidates", async Task<IResult> (
+                Guid id, [FromQuery] string? search, [FromQuery] string? status,
+                [FromQuery] int page, [FromQuery] int pageSize, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingCandidatesQuery(
+                id, search, status, page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
+        group.MapGet("{id:guid}/mapping-candidates/summary", async Task<IResult> (Guid id, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingCandidatesSummaryQuery(id))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
+        // Live, on-demand auto-match — calls the supplier's own catalog search per candidate, bounded to
+        // whatever the caller passes in (e.g. the current page's unmapped rows), never the whole catalog.
+        group.MapPost("{id:guid}/mappings/suggest", async Task<IResult> (
+                Guid id, [FromBody] IReadOnlyList<SuggestionCandidate> candidates, ISender sender) =>
+            MapResult(await sender.Send(new SuggestSupplierMappingsQuery(id, candidates))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
+        group.MapPost("{id:guid}/mappings/bulk", async Task<IResult> (
+                Guid id, [FromBody] IReadOnlyList<CreateSupplierMappingRequest> requests, ISender sender) =>
+            MapResult(await sender.Send(new BulkCreateSupplierMappingsCommand(id, requests)), StatusCodes.Status201Created))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
         var mappings = app.MapGroup("api/v{version:apiVersion}/suppliers/{supplierId:guid}/mappings")
             .WithApiVersionSet(apiVersionSet)
             .WithTags("Suppliers")
@@ -129,7 +155,33 @@ internal static class SupplierEndpoints
         mappings.MapDelete("{mappingId:guid}", async Task<IResult> (Guid supplierId, Guid mappingId, ISender sender) =>
             MapResult(await sender.Send(new DeleteSupplierMappingCommand(supplierId, mappingId))))
             .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
+        // Supplier-agnostic (not under {id}) — the product list page has no single supplier in context.
+        // Gated on Catalog.Products.View, not Suppliers.View, mirroring the fulfillment-chain endpoint's
+        // precedent above: consumed from the Catalog product list, safe/aggregate-only response.
+        app.MapPost("api/v{version:apiVersion}/suppliers/product-mapping-status", async Task<IResult> (
+                [FromBody] ProductMappingStatusRequest request, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingStatusForProductsQuery(request.ProductIds))))
+            .WithApiVersionSet(apiVersionSet)
+            .WithTags("Suppliers")
+            .HasApiVersion(1)
+            .RequireAuthorization()
+            .RequirePermission(PermissionConstants.Catalog.Products.View);
+
+        // Backs the product-centric mapping drawer's per-variant list and the product edit page's
+        // Supplier Fulfillment summary — same permission tier as product-mapping-status above, since
+        // both are consumed from the same Catalog product list/edit surfaces.
+        app.MapGet("api/v{version:apiVersion}/suppliers/product-mappings", async Task<IResult> (
+                [FromQuery] Guid productId, ISender sender) =>
+            MapResult(await sender.Send(new GetProductVariantSupplierMappingsQuery(productId))))
+            .WithApiVersionSet(apiVersionSet)
+            .WithTags("Suppliers")
+            .HasApiVersion(1)
+            .RequireAuthorization()
+            .RequirePermission(PermissionConstants.Catalog.Products.View);
     }
+
+    internal sealed record ProductMappingStatusRequest(IReadOnlyList<Guid>? ProductIds);
 
     internal sealed record UpdateMappingPriorityRequest(int Priority);
 
