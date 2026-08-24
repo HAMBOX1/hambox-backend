@@ -102,7 +102,7 @@ internal sealed class InitiateDotCheckoutCommandHandler(
                 CommerceErrors.InvalidCoupon(string.Join(' ', evaluation.ValidationErrors)));
         }
 
-        var chargeAmountResult = pricePointResolver.Resolve(totalAmount, request.Country);
+        var chargeAmountResult = await pricePointResolver.ResolveAsync(totalAmount, request.Country, cancellationToken);
         if (chargeAmountResult.IsFailure)
         {
             return Result.Failure<DotCheckoutInitiationDto>(chargeAmountResult.Error);
@@ -111,12 +111,15 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         var settings = dotOptions.Value;
         if (string.IsNullOrWhiteSpace(settings.PartnerId)
             || string.IsNullOrWhiteSpace(settings.ServiceId)
-            || string.IsNullOrWhiteSpace(settings.OperatorId)
             || string.IsNullOrWhiteSpace(settings.PublicRedirectUrl))
         {
             logger.LogError("DOT checkout attempted but DOT configuration is incomplete.");
             return Result.Failure<DotCheckoutInitiationDto>(CommerceErrors.DotGatewayMisconfigured);
         }
+
+        // Guaranteed to parse — InitiateDotCheckoutCommandValidator only lets a valid
+        // DotWalletOperator member name through before this handler ever runs.
+        var wallet = Enum.Parse<DotWalletOperator>(request.Wallet, ignoreCase: true);
 
         var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
         var orderItems = cart.Items
@@ -165,7 +168,7 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         var paymentAttempt = PaymentAttempt.CreatePendingDot(
             order.Id,
             partnerTxId,
-            settings.OperatorId,
+            wallet.ToOperatorId(),
             settings.ServiceId,
             chargeAmountResult.Value.Amount,
             chargeAmountResult.Value.Currency,
@@ -183,6 +186,7 @@ internal sealed class InitiateDotCheckoutCommandHandler(
 
         var tokenRequest = new DotAccessTokenRequest(
             partnerTxId,
+            wallet.ToOperatorId(),
             chargeAmountResult.Value.Amount,
             settings.PublicRedirectUrl,
             DateTimeOffset.UtcNow.ToUnixTimeSeconds());

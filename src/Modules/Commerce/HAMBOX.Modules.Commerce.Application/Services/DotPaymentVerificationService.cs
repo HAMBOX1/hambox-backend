@@ -85,7 +85,7 @@ public sealed class DotPaymentVerificationService(
             return new DotVerificationResult(DotVerificationOutcome.Failed, attempt.OrderId, "Order not found.");
         }
 
-        var statusResult = await dotGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, cancellationToken);
+        var statusResult = await dotGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, attempt.OperatorId, cancellationToken);
 
         if (statusResult.IsFailure)
         {

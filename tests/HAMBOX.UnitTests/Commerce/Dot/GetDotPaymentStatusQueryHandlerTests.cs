@@ -14,7 +14,7 @@ public sealed class GetDotPaymentStatusQueryHandlerTests
         var (product, variant) = await harness.SeedProductAsync(stock: 5, price: 10m);
         await harness.SeedCartAsync(product, variant);
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         var result = await harness.StatusQueryHandler.Handle(
             new GetDotPaymentStatusQuery(initiation.Value.PaymentAttemptId), CancellationToken.None);
@@ -31,7 +31,7 @@ public sealed class GetDotPaymentStatusQueryHandlerTests
         var (product, variant) = await harness.SeedProductAsync(stock: 5, price: 10m);
         await harness.SeedCartAsync(product, variant);
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         var attackerCurrentUser = new FakeCurrentUserService("attacker");
         var attackerStatusHandler = new GetDotPaymentStatusQueryHandler(harness.CommerceDb, attackerCurrentUser);
@@ -62,7 +62,7 @@ public sealed class GetDotPaymentStatusQueryHandlerTests
         var (product, variant) = await harness.SeedProductAsync(stock: 5, price: 10m);
         await harness.SeedCartAsync(product, variant);
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
         harness.Gateway.StatusResult = new(0, "successful transaction", DateTimeOffset.UtcNow, 10m, "USD");
         await harness.VerificationService.VerifyAndFinalizeAsync(initiation.Value.PaymentAttemptId, CancellationToken.None);
 

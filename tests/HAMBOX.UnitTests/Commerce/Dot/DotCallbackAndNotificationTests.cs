@@ -15,7 +15,7 @@ public sealed class DotCallbackAndNotificationTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
         Assert.True(result.IsSuccess);
 
         var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == result.Value.PaymentAttemptId);
@@ -29,7 +29,7 @@ public sealed class DotCallbackAndNotificationTests
         harness.Gateway.StatusResult = new(0, "successful transaction", DateTimeOffset.UtcNow, 10m, "USD");
 
         var result = await harness.CallbackHandler.Handle(
-            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 21, "1", "923000000000", "0", "ok"),
+            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 117, "1", "923000000000", "0", "ok"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -46,7 +46,7 @@ public sealed class DotCallbackAndNotificationTests
         harness.Gateway.StatusResult = new(1001, "Invalid PIN entered by user", null, null, null);
 
         var result = await harness.CallbackHandler.Handle(
-            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 21, "1", "923000000000", "0", "spoofed success"),
+            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 117, "1", "923000000000", "0", "spoofed success"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -91,10 +91,10 @@ public sealed class DotCallbackAndNotificationTests
         harness.Gateway.StatusResult = new(0, "successful transaction", DateTimeOffset.UtcNow, 10m, "USD");
 
         await harness.CallbackHandler.Handle(
-            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 21, "1", "923000000000", "0", "ok"),
+            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 117, "1", "923000000000", "0", "ok"),
             CancellationToken.None);
         await harness.CallbackHandler.Handle(
-            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 21, "1", "923000000000", "0", "ok"),
+            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 117, "1", "923000000000", "0", "ok"),
             CancellationToken.None);
 
         Assert.Single(harness.Gateway.StatusCheckCalls);
@@ -158,7 +158,7 @@ public sealed class DotCallbackAndNotificationTests
         harness.Gateway.StatusResult = new(0, "successful transaction", DateTimeOffset.UtcNow, 10m, "USD");
 
         await harness.CallbackHandler.Handle(
-            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 21, "1", "923000000000", "0", "ok"),
+            new HandleDotRedirectCallbackCommand(partnerTxId, "dot-txid-1", 117, "1", "923000000000", "0", "ok"),
             CancellationToken.None);
         await harness.NotificationHandler.Handle(
             new HandleDotNotificationCommand("dot-txid-1", partnerTxId, 21, "923000000000", "10.0", "1", "0", "successfully charged"),

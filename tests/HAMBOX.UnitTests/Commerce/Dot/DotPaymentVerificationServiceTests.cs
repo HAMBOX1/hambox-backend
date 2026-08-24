@@ -18,7 +18,7 @@ public sealed class DotPaymentVerificationServiceTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         return (harness, result.Value.PaymentAttemptId, result.Value.OrderId);
@@ -220,7 +220,7 @@ public sealed class DotPaymentVerificationServiceTests
         await harness.SeedCartAsync(product, variant, quantity: 1);
 
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
         Assert.True(initiation.IsSuccess);
 
         // Stock disappears between initiation and confirmation (e.g. another channel sold it) —

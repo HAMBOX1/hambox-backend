@@ -2,10 +2,12 @@ namespace HAMBOX.Modules.Commerce.Application.Options;
 
 /// <summary>
 /// Non-secret shape lives in tracked appsettings (BaseUrl, timeout). <see cref="Username"/>,
-/// <see cref="Password"/>, <see cref="PartnerId"/>, <see cref="ServiceId"/>, and
-/// <see cref="OperatorId"/> are real DOT-partner-account values and must only ever be supplied via
-/// environment variables / untracked <c>appsettings.Production.json</c> / a secret manager — never
-/// committed. See <c>DotSettingsValidator</c> for the startup fail-fast checks.
+/// <see cref="Password"/>, <see cref="PartnerId"/>, <see cref="ServiceId"/> are real
+/// DOT-partner-account values and must only ever be supplied via environment variables / untracked
+/// <c>appsettings.Production.json</c> / a secret manager — never committed. See
+/// <c>DotSettingsValidator</c> for the startup fail-fast checks. There is no <c>OperatorId</c> here
+/// — <c>op_id</c> is provider-confirmed, fixed, per-wallet data (Orange Cash 117 / Vodafone Cash
+/// 114), not per-environment config — see <see cref="DotWalletOperator"/>.
 /// </summary>
 public sealed class DotSettings
 {
@@ -19,9 +21,6 @@ public sealed class DotSettings
 
     /// <summary>The DOT-provided service identifier for the product/price point HAMBOX is configured to sell through DOT.</summary>
     public string ServiceId { get; init; } = string.Empty;
-
-    /// <summary>The mobile operator identifier. HAMBOX targets a single configured operator — no per-request operator selection.</summary>
-    public string OperatorId { get; init; } = string.Empty;
 
     /// <summary>Basic-auth username for the GET Access Token / Check Transaction Status APIs.</summary>
     public string Username { get; init; } = string.Empty;

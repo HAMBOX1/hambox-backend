@@ -5,16 +5,14 @@ using HAMBOX.SharedKernel.Results;
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
 /// <summary>
-/// Default <see cref="IDotPricePointResolver"/>: always fails cleanly. DOT's GET Access Token call
-/// takes no currency parameter, and currency only ever appears in DOT's own responses tied to the
-/// configured <c>op_id</c>/<c>service_id</c> — meaning whether this DOT account supports charging
-/// an arbitrary order total or only a fixed operator-side price point has not been confirmed with
-/// DOT. Rather than guess, DOT checkout is wired end-to-end but reports "not yet available" until
-/// the client confirms the pricing model and a real resolver is registered in its place — see
-/// <see cref="IDotPricePointResolver"/> for the full rationale.
+/// Kill-switch <see cref="IDotPricePointResolver"/>: always fails cleanly. Register this in place of
+/// <see cref="DotPricePointResolver"/> to force-disable DOT OTP checkout (Orange Cash/Vodafone Cash)
+/// without touching anything else — mirrors <c>NotConfiguredDotFawryChargeAmountResolver</c> for the
+/// sibling Direct Billing product.
 /// </summary>
 internal sealed class NotConfiguredDotPricePointResolver : IDotPricePointResolver
 {
-    public Result<DotChargeAmount> Resolve(decimal orderTotalUsd, string countryCode) =>
-        Result.Failure<DotChargeAmount>(CommerceErrors.DotPricingNotConfigured);
+    public Task<Result<DotChargeAmount>> ResolveAsync(
+        decimal orderTotalUsd, string countryCode, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Result.Failure<DotChargeAmount>(CommerceErrors.DotPricingNotConfigured));
 }

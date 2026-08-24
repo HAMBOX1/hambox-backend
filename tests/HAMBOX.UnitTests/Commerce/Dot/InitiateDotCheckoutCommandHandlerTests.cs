@@ -16,7 +16,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Contains("otp-lp", result.Value.OtpLandingPageUrl);
@@ -30,7 +30,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.OrderId == order.Id);
         Assert.Equal(10m, attempt.ExpectedAmount);
         Assert.Equal("USD", attempt.ExpectedCurrency);
-        Assert.Equal("21", attempt.OperatorId);
+        Assert.Equal("117", attempt.OperatorId);
         Assert.Equal("1", attempt.ServiceId);
 
         // Nothing was reserved or committed yet — payment isn't confirmed.
@@ -49,7 +49,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(CommerceErrors.DotPricingNotConfigured.Code, result.Error.Code);
@@ -66,7 +66,6 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
             BaseUrl = "https://dot-jo.biz",
             PartnerId = string.Empty,
             ServiceId = "1",
-            OperatorId = "21",
             Username = "test-user",
             Password = "test-pass",
             PublicRedirectUrl = "https://hambox.test/api/payments/dot/callback",
@@ -77,7 +76,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(CommerceErrors.DotGatewayMisconfigured.Code, result.Error.Code);
@@ -93,7 +92,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(CommerceErrors.DotProviderUnavailable.Code, result.Error.Code);
@@ -115,7 +114,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
     }
@@ -126,7 +125,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         var harness = DotTestHarness.Create(userId: null);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(CommerceErrors.AuthenticationRequired.Code, result.Error.Code);
@@ -138,7 +137,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         var harness = DotTestHarness.Create();
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(CommerceErrors.CartEmpty.Code, result.Error.Code);
@@ -152,7 +151,7 @@ public sealed class InitiateDotCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant, quantity: 5);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Empty(harness.CommerceDb.Orders);

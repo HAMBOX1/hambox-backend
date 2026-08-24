@@ -52,7 +52,6 @@ internal sealed class DotTestHarness
             BaseUrl = "https://dot-jo.biz",
             PartnerId = "partner_test",
             ServiceId = "1",
-            OperatorId = "21",
             Username = "test-user",
             Password = "test-pass",
             PublicRedirectUrl = "https://hambox.test/api/payments/dot/callback",
@@ -101,7 +100,7 @@ internal sealed class DotTestHarness
             NullLogger<DotPaymentVerificationService>.Instance);
 
         var callbackHandler = new HandleDotRedirectCallbackCommandHandler(
-            commerceDb, verificationService, dotOptions, NullLogger<HandleDotRedirectCallbackCommandHandler>.Instance);
+            commerceDb, verificationService, NullLogger<HandleDotRedirectCallbackCommandHandler>.Instance);
 
         var notificationHandler = new HandleDotNotificationCommandHandler(
             commerceDb, verificationService, NullLogger<HandleDotNotificationCommandHandler>.Instance);

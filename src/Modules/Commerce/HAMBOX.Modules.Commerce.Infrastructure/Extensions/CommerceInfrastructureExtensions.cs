@@ -51,7 +51,7 @@ public static class CommerceInfrastructureExtensions
 
         services.Configure<DotSettings>(configuration.GetSection(DotSettings.SectionName));
         services.AddSingleton<IValidateOptions<DotSettings>, DotSettingsValidator>();
-        services.AddScoped<IDotPricePointResolver, NotConfiguredDotPricePointResolver>();
+        services.AddScoped<IDotPricePointResolver, DotPricePointResolver>();
         services.AddHttpClient<IDotPaymentGateway, DotPaymentGateway>((sp, client) =>
             {
                 var dotSettings = sp.GetRequiredService<IOptions<DotSettings>>().Value;

@@ -33,7 +33,7 @@ internal static class DotPaymentEndpoints
             [FromBody] InitiateDotCheckoutRequest request,
             ISender sender) =>
         {
-            var result = await sender.Send(new InitiateDotCheckoutCommand(request.Email, request.Country));
+            var result = await sender.Send(new InitiateDotCheckoutCommand(request.Email, request.Country, request.Wallet));
 
             if (result.IsSuccess)
             {
@@ -135,7 +135,8 @@ internal static class DotPaymentEndpoints
     }
 }
 
-internal sealed record InitiateDotCheckoutRequest(string Email, string Country);
+/// <param name="Wallet">One of "OrangeCash", "VodafoneCash" (a <c>DotWalletOperator</c> member name).</param>
+internal sealed record InitiateDotCheckoutRequest(string Email, string Country, string Wallet);
 
 internal sealed record DotNotificationRequest(
     string? DotTransId,

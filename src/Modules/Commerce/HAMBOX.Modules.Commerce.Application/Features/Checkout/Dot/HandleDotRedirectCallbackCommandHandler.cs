@@ -1,19 +1,16 @@
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
-using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Commerce.Application.Features.Checkout.Dot;
 
 internal sealed class HandleDotRedirectCallbackCommandHandler(
     ICommerceDbContext commerceDbContext,
     DotPaymentVerificationService verificationService,
-    IOptions<DotSettings> dotOptions,
     ILogger<HandleDotRedirectCallbackCommandHandler> logger)
     : IRequestHandler<HandleDotRedirectCallbackCommand, Result<Guid>>
 {
@@ -33,11 +30,13 @@ internal sealed class HandleDotRedirectCallbackCommandHandler(
             return Result.Failure<Guid>(CommerceErrors.DotCallbackInvalid);
         }
 
-        var settings = dotOptions.Value;
+        // Sanity-check against the per-attempt operator/service context this attempt was actually
+        // initiated under (each wallet has its own op_id — see DotWalletOperator) — never a single
+        // fixed configured value.
         var opIdMatches = request.OpId is null || string.Equals(request.OpId.Value.ToString(), attempt.OperatorId, StringComparison.Ordinal);
         var serviceIdMatches = string.IsNullOrWhiteSpace(request.ServiceId) || string.Equals(request.ServiceId, attempt.ServiceId, StringComparison.Ordinal);
 
-        if (!opIdMatches || !serviceIdMatches || !string.Equals(settings.OperatorId, attempt.OperatorId, StringComparison.Ordinal))
+        if (!opIdMatches || !serviceIdMatches)
         {
             // Doesn't match the operator/service context this attempt was actually initiated
             // under. Never let a mismatched callback trigger verification of a different attempt —

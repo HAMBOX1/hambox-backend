@@ -16,6 +16,9 @@ internal sealed class FakeDotPaymentGateway : IDotPaymentGateway
 
     public List<string> StatusCheckCalls { get; } = [];
 
+    /// <summary>The <c>operatorId</c> passed on each Check Transaction Status call, in call order — parallel to <see cref="StatusCheckCalls"/>.</summary>
+    public List<string> StatusCheckOperatorIds { get; } = [];
+
     public DotAccessTokenResult AccessTokenResult { get; set; } = new(0, "Token generated successfully", "fake-token");
 
     public bool FailAccessToken { get; set; }
@@ -39,18 +42,20 @@ internal sealed class FakeDotPaymentGateway : IDotPaymentGateway
         $"&partner_tx_timestamp={originalRequest.PartnerTxTimestampUnix}&amount={originalRequest.Amount}";
 
     public Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
-        string partnerTxId, CancellationToken cancellationToken = default)
+        string partnerTxId, string operatorId, CancellationToken cancellationToken = default)
     {
         StatusCheckCalls.Add(partnerTxId);
+        StatusCheckOperatorIds.Add(operatorId);
         return Task.FromResult(FailStatusCheck
             ? Result.Failure<DotTransactionStatusResult>(CommerceErrors.DotProviderUnavailable)
             : Result.Success(StatusResult));
     }
 
     public Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByDotTxIdAsync(
-        string dotTxId, CancellationToken cancellationToken = default)
+        string dotTxId, string operatorId, CancellationToken cancellationToken = default)
     {
         StatusCheckCalls.Add(dotTxId);
+        StatusCheckOperatorIds.Add(operatorId);
         return Task.FromResult(FailStatusCheck
             ? Result.Failure<DotTransactionStatusResult>(CommerceErrors.DotProviderUnavailable)
             : Result.Success(StatusResult));

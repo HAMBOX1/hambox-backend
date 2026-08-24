@@ -14,24 +14,22 @@ internal sealed class CheckoutConfigurationProvider(
 {
     public bool IsDevelopmentCheckoutEnabled => environment.IsDevelopment();
 
-    // Settings alone aren't enough to know DOT checkout will actually work — the pricing model
-    // (fixed price point vs. arbitrary amount) hasn't been confirmed with the client yet, so the
-    // real signal is whether something other than the default "not configured" stub resolver is
-    // registered. See IDotPricePointResolver for the full rationale.
+    // Settings alone aren't enough to know DOT checkout will actually work — the real signal is
+    // whether something other than the default "not configured" stub resolver is registered. See
+    // IDotPricePointResolver for the full rationale. Gates the OTP redirect product shared by
+    // Orange Cash (opId 117) and Vodafone Cash (opId 114) — see DotWalletOperator; Fawry is a
+    // separate product, gated by IsDotFawryCheckoutEnabled below.
     public bool IsDotCheckoutEnabled =>
         dotPricePointResolver is not NotConfiguredDotPricePointResolver
         && !string.IsNullOrWhiteSpace(dotOptions.Value.PartnerId)
         && !string.IsNullOrWhiteSpace(dotOptions.Value.ServiceId)
-        && !string.IsNullOrWhiteSpace(dotOptions.Value.OperatorId)
         && !string.IsNullOrWhiteSpace(dotOptions.Value.PublicRedirectUrl)
         && !string.IsNullOrWhiteSpace(dotOptions.Value.FrontendResultUrl);
 
-    // Same gate, for the separate DOT Fawry Direct Billing product — now shared by all three
-    // Egyptian mobile wallets (Fawry, Orange Cash, Vodafone Cash), since they use the same
-    // partner/service credentials and only differ by opId (DotFawryWalletOperator, a fixed
-    // provider-confirmed constant, not per-environment config). The charge currency (EGP) is
-    // resolved (DotFawryChargeAmountResolver) — this now just confirms real partner credentials are
-    // configured, and still lets ops force-disable all three wallets at once by registering
+    // Same gate, for the separate DOT Fawry Direct Billing product (Fawry only — Orange Cash and
+    // Vodafone Cash go through the OTP redirect product above instead, per DOT). The charge
+    // currency (EGP) is resolved (DotFawryChargeAmountResolver) — this now just confirms real
+    // partner credentials are configured, and still lets ops force-disable Fawry by registering
     // NotConfiguredDotFawryChargeAmountResolver in its place without touching anything else.
     public bool IsDotFawryCheckoutEnabled =>
         dotFawryChargeAmountResolver is not NotConfiguredDotFawryChargeAmountResolver

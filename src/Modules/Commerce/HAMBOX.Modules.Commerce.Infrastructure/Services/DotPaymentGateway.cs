@@ -37,7 +37,7 @@ internal sealed class DotPaymentGateway(
             $"partner_id={Uri.EscapeDataString(settings.PartnerId)}",
             $"service_id={Uri.EscapeDataString(settings.ServiceId)}",
             $"partner_txid={Uri.EscapeDataString(request.PartnerTxId)}",
-            $"op_id={Uri.EscapeDataString(settings.OperatorId)}",
+            $"op_id={Uri.EscapeDataString(request.OperatorId)}",
             $"rurl={Uri.EscapeDataString(request.RedirectUrl)}",
             $"amount={request.Amount.ToString(CultureInfo.InvariantCulture)}");
 
@@ -67,21 +67,21 @@ internal sealed class DotPaymentGateway(
     }
 
     public Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
-        string partnerTxId, CancellationToken cancellationToken = default) =>
-        CheckTransactionStatusAsync(StatusByPartnerTxIdPathTemplate, partnerTxId, cancellationToken);
+        string partnerTxId, string operatorId, CancellationToken cancellationToken = default) =>
+        CheckTransactionStatusAsync(StatusByPartnerTxIdPathTemplate, partnerTxId, operatorId, cancellationToken);
 
     public Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByDotTxIdAsync(
-        string dotTxId, CancellationToken cancellationToken = default) =>
-        CheckTransactionStatusAsync(StatusByDotTxIdPathTemplate, dotTxId, cancellationToken);
+        string dotTxId, string operatorId, CancellationToken cancellationToken = default) =>
+        CheckTransactionStatusAsync(StatusByDotTxIdPathTemplate, dotTxId, operatorId, cancellationToken);
 
     private async Task<Result<DotTransactionStatusResult>> CheckTransactionStatusAsync(
-        string pathTemplate, string transactionIdentifier, CancellationToken cancellationToken)
+        string pathTemplate, string transactionIdentifier, string operatorId, CancellationToken cancellationToken)
     {
         var settings = optionsAccessor.Value;
         var path = string.Format(
             CultureInfo.InvariantCulture,
             pathTemplate,
-            Uri.EscapeDataString(settings.OperatorId),
+            Uri.EscapeDataString(operatorId),
             Uri.EscapeDataString(settings.ServiceId),
             Uri.EscapeDataString(transactionIdentifier));
 
