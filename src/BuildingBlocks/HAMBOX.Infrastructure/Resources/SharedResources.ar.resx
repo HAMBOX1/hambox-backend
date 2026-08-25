@@ -24,6 +24,12 @@
   <data name="Errors.Unauthorized.Detail" xml:space="preserve">
     <value>ليس لديك صلاحية لتنفيذ هذا الإجراء.</value>
   </data>
+  <data name="Errors.AuthenticationRequired.Title" xml:space="preserve">
+    <value>تسجيل الدخول مطلوب</value>
+  </data>
+  <data name="Errors.AuthenticationRequired.Detail" xml:space="preserve">
+    <value>يرجى تسجيل الدخول للمتابعة.</value>
+  </data>
   <data name="Errors.Internal.Title" xml:space="preserve">
     <value>خطأ داخلي في الخادم</value>
   </data>

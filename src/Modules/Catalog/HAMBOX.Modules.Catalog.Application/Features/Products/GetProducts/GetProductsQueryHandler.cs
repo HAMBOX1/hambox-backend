@@ -70,6 +70,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 p.CreatedOnUtc,
                 p.PublicReleaseOnUtc,
                 CollectionIds = p.Collections.Select(pc => pc.CollectionId).ToList(),
+                p.LastEditedByName,
+                p.LastEditedOnUtc,
             })
             .ToListAsync(cancellationToken);
 
@@ -108,7 +110,9 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     r.PublicReleaseOnUtc,
                     access.IsRestricted,
                     canPurchase,
-                    access.RequiredPlanNames);
+                    access.RequiredPlanNames,
+                    LastEditedByName: _currentUser.IsAdminContext ? r.LastEditedByName : null,
+                    LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null);
             })
             .ToList();
 

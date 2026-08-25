@@ -70,12 +70,14 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
                 order.SetAdminStatus(status);
 
                 var actorId = _currentUserService.UserId ?? "system";
+                var actorName = _currentUserService.DisplayName ?? actorId;
                 _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
                     order.Id,
                     "StatusChanged",
                     $"Order status changed to {command.Request.Status}.",
                     actorId,
-                    actorId));
+                    actorName));
+                order.RecordAdminEdit(actorId, actorName);
 
                 await _dbContext.SaveChangesAsync(ct);
 

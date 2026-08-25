@@ -60,6 +60,7 @@ public sealed record TicketCustomerContextDto(
     string? MembershipStatus,
     DateTime? MembershipExpiresOnUtc,
     IReadOnlyList<TicketContextOrderDto> RecentOrders,
+    Guid? RelatedOrderId,
     string? RelatedOrderNumber,
     string? RelatedProductName,
     string? CustomerCountry,

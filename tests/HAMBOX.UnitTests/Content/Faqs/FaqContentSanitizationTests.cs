@@ -26,7 +26,9 @@ public sealed class FaqContentSanitizationTests
     private sealed class FakeCurrentUserService : ICurrentUserService
     {
         public string? UserId => "test-user";
+        public string? DisplayName => null;
         public bool IsAuthenticated => true;
+        public bool IsAdminContext => true;
     }
 
     private static readonly ICurrentUserService CurrentUser = new FakeCurrentUserService();

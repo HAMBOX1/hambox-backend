@@ -57,7 +57,9 @@ public sealed class CampaignLifecycleTests : IDisposable
     private sealed class FakeCurrentUser : ICurrentUserService
     {
         public string? UserId => "test-admin";
+        public string? DisplayName => "test-admin@hambox.test";
         public bool IsAuthenticated => true;
+        public bool IsAdminContext => true;
     }
 
     private static async Task<StoreTheme> SeedThemeAsync(ThemesDbContext db, string slug, bool published = true)

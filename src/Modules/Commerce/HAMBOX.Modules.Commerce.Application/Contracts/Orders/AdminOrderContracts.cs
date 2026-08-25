@@ -14,7 +14,9 @@ public sealed record AdminOrderListItemDto(
     string DeliveryStatus,
     decimal MembershipDiscount,
     string? CouponCode,
-    DateTimeOffset PurchaseDate);
+    DateTimeOffset PurchaseDate,
+    string? LastEditedByName,
+    DateTimeOffset? LastEditedOnUtc);
 
 public sealed record AdminOrderStatisticsDto(
     int TodaysOrders,
@@ -50,7 +52,9 @@ public sealed record AdminOrderDetailDto(
     IReadOnlyList<AdminOrderPaymentCallbackDto> PaymentCallbacks,
     IReadOnlyList<AdminCustomerOrderHistoryItemDto> CustomerOrderHistory,
     string? InvoiceUrl,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    string? LastEditedByName,
+    DateTimeOffset? LastEditedOnUtc);
 
 public sealed record AdminOrderItemDto(
     Guid Id,

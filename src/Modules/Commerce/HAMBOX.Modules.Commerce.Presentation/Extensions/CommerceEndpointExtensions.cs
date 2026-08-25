@@ -30,6 +30,7 @@ public static class CommerceEndpointExtensions
         app.MapPromotionEndpoints(apiVersionSet);
         app.MapMembershipEndpoints(apiVersionSet);
         app.MapOrderManagementEndpoints(apiVersionSet);
+        app.MapAdminReferralEndpoints(apiVersionSet);
         app.MapDashboardEndpoints(apiVersionSet);
         app.MapOperationsEndpoints(apiVersionSet);
         app.MapAnalyticsEndpoints(apiVersionSet);

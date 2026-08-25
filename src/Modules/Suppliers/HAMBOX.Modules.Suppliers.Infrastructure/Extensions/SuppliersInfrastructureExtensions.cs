@@ -5,6 +5,7 @@ using HAMBOX.Modules.Suppliers.Application.Options;
 using HAMBOX.Modules.Suppliers.Infrastructure.BackgroundJobs.Handlers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Persistence;
 using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Bamboo;
+using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Visoria;
 using HAMBOX.Modules.Suppliers.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ public static class SuppliersInfrastructureExtensions
         // line like this — no other file in the module needs to change.
         services.AddScoped<ISupplierProvider, ManualSupplierProvider>();
         services.AddScoped<ISupplierProvider, BambooSupplierProvider>();
+        services.AddScoped<ISupplierProvider, VisoriaSupplierProvider>();
         services.AddScoped<ISupplierProviderRegistry, SupplierProviderRegistry>();
 
         // Non-secret HTTP tuning only — Bamboo credentials come from the encrypted Supplier entity per
@@ -45,6 +47,22 @@ public static class SuppliersInfrastructureExtensions
                 var bambooOptions = sp.GetRequiredService<IOptions<BambooProviderOptions>>().Value;
                 client.Timeout = TimeSpan.FromSeconds(bambooOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = bambooOptions.MaxResponseBytes;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        // Same non-secret-only shape as Bamboo above — Visoria's API key lives only in the encrypted
+        // Supplier.BearerToken column, never in configuration.
+        services.AddSingleton<IValidateOptions<VisoriaProviderOptions>, VisoriaProviderOptionsValidator>();
+        services.AddOptions<VisoriaProviderOptions>()
+            .Bind(configuration.GetSection(VisoriaProviderOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddHttpClient<VisoriaHttpClient>((sp, client) =>
+            {
+                client.BaseAddress = new Uri(VisoriaProviderConstants.BaseUrl);
+                var visoriaOptions = sp.GetRequiredService<IOptions<VisoriaProviderOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(visoriaOptions.RequestTimeoutSeconds);
+                client.MaxResponseContentBufferSize = visoriaOptions.MaxResponseBytes;
             })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 

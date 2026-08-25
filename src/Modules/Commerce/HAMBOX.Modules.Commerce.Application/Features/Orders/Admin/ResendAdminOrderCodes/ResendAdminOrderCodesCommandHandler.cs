@@ -31,7 +31,6 @@ internal sealed class ResendAdminOrderCodesCommandHandler : IRequestHandler<Rese
     public async Task<Result> Handle(ResendAdminOrderCodesCommand command, CancellationToken cancellationToken)
     {
         var order = await _dbContext.Orders
-            .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken);
 
         if (order is null)
@@ -50,12 +49,14 @@ internal sealed class ResendAdminOrderCodesCommandHandler : IRequestHandler<Rese
         }
 
         var actorId = _currentUserService.UserId ?? "system";
+        var actorName = _currentUserService.DisplayName ?? actorId;
         _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
             order.Id,
             "CodesResent",
             "Digital delivery codes were resent to the customer.",
             actorId,
-            actorId));
+            actorName));
+        order.RecordAdminEdit(actorId, actorName);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

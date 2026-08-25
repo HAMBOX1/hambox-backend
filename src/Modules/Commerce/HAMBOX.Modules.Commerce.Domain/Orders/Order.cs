@@ -119,6 +119,22 @@ public sealed class Order : AggregateRoot
     public Guid? MembershipSubscriptionId { get; private set; }
 
     /// <summary>
+    /// Gets the identifier of the admin who last edited this order (status change, note, refund,
+    /// manual code assignment, code resend, or fulfillment retry) via the admin order management UI.
+    /// </summary>
+    public string? LastEditedByUserId { get; private set; }
+
+    /// <summary>
+    /// Gets the display name (email) of the admin who last edited this order. See <see cref="LastEditedByUserId"/>.
+    /// </summary>
+    public string? LastEditedByName { get; private set; }
+
+    /// <summary>
+    /// Gets when the order was last edited by an admin. See <see cref="LastEditedByUserId"/>.
+    /// </summary>
+    public DateTimeOffset? LastEditedOnUtc { get; private set; }
+
+    /// <summary>
     /// Gets the order line items.
     /// </summary>
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
@@ -213,6 +229,18 @@ public sealed class Order : AggregateRoot
     }
 
     public void LinkMembershipSubscription(Guid subscriptionId) => MembershipSubscriptionId = subscriptionId;
+
+    /// <summary>
+    /// Records that an admin edited this order, for "last edited by" display.
+    /// </summary>
+    /// <param name="userId">The editing admin's user identifier.</param>
+    /// <param name="displayName">The editing admin's display name (email).</param>
+    public void RecordAdminEdit(string? userId, string? displayName)
+    {
+        LastEditedByUserId = userId;
+        LastEditedByName = displayName;
+        LastEditedOnUtc = DateTimeOffset.UtcNow;
+    }
 
     /// <summary>
     /// Records a successful payment before order completion.

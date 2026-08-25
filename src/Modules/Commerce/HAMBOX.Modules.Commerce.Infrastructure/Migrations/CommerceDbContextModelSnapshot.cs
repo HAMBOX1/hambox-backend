@@ -1212,6 +1212,17 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("LastEditedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastEditedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("LastEditedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("MembershipAction")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");

@@ -12,5 +12,11 @@ public sealed class NullCurrentUserService : ICurrentUserService
     public string? UserId => null;
 
     /// <inheritdoc />
+    public string? DisplayName => null;
+
+    /// <inheritdoc />
     public bool IsAuthenticated => false;
+
+    /// <inheritdoc />
+    public bool IsAdminContext => false;
 }

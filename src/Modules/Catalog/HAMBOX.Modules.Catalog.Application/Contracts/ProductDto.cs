@@ -30,6 +30,8 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="IsMembersOnly">True if the product is restricted to one or more membership plans (Exclusive Products benefit), regardless of the current viewer.</param>
 /// <param name="CanPurchase">True if the current viewer may purchase this product right now (both membership-restriction and release-date gates satisfied).</param>
 /// <param name="RequiredPlanNames">When <see cref="IsMembersOnly"/> is true, the plan(s) that grant access — used for the upgrade CTA.</param>
+/// <param name="LastEditedByName">The display name (email) of the admin who last edited this product's own fields, if ever edited since creation.</param>
+/// <param name="LastEditedOnUtc">When the product was last edited by an admin, if ever edited since creation.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -52,4 +54,6 @@ public sealed record ProductDto(
     DateTime? PublicReleaseOnUtc = null,
     bool IsMembersOnly = false,
     bool CanPurchase = true,
-    IReadOnlyList<string>? RequiredPlanNames = null);
+    IReadOnlyList<string>? RequiredPlanNames = null,
+    string? LastEditedByName = null,
+    DateTimeOffset? LastEditedOnUtc = null);

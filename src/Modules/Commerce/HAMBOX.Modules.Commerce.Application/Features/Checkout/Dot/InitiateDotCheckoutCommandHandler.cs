@@ -177,7 +177,11 @@ internal sealed class InitiateDotCheckoutCommandHandler(
 
         commerceDbContext.Orders.Add(order);
         commerceDbContext.PaymentAttempts.Add(paymentAttempt);
-        cart.Clear();
+
+        // Cart is deliberately NOT cleared here: the customer hasn't paid yet (they're about to be
+        // redirected to the carrier for OTP). Clearing it now would strand them with an empty cart
+        // if the payment ultimately fails. DotPaymentVerificationService clears it once payment is
+        // actually confirmed — see its VerifyAndFinalizeAsync success path.
 
         // Persist the Pending order + attempt before ever calling out to DOT: if the process
         // crashes after the DOT call but before this save, we'd otherwise have a partner_txid DOT

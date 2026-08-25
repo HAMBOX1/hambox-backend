@@ -138,6 +138,13 @@ public sealed class DotPaymentVerificationService(
             order.RecordPayment("Dot", providerTransactionId);
             RecordAudit(order.Id, "VerificationSucceeded", "Paid", attempt, status.ResultDesc);
 
+            // Only clear the cart now that payment is authoritatively confirmed — see the matching
+            // comment in InitiateDotCheckoutCommandHandler for why it isn't cleared at initiation.
+            var cart = await commerceDbContext.ShoppingCarts
+                .Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.UserId == order.UserId, ct);
+            cart?.Clear();
+
             if (!string.IsNullOrWhiteSpace(attempt.PendingPromotionsJson))
             {
                 var appliedPromotions = JsonSerializer.Deserialize<List<AppliedPromotionDto>>(attempt.PendingPromotionsJson) ?? [];

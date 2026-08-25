@@ -66,12 +66,14 @@ internal sealed class AssignAdminOrderManualCodeCommandHandler
         }
 
         var actorId = _currentUserService.UserId ?? "system";
+        var actorName = _currentUserService.DisplayName ?? actorId;
         _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
             order.Id,
             "ManualCodeAssigned",
             "A digital code was manually assigned to an order line item.",
             actorId,
-            actorId));
+            actorName));
+        order.RecordAdminEdit(actorId, actorName);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

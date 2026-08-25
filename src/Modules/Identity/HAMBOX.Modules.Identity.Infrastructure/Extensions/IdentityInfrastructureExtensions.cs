@@ -6,6 +6,7 @@ using FluentValidation;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
+using HAMBOX.Infrastructure.Resources;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Features.Register;
@@ -26,11 +27,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -191,7 +194,45 @@ public static class IdentityInfrastructureExtensions
                             context.Fail("The session has ended.");
                         }
                     }
-                }
+                },
+                // Without these, a missing/expired token or a failed permission check returns a bare
+                // 401/403 with no response body — the frontend then has nothing to show the user but
+                // a raw "Http failure response ... 401/403" message. Both shapes match what
+                // parseApiError already parses (ProblemDetails via the `detail` field), so no frontend
+                // change is needed to surface them.
+                OnChallenge = async context =>
+                {
+                    context.HandleResponse();
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/problem+json";
+
+                    var localizer = context.HttpContext.RequestServices
+                        .GetRequiredService<IStringLocalizer<SharedResources>>();
+
+                    await context.Response.WriteAsJsonAsync(new ProblemDetails
+                    {
+                        Status = StatusCodes.Status401Unauthorized,
+                        Title = localizer["Errors.AuthenticationRequired.Title"].Value,
+                        Detail = localizer["Errors.AuthenticationRequired.Detail"].Value,
+                        Type = "https://tools.ietf.org/html/rfc7235#section-3.1",
+                    });
+                },
+                OnForbidden = async context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    context.Response.ContentType = "application/problem+json";
+
+                    var localizer = context.HttpContext.RequestServices
+                        .GetRequiredService<IStringLocalizer<SharedResources>>();
+
+                    await context.Response.WriteAsJsonAsync(new ProblemDetails
+                    {
+                        Status = StatusCodes.Status403Forbidden,
+                        Title = localizer["Errors.Unauthorized.Title"].Value,
+                        Detail = localizer["Errors.Unauthorized.Detail"].Value,
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                    });
+                },
             };
         });
 

@@ -42,12 +42,13 @@ internal sealed class RevealAdminOrderLicenseKeyQueryHandler
         }
 
         var actorId = _currentUserService.UserId ?? "system";
+        var actorName = _currentUserService.DisplayName ?? actorId;
         _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
             request.OrderId,
             "LicenseKeyRevealed",
             "An administrator revealed a license key.",
             actorId,
-            actorId));
+            actorName));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

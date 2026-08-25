@@ -166,3 +166,64 @@ public sealed record SupplierCatalogSearchResultDto(
     bool IsSuccess,
     IReadOnlyList<SupplierCatalogItemDto> Items,
     string? Message);
+
+/// <summary>One row of the Map Products workspace table — a HAMBOX product variant next to this supplier's resolved mapping, if any.</summary>
+public sealed record SupplierMappingCandidateDto(
+    Guid ProductId,
+    string ProductName,
+    string CategoryName,
+    Guid VariantId,
+    string VariantDisplayName,
+    string VariantSku,
+    Guid? ExistingMappingId,
+    string? ExternalProductId,
+    string? ExternalName,
+    decimal? BuyingPrice,
+    string? Currency,
+    string? AvailabilityState);
+
+public sealed record SupplierMappingCandidatesSummaryDto(
+    int EligibleCount,
+    int MappedCount,
+    int UnmappedCount);
+
+/// <summary>Result of live auto-matching one candidate against a supplier's catalog. <see cref="ConfidenceTier"/> is "High"/"Medium"/"None".</summary>
+public sealed record SupplierMappingSuggestionDto(
+    Guid ProductId,
+    Guid VariantId,
+    SupplierCatalogItemDto? BestMatch,
+    int ConfidenceScore,
+    string ConfidenceTier);
+
+public sealed record BulkMappingFailureDto(
+    Guid ProductId,
+    Guid? VariantId,
+    string ErrorCode,
+    string ErrorMessage);
+
+public sealed record BulkCreateSupplierMappingsResultDto(
+    IReadOnlyList<Guid> CreatedMappingIds,
+    IReadOnlyList<BulkMappingFailureDto> Failures);
+
+/// <summary><see cref="Status"/> is one of "Unmapped"/"MappingError"/"SupplierUnavailable"/"PartiallyMapped"/"FullyMapped".</summary>
+public sealed record ProductSupplierMappingStatusDto(
+    string Status,
+    int MappedVariantCount,
+    int TotalVariantCount,
+    string? PrimarySupplierName);
+
+/// <summary>One product variant's resolved supplier mapping, or all-null fields when <see cref="MappingStatus"/> is "Unmapped".</summary>
+public sealed record ProductVariantSupplierMappingDto(
+    Guid VariantId,
+    string VariantDisplayName,
+    string VariantSku,
+    Guid? MappingId,
+    Guid? SupplierId,
+    string? SupplierName,
+    string? ExternalProductId,
+    string? ExternalName,
+    decimal? BuyingPrice,
+    string? Currency,
+    int? Priority,
+    string? AvailabilityState,
+    string MappingStatus);

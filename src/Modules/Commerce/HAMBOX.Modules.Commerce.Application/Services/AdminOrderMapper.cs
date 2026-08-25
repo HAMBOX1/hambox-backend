@@ -144,7 +144,9 @@ public static class AdminOrderMapper
             ResolveDeliveryStatus(order, licenseKeys),
             ResolveMembershipDiscount(promotions),
             ResolveCouponCode(promotions),
-            order.CreatedOnUtc);
+            order.CreatedOnUtc,
+            order.LastEditedByName,
+            order.LastEditedOnUtc);
     }
 
     public static IReadOnlyList<AdminOrderTimelineEventDto> BuildTimeline(

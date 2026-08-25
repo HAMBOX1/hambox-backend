@@ -30,17 +30,16 @@ internal sealed class UpsertAdminOrderNoteCommandHandler
         UpsertAdminOrderNoteCommand command,
         CancellationToken cancellationToken)
     {
-        var orderExists = await _dbContext.Orders
-            .AsNoTracking()
-            .AnyAsync(o => o.Id == command.OrderId, cancellationToken);
+        var order = await _dbContext.Orders
+            .FirstOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken);
 
-        if (!orderExists)
+        if (order is null)
         {
             return Result.Failure<AdminOrderAdminNoteDto>(CommerceErrors.OrderNotFound);
         }
 
         var actorId = _currentUserService.UserId ?? "system";
-        var actorName = actorId;
+        var actorName = _currentUserService.DisplayName ?? actorId;
 
         OrderAdminNote? note = null;
         if (command.NoteId is Guid noteId)
@@ -67,6 +66,7 @@ internal sealed class UpsertAdminOrderNoteCommandHandler
             command.NoteId.HasValue ? "An internal admin note was updated." : "An internal admin note was added.",
             actorId,
             actorName));
+        order.RecordAdminEdit(actorId, actorName);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

@@ -65,6 +65,12 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.ModifiedBy)
             .HasMaxLength(256);
 
+        builder.Property(p => p.LastEditedByUserId)
+            .HasMaxLength(450);
+
+        builder.Property(p => p.LastEditedByName)
+            .HasMaxLength(200);
+
         // Soft delete properties (ISoftDeletable)
         builder.Property(p => p.IsDeleted)
             .IsRequired()

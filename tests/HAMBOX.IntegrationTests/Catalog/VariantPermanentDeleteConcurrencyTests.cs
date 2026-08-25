@@ -198,7 +198,9 @@ public sealed class VariantPermanentDeleteConcurrencyTests : IAsyncLifetime
     private sealed class FixedCurrentUser(string? userId) : ICurrentUserService
     {
         public string? UserId { get; } = userId;
+        public string? DisplayName => null;
         public bool IsAuthenticated => UserId is not null;
+        public bool IsAdminContext => UserId is not null;
     }
 
     private sealed class ThrowingPlatformSettingsProvider : IPlatformSettingsProvider

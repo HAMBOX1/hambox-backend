@@ -195,6 +195,14 @@ public static class CommerceErrors
         "Orders.ItemNotFound",
         "The order line item was not found.");
 
+    public static readonly Error ReferralNotFound = new(
+        "Referrals.NotFound",
+        "The referral was not found.");
+
+    public static readonly Error ReferralAlreadyResolved = new(
+        "Referrals.AlreadyResolved",
+        "This referral has already reached a final state and cannot be reversed again.");
+
     public static readonly Error OrderFulfillmentFailed = new(
         "Orders.FulfillmentFailed",
         "Fulfillment could not be completed.");

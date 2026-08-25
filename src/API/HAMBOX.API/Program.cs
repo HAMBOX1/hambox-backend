@@ -1,6 +1,8 @@
+using System.Threading.RateLimiting;
 using Asp.Versioning;
 using HAMBOX.API.Extensions;
 using HAMBOX.Application.Behaviors;
+using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Extensions;
 using HAMBOX.Infrastructure.Currency;
@@ -113,6 +115,42 @@ try
     builder.Services.AddCatalogInfrastructure(builder.Configuration);
     builder.Services.AddCommerceInfrastructure(builder.Configuration);
     builder.Services.AddCommerceApplication();
+
+    // Per-client-IP defense-in-depth on checkout/payment endpoints — additive to (never a
+    // replacement for) the server-side payment verification/idempotency checks that already gate
+    // these paths. Mirrors Identity's own fixed-window rate limiter registration (partitioned per
+    // remote IP, not a single shared bucket — a global, non-partitioned limiter would let one
+    // caller exhaust the limit for every other customer). Registered here rather than inside
+    // AddCommerceInfrastructure: Commerce.Infrastructure is a plain class library and, in this
+    // solution's current package graph, doesn't reliably resolve
+    // Microsoft.AspNetCore.RateLimiting's extension methods on its own (Identity.Infrastructure's
+    // identical call only compiles because it also references
+    // Microsoft.AspNetCore.Authentication.JwtBearer for unrelated JWT setup, which incidentally
+    // pulls in what's missing) — HAMBOX.API is the Web SDK host project, so it always has the full
+    // ASP.NET Core surface. Values are deliberately generous so a customer retrying a failed card,
+    // or a PSP resending a webhook, is never blocked.
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddPolicy(CommerceRateLimitPolicies.CheckoutInitiation, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromSeconds(60),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
+        options.AddPolicy(CommerceRateLimitPolicies.PaymentCallback, httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromSeconds(60),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+    });
     builder.Services.AddCommerceRealtime();
     builder.Services.AddThemesInfrastructure(builder.Configuration);
     builder.Services.AddLegalInfrastructure(builder.Configuration);
@@ -152,11 +190,12 @@ try
 
     // nginx runs on the host and proxies to this container's published port; Docker's own NAT makes
     // that connection appear to originate from the bridge network's gateway (not from loopback), so
-    // the default KnownIPNetworks (loopback-only) never trusts nginx's X-Forwarded-For — every
-    // request then reports RemoteIpAddress as the docker bridge gateway. This breaks anything keyed
-    // on the real client IP, notably DotNotificationIpAllowlist (DOT/DOT Fawry payment webhooks —
-    // every real call gets rejected with 403). Trust the private Docker bridge range so the
-    // forwarded header is honored.
+    // the default KnownIPNetworks (loopback-only) never trusts nginx's X-Forwarded-For — every request
+    // then reports RemoteIpAddress as the docker bridge gateway. This breaks anything keyed on the
+    // real client IP: DotNotificationIpAllowlist (DOT/DOT Fawry webhook — every real call gets 403)
+    // and the CheckoutInitiation/PaymentCallback rate limiters (every real caller collapses into one
+    // shared partition, tripping 503s under normal traffic). Trust the private Docker bridge range so
+    // the forwarded header is honored.
     var forwardedHeadersOptions = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
@@ -206,6 +245,7 @@ try
     // ──── Middleware Pipeline (order matters) ──────────────────
     app.UseSerilogRequestLoggingMiddleware();
     app.UseCorrelationId();
+    app.UseSecurityHeaders();
     app.UseCountryResolution();
     app.UseSecurityEnforcement();
     app.UseHamboxLocalization();
@@ -218,6 +258,7 @@ try
     // Avoid 307 redirects to HTTPS in dev — they break the Angular proxy and strip Authorization headers.
     if (!app.Environment.IsDevelopment())
     {
+        app.UseHsts();
         app.UseHttpsRedirection();
     }
 
@@ -233,6 +274,21 @@ try
     {
         Directory.CreateDirectory(uploadsRoot);
     }
+
+    // The DataProtection keyring (which encrypts every inventory code / license key at rest) is
+    // persisted under this same uploads root so it survives redeploys — see the PersistKeysToFileSystem
+    // call in AddSharedInfrastructure. It must never be servable over HTTP: block that one segment
+    // before the static file middleware gets a chance to serve it.
+    app.Use(async (context, next) =>
+    {
+        if (InfrastructureExtensions.IsDataProtectionKeysRequest(context.Request.Path, fileStorageSettings.PublicBasePath))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await next();
+    });
 
     app.UseStaticFiles(new StaticFileOptions
     {
@@ -272,3 +328,10 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+/// <summary>
+/// Exposes the top-level-statement-generated entry point so <c>WebApplicationFactory&lt;Program&gt;</c>
+/// can boot this host in integration tests (see <c>HAMBOX.IntegrationTests</c>). Declaring this partial
+/// class has no effect on runtime behavior.
+/// </summary>
+public partial class Program;

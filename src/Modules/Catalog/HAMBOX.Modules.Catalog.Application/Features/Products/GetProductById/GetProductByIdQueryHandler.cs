@@ -59,7 +59,8 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
             categoryEffectiveImageUrl: category?.EffectiveImageUrl,
             isMembersOnly: productAccess.IsRestricted,
             canPurchase: canPurchase,
-            requiredPlanNames: productAccess.RequiredPlanNames));
+            requiredPlanNames: productAccess.RequiredPlanNames,
+            isAdminContext: _currentUser.IsAdminContext));
     }
 
     internal static bool IsReleasedFor(DateTime? publicReleaseOnUtc, MembershipAccessInfo access)

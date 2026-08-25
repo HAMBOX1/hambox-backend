@@ -3,6 +3,7 @@ using HAMBOX.Application.Communication;
 using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
+using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -273,6 +274,65 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
             default:
                 // Already Expired/Reversed — idempotent no-op.
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Staff-initiated override for the Referral.Manage permission: voids a still-Pending referral,
+    /// or reverses a Qualified/Rewarded one and claws back any points already awarded. Unlike
+    /// <see cref="ReverseForOrderAsync"/> this isn't triggered by an order event — an admin looked up
+    /// the referral directly (fraud review, a support ticket, a data-entry mistake).
+    /// </summary>
+    public async Task<Result> AdminReverseAsync(Guid referralHistoryEntryId, string actorUserId, CancellationToken cancellationToken)
+    {
+        var entry = await _db.ReferralHistoryEntries
+            .FirstOrDefaultAsync(h => h.Id == referralHistoryEntryId, cancellationToken);
+
+        if (entry is null)
+        {
+            return Result.Failure(CommerceErrors.ReferralNotFound);
+        }
+
+        switch (entry.Status)
+        {
+            case ReferralStatus.Pending:
+                var voided = await TryTransitionAsync(
+                    entry,
+                    entry.MarkExpired,
+                    ReferralAuditAction.Expired,
+                    points: null,
+                    actorUserId,
+                    "Manually voided by an administrator.",
+                    cancellationToken);
+
+                return voided ? Result.Success() : Result.Failure(CommerceErrors.ReferralAlreadyResolved);
+
+            case ReferralStatus.Qualified or ReferralStatus.Rewarded:
+                var pointsToClawBack = entry.PointsEarned;
+
+                var reversed = await TryTransitionAsync(
+                    entry,
+                    entry.Reverse,
+                    ReferralAuditAction.Reversed,
+                    points: pointsToClawBack > 0 ? -pointsToClawBack : null,
+                    actorUserId,
+                    "Manually reversed by an administrator.",
+                    cancellationToken);
+
+                if (!reversed)
+                {
+                    return Result.Failure(CommerceErrors.ReferralAlreadyResolved);
+                }
+
+                if (pointsToClawBack > 0)
+                {
+                    await _rewardService.ReverseAsync(entry.ReferrerUserId, pointsToClawBack, cancellationToken);
+                }
+
+                return Result.Success();
+
+            default:
+                return Result.Failure(CommerceErrors.ReferralAlreadyResolved);
         }
     }
 

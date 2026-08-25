@@ -1296,6 +1296,17 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("LastEditedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastEditedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("LastEditedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");

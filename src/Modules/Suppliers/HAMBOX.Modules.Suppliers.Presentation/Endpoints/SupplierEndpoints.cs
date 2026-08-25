@@ -103,6 +103,20 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new DeleteSupplierCommand(id))))
             .RequirePermission(PermissionConstants.Suppliers.Delete);
 
+        // Cross-supplier product mapping status — consumed by the Catalog product list's Supplier
+        // Mapping column/filter, so gated on the Catalog permission rather than Suppliers.View, mirroring
+        // the fulfillment-chain endpoint above.
+        group.MapPost("product-mapping-status", async Task<IResult> (
+                [FromBody] GetSupplierMappingStatusForProductsRequest request, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingStatusForProductsQuery(request.ProductIds))))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
+        // Per-variant mapping breakdown for one product — the product-centric mapping drawer's and the
+        // product edit page's Supplier Fulfillment card's shared data source.
+        group.MapGet("product-mappings", async Task<IResult> ([FromQuery] Guid productId, ISender sender) =>
+            MapResult(await sender.Send(new GetProductVariantSupplierMappingsQuery(productId))))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
+
         var mappings = app.MapGroup("api/v{version:apiVersion}/suppliers/{supplierId:guid}/mappings")
             .WithApiVersionSet(apiVersionSet)
             .WithTags("Suppliers")
@@ -129,9 +143,40 @@ internal static class SupplierEndpoints
         mappings.MapDelete("{mappingId:guid}", async Task<IResult> (Guid supplierId, Guid mappingId, ISender sender) =>
             MapResult(await sender.Send(new DeleteSupplierMappingCommand(supplierId, mappingId))))
             .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
+        // The Map Products workspace — same ManageMappings gate as the rest of this group and the
+        // frontend route (:id/map-products) that hosts it.
+        var mappingsRoot = app.MapGroup("api/v{version:apiVersion}/suppliers/{supplierId:guid}")
+            .WithApiVersionSet(apiVersionSet)
+            .WithTags("Suppliers")
+            .HasApiVersion(1)
+            .RequireAuthorization();
+
+        mappingsRoot.MapGet("mapping-candidates", async Task<IResult> (
+                Guid supplierId, [FromQuery] string? search, [FromQuery] string? status,
+                [FromQuery] int page, [FromQuery] int pageSize, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingCandidatesQuery(
+                supplierId, search, status, page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
+        mappingsRoot.MapGet("mapping-candidates/summary", async Task<IResult> (Guid supplierId, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierMappingCandidatesSummaryQuery(supplierId))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
+        mappingsRoot.MapPost("mappings/suggest", async Task<IResult> (
+                Guid supplierId, [FromBody] IReadOnlyList<SuggestionCandidate> candidates, ISender sender) =>
+            MapResult(await sender.Send(new SuggestSupplierMappingsQuery(supplierId, candidates))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
+
+        mappingsRoot.MapPost("mappings/bulk", async Task<IResult> (
+                Guid supplierId, [FromBody] IReadOnlyList<CreateSupplierMappingRequest> requests, ISender sender) =>
+            MapResult(await sender.Send(new BulkCreateSupplierMappingsCommand(supplierId, requests))))
+            .RequirePermission(PermissionConstants.Suppliers.ManageMappings);
     }
 
     internal sealed record UpdateMappingPriorityRequest(int Priority);
+
+    internal sealed record GetSupplierMappingStatusForProductsRequest(IReadOnlyList<Guid>? ProductIds);
 
     private static IResult MapResult(Result result, int successStatusCode = StatusCodes.Status200OK) =>
         result.IsSuccess ? Results.StatusCode(successStatusCode) : Results.Problem(result.Error.Description, statusCode: StatusCodes.Status400BadRequest);

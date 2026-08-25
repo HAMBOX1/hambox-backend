@@ -181,7 +181,11 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
 
         commerceDbContext.Orders.Add(order);
         commerceDbContext.PaymentAttempts.Add(paymentAttempt);
-        cart.Clear();
+
+        // Cart is deliberately NOT cleared here: the customer hasn't paid yet (they still need to
+        // complete payment in their wallet). Clearing it now would strand them with an empty cart if
+        // the payment ultimately fails. DotFawryPaymentVerificationService clears it once payment is
+        // actually confirmed — see its VerifyAndFinalizeAsync success path.
 
         // Persist the Pending order + attempt before ever calling out to DOT: if the process
         // crashes after the DOT call but before this save, we'd otherwise have a partnerTransId DOT

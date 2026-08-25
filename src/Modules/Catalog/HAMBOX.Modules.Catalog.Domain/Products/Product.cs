@@ -141,6 +141,27 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <inheritdoc />
     public string? ModifiedBy { get; private set; }
 
+    /// <summary>
+    /// Gets the identifier of the admin who last edited this product's own fields (name, price,
+    /// category, status, etc.) via the admin catalog UI.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="ModifiedBy"/>, which is bumped by any save including checkout-driven stock
+    /// reservation, this is only set by <see cref="RecordAdminEdit"/> so it reliably answers "which
+    /// admin last edited this record" rather than "who last touched any field."
+    /// </remarks>
+    public string? LastEditedByUserId { get; private set; }
+
+    /// <summary>
+    /// Gets the display name (email) of the admin who last edited this product. See <see cref="LastEditedByUserId"/>.
+    /// </summary>
+    public string? LastEditedByName { get; private set; }
+
+    /// <summary>
+    /// Gets when the product was last edited by an admin. See <see cref="LastEditedByUserId"/>.
+    /// </summary>
+    public DateTimeOffset? LastEditedOnUtc { get; private set; }
+
     /// <inheritdoc />
     public bool IsDeleted { get; private set; }
 
@@ -313,6 +334,18 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         NameEn = nameEn;
         DescriptionAr = string.IsNullOrWhiteSpace(descriptionAr) ? descriptionEn : descriptionAr;
         DescriptionEn = descriptionEn;
+    }
+
+    /// <summary>
+    /// Records that an admin edited this product's own fields, for "last edited by" display.
+    /// </summary>
+    /// <param name="userId">The editing admin's user identifier.</param>
+    /// <param name="displayName">The editing admin's display name (email).</param>
+    public void RecordAdminEdit(string? userId, string? displayName)
+    {
+        LastEditedByUserId = userId;
+        LastEditedByName = displayName;
+        LastEditedOnUtc = DateTimeOffset.UtcNow;
     }
 
     /// <summary>

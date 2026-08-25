@@ -197,6 +197,13 @@ public sealed class DotFawryPaymentVerificationService(
             order.RecordPayment("DotFawry", providerTransactionId);
             RecordAudit(order.Id, "VerificationSucceeded", "Paid", attempt, status.BillingTransactionResultDesc ?? status.ResultDesc);
 
+            // Only clear the cart now that payment is authoritatively confirmed — see the matching
+            // comment in InitiateDotFawryCheckoutCommandHandler for why it isn't cleared at initiation.
+            var cart = await commerceDbContext.ShoppingCarts
+                .Include(c => c.Items)
+                .FirstOrDefaultAsync(c => c.UserId == order.UserId, ct);
+            cart?.Clear();
+
             if (!string.IsNullOrWhiteSpace(attempt.PendingPromotionsJson))
             {
                 var appliedPromotions = JsonSerializer.Deserialize<List<AppliedPromotionDto>>(attempt.PendingPromotionsJson) ?? [];

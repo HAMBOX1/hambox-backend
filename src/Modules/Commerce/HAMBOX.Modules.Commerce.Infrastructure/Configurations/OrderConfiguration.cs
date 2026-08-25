@@ -80,6 +80,12 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.MembershipPlanId);
         builder.Property(o => o.MembershipSubscriptionId);
 
+        builder.Property(o => o.LastEditedByUserId)
+            .HasMaxLength(450);
+
+        builder.Property(o => o.LastEditedByName)
+            .HasMaxLength(200);
+
         builder.Property(o => o.CreatedOnUtc)
             .IsRequired();
 

@@ -97,6 +97,7 @@ public sealed class TicketContextBuilder(
             membershipStatus,
             membership.ExpiresOnUtc,
             recentOrderDtos,
+            ticket.RelatedOrderId,
             relatedOrderNumber,
             relatedProductName,
             ticket.CustomerCountry,

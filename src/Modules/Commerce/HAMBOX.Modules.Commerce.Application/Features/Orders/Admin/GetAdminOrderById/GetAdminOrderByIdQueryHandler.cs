@@ -188,6 +188,8 @@ internal sealed class GetAdminOrderByIdQueryHandler
                     o.CreatedOnUtc);
             }).ToList(),
             null,
-            order.CreatedOnUtc));
+            order.CreatedOnUtc,
+            order.LastEditedByName,
+            order.LastEditedOnUtc));
     }
 }

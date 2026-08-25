@@ -24,5 +24,26 @@ public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor)
     }
 
     /// <inheritdoc />
+    public string? DisplayName
+    {
+        get
+        {
+            var user = httpContextAccessor.HttpContext?.User;
+
+            var email = user?.FindFirst(ClaimTypes.Email)?.Value
+                        ?? user?.FindFirst("email")?.Value;
+
+            return string.IsNullOrWhiteSpace(email) ? null : email;
+        }
+    }
+
+    /// <inheritdoc />
     public bool IsAuthenticated => UserId is not null;
+
+    /// <inheritdoc />
+    public bool IsAdminContext =>
+        string.Equals(
+            httpContextAccessor.HttpContext?.User.FindFirst("auth_context")?.Value,
+            "admin",
+            StringComparison.OrdinalIgnoreCase);
 }

@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -12,10 +13,12 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.UpdateProduct;
 internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, Result>
 {
     private readonly ICatalogDbContext _dbContext;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateProductCommandHandler(ICatalogDbContext dbContext)
+    public UpdateProductCommandHandler(ICatalogDbContext dbContext, ICurrentUserService currentUserService)
     {
         _dbContext = dbContext;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
@@ -85,6 +88,7 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
         product.Update(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn);
         product.ChangePrice(request.Price);
         product.ScheduleRelease(request.PublicReleaseOnUtc);
+        product.RecordAdminEdit(_currentUserService.UserId, _currentUserService.DisplayName);
 
         if (request.Status != product.Status)
         {

@@ -9,6 +9,7 @@ using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Infrastructure.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -132,5 +133,29 @@ public static class InfrastructureExtensions
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
         return app;
+    }
+
+    /// <summary>
+    /// Adds the baseline security response headers middleware to the application pipeline.
+    /// </summary>
+    /// <param name="app">The web application.</param>
+    /// <returns>The web application.</returns>
+    public static WebApplication UseSecurityHeaders(this WebApplication app)
+    {
+        app.UseMiddleware<SecurityHeadersMiddleware>();
+        return app;
+    }
+
+    private const string DataProtectionKeysSegment = "dataprotection-keys";
+
+    /// <summary>
+    /// True when <paramref name="requestPath"/> falls under the DataProtection keyring's public-facing
+    /// path segment (see the <c>PersistKeysToFileSystem</c> call above) — used to 404 it before the
+    /// static file middleware gets a chance to serve the keyring over HTTP.
+    /// </summary>
+    public static bool IsDataProtectionKeysRequest(PathString requestPath, string publicBasePath)
+    {
+        var prefix = $"{publicBasePath.TrimEnd('/')}/{DataProtectionKeysSegment}";
+        return requestPath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);
     }
 }

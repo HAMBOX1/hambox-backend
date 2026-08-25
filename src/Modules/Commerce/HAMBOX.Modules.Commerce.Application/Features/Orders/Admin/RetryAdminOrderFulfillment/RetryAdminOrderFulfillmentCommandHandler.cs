@@ -74,12 +74,14 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
                 }
 
                 var actorId = _currentUserService.UserId ?? "system";
+                var actorName = _currentUserService.DisplayName ?? actorId;
                 _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
                     order.Id,
                     "FulfillmentRetried",
                     $"Fulfillment retry delivered {result.CodesDelivered} code(s).",
                     actorId,
-                    actorId));
+                    actorName));
+                order.RecordAdminEdit(actorId, actorName);
 
                 await _dbContext.SaveChangesAsync(ct);
             }, cancellationToken);

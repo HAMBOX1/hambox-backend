@@ -70,12 +70,14 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                 }
 
                 var actorId = _currentUserService.UserId ?? "system";
+                var actorName = _currentUserService.DisplayName ?? actorId;
                 _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
                     order.Id,
                     "RefundIssued",
                     "Order was refunded by an administrator.",
                     actorId,
-                    actorId));
+                    actorName));
+                order.RecordAdminEdit(actorId, actorName);
 
                 await _dbContext.SaveChangesAsync(ct);
 
