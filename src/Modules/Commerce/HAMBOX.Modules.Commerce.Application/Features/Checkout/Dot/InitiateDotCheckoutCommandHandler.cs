@@ -11,6 +11,8 @@ using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Legal.Application.Abstractions;
+using HAMBOX.Modules.Legal.Application.Services;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +24,7 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Checkout.Dot;
 internal sealed class InitiateDotCheckoutCommandHandler(
     ICommerceDbContext commerceDbContext,
     ICatalogDbContext catalogDbContext,
+    ILegalDbContext legalDbContext,
     ICurrentUserService currentUserService,
     IInventoryEngine inventoryEngine,
     CartResponseBuilder cartResponseBuilder,
@@ -93,6 +96,9 @@ internal sealed class InitiateDotCheckoutCommandHandler(
             return Result.Failure<DotCheckoutInitiationDto>(lineValidation.Error);
         }
 
+        CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
+        var resolvedPricingByLine = lineValidation.Value.Lines.ToDictionary(l => (l.ProductId, l.ProductVariantId));
+
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
             await cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken);
 
@@ -132,13 +138,19 @@ internal sealed class InitiateDotCheckoutCommandHandler(
                     sku = variant.Sku;
                 }
 
+                var resolved = resolvedPricingByLine[(item.ProductId, variantId)];
+
                 return (
                     item.ProductId,
                     products[item.ProductId].NameEn,
                     item.Quantity,
                     item.UnitPrice,
                     variantId,
-                    sku);
+                    sku,
+                    resolved.SelectedSupplierId,
+                    resolved.SelectedSupplierProductMappingId,
+                    resolved.SupplierBuyingPriceAtOrderTime,
+                    resolved.MarginPercentAppliedAtOrderTime);
             })
             .ToList();
 
@@ -187,6 +199,19 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         // crashes after the DOT call but before this save, we'd otherwise have a partner_txid DOT
         // knows about with no HAMBOX record to reconcile it against.
         await commerceDbContext.SaveChangesAsync(cancellationToken);
+
+        // Before payment, not after — per contract §33.1. Compliance-audit row, not
+        // money/inventory-critical, so a separate SaveChanges on Legal's own DbContext is fine (same
+        // "sequential, not cross-schema-atomic" treatment RegisterCommandHandler gives this).
+        await LegalAcceptanceRecorder.RecordAsync(
+            legalDbContext,
+            currentUserService.UserId!,
+            request.IpAddress,
+            request.UserAgent,
+            request.Language,
+            order.Id,
+            cancellationToken);
+        await legalDbContext.SaveChangesAsync(cancellationToken);
 
         var tokenRequest = new DotAccessTokenRequest(
             partnerTxId,

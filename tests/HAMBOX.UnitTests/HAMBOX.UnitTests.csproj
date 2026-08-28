@@ -42,6 +42,7 @@
     <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Domain\HAMBOX.Modules.Messaging.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Application\HAMBOX.Modules.Messaging.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Messaging\HAMBOX.Modules.Messaging.Infrastructure\HAMBOX.Modules.Messaging.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Legal\HAMBOX.Modules.Legal.Infrastructure\HAMBOX.Modules.Legal.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

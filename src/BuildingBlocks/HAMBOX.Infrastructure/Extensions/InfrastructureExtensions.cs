@@ -1,18 +1,22 @@
 using System.IO.Compression;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
+using HAMBOX.Application.Security;
 using HAMBOX.Infrastructure.Currency;
 using HAMBOX.Infrastructure.Localization;
 using HAMBOX.Infrastructure.Middleware;
 using HAMBOX.Infrastructure.Options;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
+using HAMBOX.Infrastructure.Security;
 using HAMBOX.Infrastructure.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Infrastructure.Extensions;
 
@@ -79,22 +83,24 @@ public static class InfrastructureExtensions
 
         services.AddCors(options =>
         {
-            options.AddPolicy("HamboxCors", policy =>
-            {
-                if (allowedOrigins.Length > 0)
-                {
-                    policy.WithOrigins(allowedOrigins)
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials();
-                }
-                else
-                {
-                    policy.AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod();
-                }
-            });
+            options.AddPolicy("HamboxCors", policy => ConfigureHamboxCorsPolicy(policy, allowedOrigins));
+        });
+
+        // 3.5 Turnstile (Cloudflare bot verification) — cross-module (Identity's register/forgot-password/
+        // resend-verification validators consume it), so registered here rather than in a module's own
+        // Infrastructure. ValidateOnStart mirrors the JwtSettings/EmailSettings/Suppliers-provider fail-fast
+        // pattern: an unconfigured or malformed SiteKey/SecretKey fails application startup rather than
+        // silently letting every account-action endpoint through unverified.
+        services.AddSingleton<IValidateOptions<TurnstileSettings>, TurnstileSettingsValidator>();
+        services.AddOptions<TurnstileSettings>()
+            .Bind(configuration.GetSection(TurnstileSettings.SectionName))
+            .ValidateOnStart();
+
+        services.AddHttpClient<ITurnstileVerificationService, TurnstileVerificationService>((sp, client) =>
+        {
+            client.BaseAddress = new Uri("https://challenges.cloudflare.com/");
+            var turnstileSettings = sp.GetRequiredService<IOptions<TurnstileSettings>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(turnstileSettings.RequestTimeoutSeconds > 0 ? turnstileSettings.RequestTimeoutSeconds : 10);
         });
 
         // 4. Health Checks
@@ -144,6 +150,31 @@ public static class InfrastructureExtensions
     {
         app.UseMiddleware<SecurityHeadersMiddleware>();
         return app;
+    }
+
+    /// <summary>
+    /// Builds the "HamboxCors" policy: only explicitly configured, well-formed absolute-URI origins
+    /// are ever allowed. If <paramref name="allowedOrigins"/> is missing, empty, or every entry is
+    /// malformed, the policy ends up with zero configured origins — which <see cref="CorsPolicy"/>
+    /// treats as "reject every cross-origin request" (<c>AllowAnyOrigin</c> stays false, <c>Origins</c>
+    /// stays empty). This must never fall back to <c>AllowAnyOrigin()</c>: that would silently accept
+    /// requests from any origin whenever the setting is unconfigured or mistyped — fail closed, not open.
+    /// </summary>
+    public static void ConfigureHamboxCorsPolicy(CorsPolicyBuilder policy, IReadOnlyList<string> allowedOrigins)
+    {
+        var validOrigins = allowedOrigins
+            .Where(origin => !string.IsNullOrWhiteSpace(origin) && Uri.TryCreate(origin, UriKind.Absolute, out _))
+            .ToArray();
+
+        if (validOrigins.Length == 0)
+        {
+            return;
+        }
+
+        policy.WithOrigins(validOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
     }
 
     private const string DataProtectionKeysSegment = "dataprotection-keys";

@@ -1,6 +1,8 @@
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Application.Communication;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Operations;
@@ -9,16 +11,17 @@ using Microsoft.EntityFrameworkCore;
 namespace HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 
 /// <summary>
-/// Recurring scan for price-drop alerts. Only ever compares
-/// <c>Variant.PriceOverride ?? Product.Price</c> — deliberately never promotions, coupons,
-/// membership discounts, or currency conversion (see the architecture audit's pricing-lifecycle
-/// scoping decision). Only variants with at least one active
+/// Recurring scan for price-drop alerts. Compares <see cref="EffectivePriceResolver"/>'s effective price
+/// (supplier-derived override when eligible, else <c>Variant.PriceOverride ?? Product.Price</c>) —
+/// deliberately never promotions, coupons, membership discounts, or currency conversion (see the
+/// architecture audit's pricing-lifecycle scoping decision). Only variants with at least one active
 /// <see cref="CustomerAlertType.PriceDrop"/> subscription are ever read.
 /// </summary>
 internal sealed class PriceDropAlertJobHandler(
     IBackgroundJobSerializer serializer,
     ICommerceDbContext commerceDb,
     ICatalogDbContext catalogDb,
+    IFulfillmentRouter fulfillmentRouter,
     ICommunicationService communication) : BackgroundJobHandlerBase<string?>(serializer)
 {
     public override string JobType => OperationalJobTypes.ScanPriceDropAlerts;
@@ -45,6 +48,8 @@ internal sealed class PriceDropAlertJobHandler(
             .Where(p => productIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, cancellationToken);
 
+        var supplierEffectivePrices = await fulfillmentRouter.GetEffectivePriceOverridesBulkAsync(variantIds, cancellationToken);
+
         foreach (var variantId in variantIds)
         {
             if (!variants.TryGetValue(variantId, out var variant) || !products.TryGetValue(variant.ProductId, out var product))
@@ -52,7 +57,10 @@ internal sealed class PriceDropAlertJobHandler(
                 continue; // Variant or product was permanently deleted since the subscription was created.
             }
 
-            var currentPrice = variant.PriceOverride ?? product.Price;
+            var currentPrice = EffectivePriceResolver.Resolve(
+                variant,
+                product,
+                supplierEffectivePrices.TryGetValue(variantId, out var supplierPrice) ? supplierPrice : null);
 
             var subscriptions = await commerceDb.CustomerAlertSubscriptions
                 .Where(s => s.AlertType == CustomerAlertType.PriceDrop

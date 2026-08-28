@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
@@ -117,7 +118,14 @@ internal sealed class CreateAlertSubscriptionCommandHandler
         }
         else
         {
-            lastObservedPrice = variant.PriceOverride ?? product.Price;
+            decimal? supplierEffectivePrice = null;
+            if (variant.FulfillmentMode is FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly)
+            {
+                var overrides = await _fulfillmentRouter.GetEffectivePriceOverridesBulkAsync([variant.Id], cancellationToken);
+                supplierEffectivePrice = overrides.TryGetValue(variant.Id, out var overridePrice) ? overridePrice : null;
+            }
+
+            lastObservedPrice = EffectivePriceResolver.Resolve(variant, product, supplierEffectivePrice);
         }
 
         var subscription = userId is not null

@@ -1,5 +1,6 @@
 using HAMBOX.Infrastructure.Localization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
@@ -15,13 +16,18 @@ using HAMBOX.Modules.Identity.Application.Features.ResetPassword;
 using HAMBOX.Modules.Identity.Application.Features.Sessions;
 using HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 using HAMBOX.Modules.Identity.Application.Features.VerifyEmail;
+using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Application.RateLimiting;
+using HAMBOX.Modules.Identity.Presentation.Authentication;
+using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Presentation.Endpoints;
 
@@ -60,7 +66,8 @@ public static class AuthEndpoints
                 ipAddress,
                 userAgent,
                 language,
-                request.ReferralCode);
+                request.ReferralCode,
+                request.TurnstileToken);
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -70,6 +77,9 @@ public static class AuthEndpoints
             [FromBody] LoginRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
+            ITokenGenerator tokenGenerator,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -86,13 +96,16 @@ public static class AuthEndpoints
                 request.RememberMe);
 
             var result = await sender.Send(command, ct);
-            return LocalizedEndpointResults.FromResult(httpContext, result);
+            return HandleTokenResult(httpContext, result, cookieSettingsOptions.Value, environment, tokenGenerator);
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("google", async (
             [FromBody] GoogleLoginRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
+            ITokenGenerator tokenGenerator,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -107,13 +120,16 @@ public static class AuthEndpoints
                 geoLocation?.City);
 
             var result = await sender.Send(command, ct);
-            return LocalizedEndpointResults.FromResult(httpContext, result);
+            return HandleTokenResult(httpContext, result, cookieSettingsOptions.Value, environment, tokenGenerator);
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/login", async (
             [FromBody] LoginRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
+            ITokenGenerator tokenGenerator,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -129,13 +145,32 @@ public static class AuthEndpoints
                 geoLocation?.City);
 
             var result = await sender.Send(command, ct);
-            return LocalizedEndpointResults.FromResult(httpContext, result);
+            if (!result.IsSuccess)
+            {
+                return LocalizedEndpointResults.FromResult(httpContext, result);
+            }
+
+            // Token is only populated when Admin OTP is disabled via Platform Settings — the caller
+            // is already fully authenticated and the cookie must be issued now, same as a normal login.
+            var challenge = result.Value;
+            AccessTokenResponseDto? tokenDto = null;
+            if (challenge.Token is not null)
+            {
+                WriteAuthCookies(httpContext, challenge.Token, cookieSettingsOptions.Value, environment, tokenGenerator);
+                tokenDto = ToAccessTokenResponse(challenge.Token);
+            }
+
+            return Results.Ok(new AdminLoginChallengeResponseDto(
+                challenge.ChallengeId, challenge.ExpiresAt, challenge.ResendAvailableAt, challenge.MaskedEmail, tokenDto));
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/verify-otp", async (
             [FromBody] VerifyAdminOtpRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
+            ITokenGenerator tokenGenerator,
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -148,7 +183,7 @@ public static class AuthEndpoints
                 userAgent);
 
             var result = await sender.Send(command, ct);
-            return LocalizedEndpointResults.FromResult(httpContext, result);
+            return HandleTokenResult(httpContext, result, cookieSettingsOptions.Value, environment, tokenGenerator);
         });
 
         group.MapPost("admin/resend-otp", async (
@@ -175,37 +210,75 @@ public static class AuthEndpoints
         });
 
         group.MapPost("refresh", async (
-            [FromBody] RefreshRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
+            ITokenGenerator tokenGenerator,
             CancellationToken ct) =>
         {
-            var command = new RefreshTokenCommand(request.RefreshToken);
+            var cookieSettings = cookieSettingsOptions.Value;
+
+            if (!httpContext.Request.Cookies.TryGetValue(cookieSettings.CookieName, out var refreshTokenPlaintext)
+                || string.IsNullOrWhiteSpace(refreshTokenPlaintext))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (!CsrfCookieWriter.ValidateCsrfToken(httpContext))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            var command = new RefreshTokenCommand(refreshTokenPlaintext);
             var result = await sender.Send(command, ct);
-            return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+            return HandleTokenResult(httpContext, result, cookieSettings, environment, tokenGenerator);
+        }).RequireRateLimiting(RateLimitPolicies.Refresh);
 
         group.MapPost("logout", async (
-            [FromBody] LogoutRequest request,
             HttpContext httpContext,
             ISender sender,
+            IOptions<RefreshCookieSettings> cookieSettingsOptions,
+            IHostEnvironment environment,
             CancellationToken ct) =>
         {
-            var command = new LogoutCommand(request.RefreshToken);
+            var cookieSettings = cookieSettingsOptions.Value;
+
+            if (!httpContext.Request.Cookies.TryGetValue(cookieSettings.CookieName, out var refreshTokenPlaintext)
+                || string.IsNullOrWhiteSpace(refreshTokenPlaintext))
+            {
+                // Nothing to revoke and nothing ambient to protect via CSRF — idempotent success,
+                // matching a caller who is already logged out. Still clear defensively in case a
+                // stray CSRF cookie is left behind without its paired refresh cookie.
+                AuthCookieWriter.ClearRefreshTokenCookie(httpContext, cookieSettings, environment);
+                CsrfCookieWriter.ClearCsrfCookie(httpContext, cookieSettings, environment);
+                return Results.Ok();
+            }
+
+            if (!CsrfCookieWriter.ValidateCsrfToken(httpContext))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            var command = new LogoutCommand(refreshTokenPlaintext);
             var result = await sender.Send(command, ct);
+
+            AuthCookieWriter.ClearRefreshTokenCookie(httpContext, cookieSettings, environment);
+            CsrfCookieWriter.ClearCsrfCookie(httpContext, cookieSettings, environment);
+
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Refresh);
 
         group.MapPost("verify-email", async (
-            [FromQuery] string token,
+            [FromBody] VerifyEmailRequest request,
             HttpContext httpContext,
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new VerifyEmailCommand(token);
+            var command = new VerifyEmailCommand(request.Token);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapPost("forgot-password", async (
             [FromBody] ForgotPasswordRequest request,
@@ -213,7 +286,8 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new ForgotPasswordCommand(request.Email);
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var command = new ForgotPasswordCommand(request.Email, ipAddress, request.TurnstileToken);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -235,7 +309,8 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new ResendVerificationCommand(request.Email);
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var command = new ResendVerificationCommand(request.Email, ipAddress, request.TurnstileToken);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -305,12 +380,66 @@ public static class AuthEndpoints
         httpContext.Items.TryGetValue(GeoLocationHttpContextKeys.ResolvedGeoLocation, out var value)
             ? value as GeoLocationResult
             : null;
+
+    /// <summary>
+    /// Writes (or rotates) both the HttpOnly refresh cookie and its paired non-HttpOnly CSRF cookie —
+    /// every token-issuing response (login, google, admin bypass, admin OTP verify, refresh) writes
+    /// both together so the CSRF token is always in sync with whichever refresh token is currently live.
+    /// </summary>
+    private static void WriteAuthCookies(
+        HttpContext httpContext,
+        AuthTokenResponse tokens,
+        RefreshCookieSettings cookieSettings,
+        IHostEnvironment environment,
+        ITokenGenerator tokenGenerator)
+    {
+        AuthCookieWriter.WriteRefreshTokenCookie(
+            httpContext, cookieSettings, environment, tokens.RefreshToken, tokens.RefreshTokenExpiresAt);
+        CsrfCookieWriter.WriteCsrfCookie(httpContext, cookieSettings, environment, tokenGenerator);
+    }
+
+    /// <summary>
+    /// Maps the internal <see cref="AuthTokenResponse"/> (which carries the plaintext refresh token)
+    /// to the client-facing shape — deliberately omits <c>RefreshToken</c>, which travels exclusively
+    /// via the HttpOnly cookie written by <see cref="WriteAuthCookies"/>.
+    /// </summary>
+    private static AccessTokenResponseDto ToAccessTokenResponse(AuthTokenResponse tokens) =>
+        new(tokens.AccessToken, tokens.ExpiresAt);
+
+    /// <summary>
+    /// Shared success/failure mapping for every endpoint that issues a <see cref="Result{AuthTokenResponse}"/>:
+    /// on success, writes the refresh/CSRF cookies and returns only the access token to the caller;
+    /// on failure, defers to the existing localized error-payload convention. The refresh token in
+    /// <c>result.Value</c> is never touched in the failure branch of <c>LocalizedEndpointResults.FromResult</c>,
+    /// so this can never leak it even indirectly.
+    /// </summary>
+    private static IResult HandleTokenResult(
+        HttpContext httpContext,
+        Result<AuthTokenResponse> result,
+        RefreshCookieSettings cookieSettings,
+        IHostEnvironment environment,
+        ITokenGenerator tokenGenerator)
+    {
+        if (!result.IsSuccess)
+        {
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        }
+
+        WriteAuthCookies(httpContext, result.Value, cookieSettings, environment, tokenGenerator);
+        return Results.Ok(ToAccessTokenResponse(result.Value));
+    }
 }
 
 /// <summary>
 /// Represents a registration request.
 /// </summary>
-public sealed record RegisterRequest(string Email, string Password, string FirstName, string LastName, string? ReferralCode = null);
+public sealed record RegisterRequest(
+    string Email,
+    string Password,
+    string FirstName,
+    string LastName,
+    string? ReferralCode = null,
+    string TurnstileToken = "");
 
 /// <summary>
 /// Represents a login request.
@@ -323,19 +452,24 @@ public sealed record LoginRequest(string Email, string Password, bool RememberMe
 public sealed record GoogleLoginRequest(string IdToken);
 
 /// <summary>
-/// Represents a refresh token request.
+/// The client-facing shape of a successful login/refresh/OTP-verify response. Deliberately excludes
+/// the refresh token — it travels exclusively via the HttpOnly <c>hambox_rt</c> cookie written by
+/// <see cref="AuthCookieWriter"/>, never in a JSON body. <c>refresh</c>/<c>logout</c> themselves take
+/// no request body at all: the refresh token is read from that same cookie, not from JSON.
 /// </summary>
-public sealed record RefreshRequest(string RefreshToken);
+public sealed record AccessTokenResponseDto(string AccessToken, DateTimeOffset ExpiresAt);
 
 /// <summary>
-/// Represents a logout request.
+/// Represents an email verification request. The token travels in the request body (not the query
+/// string) so it is never written into <c>ApiRequestLogs</c>' logged <c>Path + QueryString</c>,
+/// browser history for the API call itself, or referrer headers.
 /// </summary>
-public sealed record LogoutRequest(string RefreshToken);
+public sealed record VerifyEmailRequest(string Token);
 
 /// <summary>
 /// Represents a forgot password request.
 /// </summary>
-public sealed record ForgotPasswordRequest(string Email);
+public sealed record ForgotPasswordRequest(string Email, string TurnstileToken = "");
 
 /// <summary>
 /// Represents a reset password request.
@@ -345,7 +479,7 @@ public sealed record ResetPasswordRequest(string Token, string NewPassword);
 /// <summary>
 /// Represents a resend verification email request.
 /// </summary>
-public sealed record ResendVerificationRequest(string Email);
+public sealed record ResendVerificationRequest(string Email, string TurnstileToken = "");
 
 /// <summary>
 /// Represents an update profile request.
@@ -376,3 +510,15 @@ public sealed record ResendAdminOtpRequest(Guid ChallengeId);
 /// Represents a maintenance-mode bypass request.
 /// </summary>
 public sealed record MaintenanceBypassRequest(string Password);
+
+/// <summary>
+/// Client-facing shape of <see cref="AdminLoginChallengeResponse"/> — identical except
+/// <c>Token</c> is the trimmed <see cref="AccessTokenResponseDto"/>, never the raw
+/// <see cref="AuthTokenResponse"/> (which would leak the refresh token).
+/// </summary>
+public sealed record AdminLoginChallengeResponseDto(
+    Guid ChallengeId,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset ResendAvailableAt,
+    string MaskedEmail,
+    AccessTokenResponseDto? Token = null);

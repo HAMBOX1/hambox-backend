@@ -19,6 +19,10 @@ internal sealed class BambooSupplierProvider(BambooHttpClient httpClient, ILogge
 
     public string ProviderType => BambooProviderConstants.ProviderType;
 
+    // No quantity cap is documented anywhere in the Bamboo API — Checkout's Products array already
+    // accepts an arbitrary Quantity per line, so no cap is declared here.
+    public int? MaxQuantityPerPurchase => null;
+
     public async Task<SupplierConnectionTestResult> TestConnectionAsync(SupplierProviderContext context, CancellationToken cancellationToken = default)
     {
         try

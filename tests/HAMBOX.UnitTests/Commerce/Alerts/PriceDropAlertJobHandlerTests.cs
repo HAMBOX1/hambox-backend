@@ -35,7 +35,7 @@ public sealed class PriceDropAlertJobHandlerTests
         HAMBOX.Modules.Catalog.Infrastructure.Persistence.CatalogDbContext catalogDb)
     {
         var communication = new FakeCommunicationService();
-        var handler = new PriceDropAlertJobHandler(new FakeBackgroundJobSerializer(), commerceDb, catalogDb, communication);
+        var handler = new PriceDropAlertJobHandler(new FakeBackgroundJobSerializer(), commerceDb, catalogDb, new FakeFulfillmentRouter(), communication);
         return (handler, communication);
     }
 

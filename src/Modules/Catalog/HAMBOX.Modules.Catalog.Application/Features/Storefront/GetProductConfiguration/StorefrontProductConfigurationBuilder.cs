@@ -2,6 +2,7 @@ using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 
@@ -18,7 +19,8 @@ internal static class StorefrontProductConfigurationBuilder
         IReadOnlyList<ProductOptionGroup> optionGroups,
         IReadOnlyList<ProductVariant> variants,
         IReadOnlyDictionary<Guid, VariantStockSnapshot> stock,
-        IReadOnlyDictionary<Guid, FulfillmentReadiness> readiness)
+        IReadOnlyDictionary<Guid, FulfillmentReadiness> readiness,
+        IReadOnlyDictionary<Guid, decimal>? supplierEffectivePrices = null)
     {
         var optionGroupDtos = optionGroups.Select(g => new ProductOptionGroupDto(
             g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
@@ -43,10 +45,14 @@ internal static class StorefrontProductConfigurationBuilder
             var optionIds = v.SelectedOptions.Select(o => o.OptionId).ToList();
             var isCompleteCombination = VariantCombinationHelper.IsCompleteCombination(optionIds, validCombinationKeys, optionGroups);
 
+            var supplierEffectivePrice = supplierEffectivePrices?.TryGetValue(v.Id, out var overridePrice) == true
+                ? overridePrice
+                : (decimal?)null;
+
             return new StorefrontVariantDto(
                 v.Id,
                 v.Sku,
-                v.PriceOverride ?? product.Price,
+                EffectivePriceResolver.Resolve(v, product, supplierEffectivePrice),
                 v.ComparePrice,
                 manualAvailable,
                 s?.IsLowStock ?? false,

@@ -18,6 +18,22 @@ public static class LegalAcceptanceRecorder
         string ipAddress,
         string userAgent,
         string language,
+        CancellationToken cancellationToken = default) =>
+        await RecordAsync(dbContext, userId, ipAddress, userAgent, language, orderId: null, cancellationToken);
+
+    /// <summary>
+    /// Same as the registration-time overload, but ties the acceptance rows to the order they
+    /// gated — required at checkout (contract §33.1: User ID, Order ID, Policy Version, Timestamp,
+    /// IP, Device, captured before payment). Call this right after the order is created and before
+    /// the payment provider is invoked, in the same handler.
+    /// </summary>
+    public static async Task RecordAsync(
+        ILegalDbContext dbContext,
+        string userId,
+        string ipAddress,
+        string userAgent,
+        string language,
+        Guid? orderId,
         CancellationToken cancellationToken = default)
     {
         var sections = await RequireAcceptanceSectionsAsync(dbContext, cancellationToken);
@@ -25,7 +41,8 @@ public static class LegalAcceptanceRecorder
         foreach (var (section, publishedVersionNumber) in sections)
         {
             dbContext.LegalSectionAcceptances.Add(
-                LegalSectionAcceptance.Create(userId, section.Id, publishedVersionNumber, ipAddress, userAgent, language));
+                LegalSectionAcceptance.Create(
+                    userId, section.Id, publishedVersionNumber, ipAddress, userAgent, language, orderId));
         }
     }
 

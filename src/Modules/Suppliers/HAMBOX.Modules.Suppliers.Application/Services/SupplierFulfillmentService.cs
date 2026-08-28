@@ -98,7 +98,42 @@ internal sealed class SupplierFulfillmentService(
             request.OrderId, request.OrderItemId, request.SupplierId, request.SupplierProductMappingId, request.RequestedQuantity);
 
         db.SupplierFulfillments.Add(fulfillment);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            // The rejected insert is still tracked as Added on this context — detach it so it can never
+            // resurface on a later SaveChangesAsync call within the same scoped unit of work, regardless
+            // of which branch below is taken.
+            db.SupplierFulfillments.Remove(fulfillment);
+
+            var winner = await db.SupplierFulfillments.AsNoTracking().FirstOrDefaultAsync(f =>
+                f.OrderId == request.OrderId &&
+                f.OrderItemId == request.OrderItemId &&
+                f.SupplierId == request.SupplierId &&
+                f.SupplierProductMappingId == request.SupplierProductMappingId &&
+                !TerminalStatuses.Contains(f.Status), cancellationToken);
+
+            if (winner is null)
+            {
+                // Not the expected race — some other constraint/DB failure. Never swallowed as if it
+                // were the benign race case.
+                throw;
+            }
+
+            // Another concurrent caller (possibly on a different API instance) won the race and already
+            // inserted the row for this exact scope — IX_SupplierFulfillments_Scope_NonTerminal rejected
+            // this insert. Never treated as a real error: re-read and return the winner's row, exactly
+            // like ProcessAsync's own DbUpdateConcurrencyException handling treats "another worker won"
+            // as a safe no-op rather than a failure.
+            logger.LogInformation(ex,
+                "Lost the create race for a new supplier fulfillment (order item {OrderItemId}, supplier {SupplierId}) — reusing the concurrently-created {FulfillmentId}.",
+                request.OrderItemId, request.SupplierId, winner.Id);
+
+            return Result.Success(ToOutcome(winner, deliveredCodes: null));
+        }
 
         logger.LogInformation(
             "Created supplier fulfillment {FulfillmentId} (HamboxReferenceId {HamboxReferenceId}) for order item {OrderItemId}, supplier {SupplierId}, requested quantity {Quantity}.",

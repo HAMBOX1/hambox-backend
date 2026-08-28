@@ -26,7 +26,7 @@ public sealed class OrderFulfillmentServiceTests
             discountAmount: 0m,
             taxAmount: 0m,
             totalAmount: 10m,
-            items: items.Select(i => (i.ProductId, "Test Product", i.Quantity, 10m, i.VariantId, (string?)null)));
+            items: items.Select(i => (i.ProductId, "Test Product", i.Quantity, 10m, i.VariantId, (string?)null, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)));
 
         order.RecordPayment("development", $"txn-{Guid.NewGuid():N}");
         return order;
@@ -48,7 +48,9 @@ public sealed class OrderFulfillmentServiceTests
         inventoryEngine.CodesByVariant[variantId] = new Queue<string>(["REAL-GAME-KEY-0001"]);
 
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -88,7 +90,9 @@ public sealed class OrderFulfillmentServiceTests
         inventoryEngine.AvailableStockByVariant[variantId] = 0;
 
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
 
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
 
@@ -112,7 +116,9 @@ public sealed class OrderFulfillmentServiceTests
 
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
 
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
@@ -143,7 +149,9 @@ public sealed class OrderFulfillmentServiceTests
         inventoryEngine.CodesByVariant[variantId] = new Queue<string>(["REAL-GAME-KEY-0002"]);
 
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -173,12 +181,14 @@ public sealed class OrderFulfillmentServiceTests
             discountAmount: 0m,
             taxAmount: 0m,
             totalAmount: 10m,
-            items: [(Guid.NewGuid(), "Test Product", 1, 10m, Guid.NewGuid(), (string?)null)]);
+            items: [(Guid.NewGuid(), "Test Product", 1, 10m, Guid.NewGuid(), (string?)null, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)]);
         // Deliberately not calling RecordPayment — PaymentStatus stays unpaid.
 
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.FulfillMissingAsync(order, CancellationToken.None));

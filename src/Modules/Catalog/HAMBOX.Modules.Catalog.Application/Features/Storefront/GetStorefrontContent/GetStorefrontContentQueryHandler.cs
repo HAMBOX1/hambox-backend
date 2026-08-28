@@ -31,14 +31,6 @@ internal sealed class GetStorefrontContentQueryHandler(IPlatformSettingsProvider
                 settings.Hero.BadgeText,
                 settings.Hero.BadgeColor,
                 settings.Hero.Visible),
-            new StorefrontAnnouncementBarDto(
-                settings.AnnouncementBar.Text,
-                settings.AnnouncementBar.Link,
-                settings.AnnouncementBar.ButtonText,
-                settings.AnnouncementBar.BackgroundColor,
-                settings.AnnouncementBar.TextColor,
-                settings.AnnouncementBar.Visible,
-                settings.AnnouncementBar.DisplayPosition),
             new StorefrontPromoBannerDto(
                 settings.PromotionalBanner.Title,
                 settings.PromotionalBanner.Subtitle,

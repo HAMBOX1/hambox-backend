@@ -13,10 +13,33 @@ internal sealed class GenerateOperationalAlertsJobHandler(
     IInventoryEngine inventory,
     IWorkerRuntimeState worker) : BackgroundJobHandlerBase<string?>(serializer)
 {
+    /// <summary>
+    /// Contract-mandated default (§25.10): jobs sitting Queued or Running longer than this without
+    /// completing are "stuck" and must alert admins — regardless of whether the job is still,
+    /// technically, going to succeed on its own eventually.
+    /// </summary>
+    private static readonly TimeSpan StuckJobThreshold = TimeSpan.FromMinutes(10);
+
     public override string JobType => OperationalJobTypes.GenerateOperationalAlerts;
 
     public override async Task HandleAsync(string? payload, IBackgroundJobContext context, CancellationToken cancellationToken)
     {
+        var stuckCutoffUtc = DateTimeOffset.UtcNow - StuckJobThreshold;
+        var stuckJobs = await db.OperationalJobs.CountAsync(
+            j => (j.Status == OperationalJobStatus.Queued && j.CreatedOnUtc <= stuckCutoffUtc)
+                || (j.Status == OperationalJobStatus.Running && j.StartedOnUtc != null && j.StartedOnUtc <= stuckCutoffUtc),
+            cancellationToken);
+        if (stuckJobs > 0)
+        {
+            await OperationalAlertUpsert.UpsertAsync(
+                db,
+                "STUCK_JOBS",
+                "Stuck jobs detected",
+                $"{stuckJobs} job(s) have been Queued or Running for more than {StuckJobThreshold.TotalMinutes:0} minutes without completing.",
+                OperationalAlertSeverity.Critical,
+                cancellationToken);
+        }
+
         var failedJobs = await db.OperationalJobs.CountAsync(
             j => j.Status == OperationalJobStatus.Failed,
             cancellationToken);

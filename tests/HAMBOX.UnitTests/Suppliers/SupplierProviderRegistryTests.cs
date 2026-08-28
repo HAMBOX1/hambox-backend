@@ -57,6 +57,8 @@ public sealed class SupplierProviderRegistryTests
     {
         public string ProviderType => providerType;
 
+        public int? MaxQuantityPerPurchase => null;
+
         public Task<SupplierConnectionTestResult> TestConnectionAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SupplierConnectionTestResult(true, "ok"));
 

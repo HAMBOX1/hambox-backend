@@ -21,7 +21,8 @@ public sealed class LegalSectionAcceptance : BaseEntity
         DateTimeOffset acceptedAtUtc,
         string ipAddress,
         string userAgent,
-        string language)
+        string language,
+        Guid? orderId)
         : base(id)
     {
         UserId = userId;
@@ -31,6 +32,7 @@ public sealed class LegalSectionAcceptance : BaseEntity
         IpAddress = ipAddress;
         UserAgent = userAgent;
         Language = language;
+        OrderId = orderId;
     }
 
     public string UserId { get; private set; } = string.Empty;
@@ -41,7 +43,19 @@ public sealed class LegalSectionAcceptance : BaseEntity
     public string UserAgent { get; private set; } = string.Empty;
     public string Language { get; private set; } = "en";
 
+    /// <summary>
+    /// The order this acceptance gated, when recorded at checkout rather than at registration.
+    /// Null for the registration-time acceptance sweep, which predates any order existing.
+    /// </summary>
+    public Guid? OrderId { get; private set; }
+
     public static LegalSectionAcceptance Create(
-        string userId, Guid legalSectionId, int versionNumber, string ipAddress, string userAgent, string language) =>
-        new(Guid.NewGuid(), userId, legalSectionId, versionNumber, DateTimeOffset.UtcNow, ipAddress, userAgent, language);
+        string userId,
+        Guid legalSectionId,
+        int versionNumber,
+        string ipAddress,
+        string userAgent,
+        string language,
+        Guid? orderId = null) =>
+        new(Guid.NewGuid(), userId, legalSectionId, versionNumber, DateTimeOffset.UtcNow, ipAddress, userAgent, language, orderId);
 }

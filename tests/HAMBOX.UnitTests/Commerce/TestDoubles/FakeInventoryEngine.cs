@@ -22,6 +22,14 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
     /// hand back the exact code that was reserved instead of a different, made-up string.</summary>
     private readonly Dictionary<Guid, string> _reservedCodeText = [];
 
+    /// <summary>Configurable per test; defaults to "nothing low/out of stock" for tests that only need
+    /// <see cref="GetStatisticsAsync"/> to return without throwing, not to assert on stock counts.</summary>
+    public InventoryStatisticsSnapshot Statistics { get; set; } = new(0, 0, 0, 0, 0, 0, 0m, 0m, 0m, 0m);
+
+    public Task<InventoryStatisticsSnapshot> GetStatisticsAsync(
+        Guid? productId = null, Guid? variantId = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Statistics);
+
     public Task<VariantStockSnapshot> GetVariantStockAsync(Guid variantId, CancellationToken cancellationToken = default)
     {
         var available = AvailableStockByVariant.GetValueOrDefault(variantId);
@@ -119,10 +127,6 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
 
     public Task<int> ReleaseSoldCodesForOrderAsync(
         Guid orderId, string? performedByUserId, CancellationToken cancellationToken = default) => Task.FromResult(0);
-
-    public Task<InventoryStatisticsSnapshot> GetStatisticsAsync(
-        Guid? productId = null, Guid? variantId = null, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Not needed by H1 tests.");
 
     public Task<ImportCodesResult> ImportCodesAsync(
         Guid variantId, Guid batchId, IReadOnlyList<ImportCodeItem> codes, string? performedByUserId,

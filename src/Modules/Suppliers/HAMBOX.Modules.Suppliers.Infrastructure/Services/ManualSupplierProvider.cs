@@ -16,6 +16,9 @@ internal sealed class ManualSupplierProvider : ISupplierProvider
 
     public string ProviderType => Key;
 
+    // Manual supplier never purchases at all (see PurchaseAsync below) — no cap is meaningful.
+    public int? MaxQuantityPerPurchase => null;
+
     public Task<SupplierConnectionTestResult> TestConnectionAsync(SupplierProviderContext context, CancellationToken cancellationToken = default) =>
         Task.FromResult(new SupplierConnectionTestResult(true, "Manual supplier — no external connection required."));
 

@@ -111,6 +111,8 @@ internal sealed class OperationalJobWorker(
             "commerce.reconcile-dot-payments", OperationalJobTypes.ReconcileDotPayments, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.High));
         recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.reconcile-dot-fawry-payments", OperationalJobTypes.ReconcileDotFawryPayments, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.High));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.recompute-supplier-derived-pricing", OperationalJobTypes.RecomputeSupplierDerivedPricing, TimeSpan.FromMinutes(5)));
     }
 
     /// <summary>

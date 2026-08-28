@@ -17,7 +17,7 @@ public sealed class DotFawryPaymentVerificationServiceTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -191,7 +191,7 @@ public sealed class DotFawryPaymentVerificationServiceTests
         harness.Gateway.StatusResult = new("1006", "Transaction Not Found", null, null, "dot-trans-1");
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);

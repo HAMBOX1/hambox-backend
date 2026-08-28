@@ -69,6 +69,7 @@ public static class IdentityInfrastructureExtensions
         var jwtSettingsSection = configuration.GetSection(JwtSettings.SectionName);
         services.Configure<JwtSettings>(jwtSettingsSection);
         services.Configure<LockoutSettings>(configuration.GetSection(LockoutSettings.SectionName));
+        services.Configure<RefreshCookieSettings>(configuration.GetSection(RefreshCookieSettings.SectionName));
         services.Configure<AdminOtpSettings>(configuration.GetSection(AdminOtpSettings.SectionName));
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
 
@@ -93,6 +94,7 @@ public static class IdentityInfrastructureExtensions
 
             AddFixedWindowPolicy(options, RateLimitPolicies.Login, rateLimitingSettings.Login);
             AddFixedWindowPolicy(options, RateLimitPolicies.AccountActions, rateLimitingSettings.AccountActions);
+            AddFixedWindowPolicy(options, RateLimitPolicies.Refresh, rateLimitingSettings.Refresh);
         });
 
         var emailSettingsSection = configuration.GetSection(EmailSettings.SectionName);

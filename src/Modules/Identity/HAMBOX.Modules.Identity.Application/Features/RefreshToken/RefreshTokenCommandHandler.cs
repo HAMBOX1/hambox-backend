@@ -101,7 +101,7 @@ internal sealed class RefreshTokenCommandHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt));
+        return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt, refreshExpiresAt));
     }
 
     private async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken)

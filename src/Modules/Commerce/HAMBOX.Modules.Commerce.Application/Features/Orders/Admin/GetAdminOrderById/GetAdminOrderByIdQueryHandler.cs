@@ -7,6 +7,7 @@ using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.Modules.Commerce.Domain.Promotions;
+using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -20,13 +21,16 @@ internal sealed class GetAdminOrderByIdQueryHandler
 {
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
+    private readonly ISender _sender;
 
     public GetAdminOrderByIdQueryHandler(
         ICommerceDbContext commerceDbContext,
-        ICatalogDbContext catalogDbContext)
+        ICatalogDbContext catalogDbContext,
+        ISender sender)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
+        _sender = sender;
     }
 
     public async Task<Result<AdminOrderDetailDto>> Handle(
@@ -94,6 +98,20 @@ internal sealed class GetAdminOrderByIdQueryHandler
             _catalogDbContext,
             productIds,
             cancellationToken);
+
+        // Best-effort: a routing-history read failure must never take down the whole order-detail page.
+        var supplierRoutingResult = await _sender.Send(new GetSupplierRoutingHistoryForOrderQuery(order.Id), cancellationToken);
+        var supplierRouting = supplierRoutingResult.IsSuccess
+            ? supplierRoutingResult.Value.Select(r => new AdminOrderSupplierRoutingDto(
+                r.OrderItemId,
+                r.SelectedSupplierName,
+                r.SelectedCostInBaseCurrency,
+                r.BaseCurrency,
+                r.FallbackOccurred,
+                r.Candidates.Select(c => new AdminOrderSupplierRoutingCandidateDto(
+                    c.SupplierName, c.ProviderType, c.Eligible, c.Selected, c.CostInBaseCurrency, c.OriginalCurrency, c.OriginalCost, c.RejectionReason)).ToList(),
+                r.CreatedOnUtc)).ToList()
+            : [];
 
         var membershipDiscount = AdminOrderMapper.ResolveMembershipDiscount(promotions);
         var coupon = promotions.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.CouponCode));
@@ -190,6 +208,7 @@ internal sealed class GetAdminOrderByIdQueryHandler
             null,
             order.CreatedOnUtc,
             order.LastEditedByName,
-            order.LastEditedOnUtc));
+            order.LastEditedOnUtc,
+            supplierRouting));
     }
 }

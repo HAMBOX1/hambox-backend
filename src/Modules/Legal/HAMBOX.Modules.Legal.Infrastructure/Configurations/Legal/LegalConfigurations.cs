@@ -72,6 +72,8 @@ internal sealed class LegalSectionAcceptanceConfiguration : IEntityTypeConfigura
         builder.Property(a => a.IpAddress).HasMaxLength(64).IsRequired();
         builder.Property(a => a.UserAgent).HasMaxLength(1000).IsRequired();
         builder.Property(a => a.Language).HasMaxLength(16).IsRequired();
+        builder.Property(a => a.OrderId);
         builder.HasIndex(a => new { a.UserId, a.LegalSectionId, a.AcceptedAtUtc });
+        builder.HasIndex(a => a.OrderId);
     }
 }

@@ -18,5 +18,11 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Checkout.Dot;
 /// members ("OrangeCash", "VodafoneCash"), enforced by <c>InitiateDotCheckoutCommandValidator</c>.
 /// Determines the <c>op_id</c> sent to DOT.
 /// </param>
-public sealed record InitiateDotCheckoutCommand(string Email, string Country, string Wallet)
+public sealed record InitiateDotCheckoutCommand(
+    string Email,
+    string Country,
+    string Wallet,
+    string IpAddress,
+    string UserAgent,
+    string Language)
     : IRequest<Result<DotCheckoutInitiationDto>>, IIdempotentRequest<DotCheckoutInitiationDto>;

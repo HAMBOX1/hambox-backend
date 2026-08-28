@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
+using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -16,8 +17,11 @@ internal sealed class ResetPasswordCommandHandler(
     /// <inheritdoc />
     public async Task<Result> Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
+        // PasswordResetTokens.Token stores only the SHA-256 hash — the incoming plaintext (from the
+        // reset link) must be hashed the same way before the lookup can match it.
+        var lookupHash = PasswordResetToken.GetLookupHash(request.Token);
         var token = await dbContext.PasswordResetTokens
-            .FirstOrDefaultAsync(t => t.Token == request.Token, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == lookupHash, cancellationToken);
 
         if (token is null)
         {

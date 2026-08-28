@@ -68,6 +68,11 @@ public static class CommerceInfrastructureExtensions
         services.Configure<DotFawrySettings>(configuration.GetSection(DotFawrySettings.SectionName));
         services.AddSingleton<IValidateOptions<DotFawrySettings>, DotFawrySettingsValidator>();
         services.AddScoped<IDotFawryChargeAmountResolver, DotFawryChargeAmountResolver>();
+
+        // Cost-based automated-supplier selection — reuses the same CurrencyExchangeRateService
+        // DotFawryChargeAmountResolver already relies on (registered by AddSharedInfrastructure).
+        services.AddScoped<ISupplierRoutingEngine, SupplierRoutingEngine>();
+        services.AddScoped<ISupplierPricingEngine, SupplierPricingEngine>();
         services.AddHttpClient<IDotFawryPaymentGateway, DotFawryPaymentGateway>((sp, client) =>
             {
                 var dotFawrySettings = sp.GetRequiredService<IOptions<DotFawrySettings>>().Value;
@@ -98,6 +103,7 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<IBackgroundJobHandler, PriceDropAlertJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotPaymentsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotFawryPaymentsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, RecomputeSupplierDerivedPricingJobHandler>();
 
         services.AddScoped<IOperationsMonitorService, OperationsMonitorService>();
         services.AddScoped<IAnalyticsAggregationService, AnalyticsAggregationService>();

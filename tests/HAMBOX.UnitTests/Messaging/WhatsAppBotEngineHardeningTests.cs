@@ -34,7 +34,7 @@ public sealed class WhatsAppBotEngineHardeningTests
 
         return new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
-            new GetProductsQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider(), NullLogger<GetProductsQueryHandler>.Instance),
+            new GetProductsQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
             new GetProductByIdQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider()),
             new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, currentUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),

@@ -125,4 +125,44 @@ public sealed class RateLimitingPolicyTests : IAsyncLifetime
         Assert.All(statuses.Take(30), status => Assert.Equal(HttpStatusCode.Forbidden, status));
         Assert.Equal(HttpStatusCode.TooManyRequests, statuses[30]);
     }
+
+    /// <summary>
+    /// <c>POST api/auth/refresh</c> is protected by <c>RateLimitPolicies.Refresh</c>
+    /// (30 requests / 60s). No cookie is attached, so every request the limiter admits reaches the
+    /// endpoint's own missing-cookie check and is rejected 401 — proving the limiter gates the
+    /// endpoint itself, not just its business logic.
+    /// </summary>
+    [Fact]
+    public async Task Refresh_AllowsThirtyRequests_ThenBlocksThirtyFirstWith429()
+    {
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 31; i++)
+        {
+            using var response = await _client.PostAsync("api/auth/refresh", null);
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(30), status => Assert.Equal(HttpStatusCode.Unauthorized, status));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[30]);
+    }
+
+    /// <summary>
+    /// <c>POST api/auth/logout</c> shares <c>RateLimitPolicies.Refresh</c> with <c>refresh</c>. No
+    /// cookie is attached, so every request the limiter admits reaches the endpoint's idempotent
+    /// "nothing to log out" path and returns 200 — proving the limiter is attached even though the
+    /// endpoint itself never fails for a missing cookie.
+    /// </summary>
+    [Fact]
+    public async Task Logout_AllowsThirtyRequests_ThenBlocksThirtyFirstWith429()
+    {
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 31; i++)
+        {
+            using var response = await _client.PostAsync("api/auth/logout", null);
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(30), status => Assert.Equal(HttpStatusCode.OK, status));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[30]);
+    }
 }

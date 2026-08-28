@@ -3708,6 +3708,11 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("RevokedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<Guid>("SessionId")
                         .HasColumnType("uniqueidentifier");
 

@@ -99,7 +99,15 @@ public sealed record SupplierMappingDto(
     /// <summary>Null exactly when Manual, or when no supplier row exists yet for this mapping — the frontend renders that the same as "Unknown".</summary>
     string? AvailabilityState = null,
     int? AvailableQuantity = null,
-    DateTimeOffset? AvailabilityLastCheckedAtUtc = null);
+    DateTimeOffset? AvailabilityLastCheckedAtUtc = null,
+    /// <summary>Null means "use the platform default margin" (Commerce Platform Settings).</summary>
+    decimal? MarginPercentOverride = null,
+    /// <summary>The margin actually applied when this mapping was last priced — override if set, else the platform default at that time.</summary>
+    decimal? EffectiveMarginPercent = null,
+    /// <summary>Buying price × (1 + effective margin), in the mapping's own currency — admin-only, never exposed on any customer-facing DTO.</summary>
+    decimal? SellingPrice = null,
+    /// <summary>True when this mapping is the one currently driving the variant/product's storefront <c>EffectivePrice</c>.</summary>
+    bool IsSelectedForPricing = false);
 
 /// <summary>
 /// Counts for the supplier detail page's availability status section — always computed from the same
@@ -121,7 +129,8 @@ public sealed record CreateSupplierMappingRequest(
     decimal BuyingPrice,
     string Currency,
     int Priority,
-    Guid? InternalProductVariantId = null);
+    Guid? InternalProductVariantId = null,
+    decimal? MarginPercentOverride = null);
 
 /// <summary>
 /// One entry in a product/variant's fulfillment chain — safe metadata only (no credential values,
@@ -150,7 +159,8 @@ public sealed record UpdateSupplierMappingRequest(
     decimal BuyingPrice,
     string Currency,
     int Priority,
-    string Status);
+    string Status,
+    decimal? MarginPercentOverride = null);
 
 /// <summary>One selectable supplier catalog product — safe display fields only, mirrors <c>ISupplierProvider.SupplierCatalogItem</c> at the HTTP boundary.</summary>
 public sealed record SupplierCatalogItemDto(
@@ -227,3 +237,32 @@ public sealed record ProductVariantSupplierMappingDto(
     int? Priority,
     string? AvailabilityState,
     string MappingStatus);
+
+/// <summary>
+/// One routing decision for one order item's shortfall, from <c>SupplierRoutingAuditLog</c> — admin-facing
+/// only (surfaced via the admin order-detail page), and safe: cost is the supplier's internal acquisition
+/// cost, never the customer's selling price, and <see cref="Candidates"/> never carries a credential.
+/// </summary>
+public sealed record SupplierRoutingAuditLogDto(
+    Guid Id,
+    Guid OrderId,
+    Guid OrderItemId,
+    Guid? SelectedSupplierId,
+    string? SelectedSupplierName,
+    Guid? SelectedSupplierProductMappingId,
+    decimal? SelectedCostInBaseCurrency,
+    string BaseCurrency,
+    bool FallbackOccurred,
+    IReadOnlyList<SupplierRoutingCandidateSummaryDto> Candidates,
+    DateTimeOffset CreatedOnUtc);
+
+/// <summary>One considered candidate — either eligible (with cost) or rejected (with a safe reason), parsed from <c>SupplierRoutingAuditLog.CandidatesJson</c>.</summary>
+public sealed record SupplierRoutingCandidateSummaryDto(
+    string SupplierName,
+    string ProviderType,
+    bool Eligible,
+    bool Selected,
+    decimal? CostInBaseCurrency,
+    string? OriginalCurrency,
+    decimal? OriginalCost,
+    string? RejectionReason);

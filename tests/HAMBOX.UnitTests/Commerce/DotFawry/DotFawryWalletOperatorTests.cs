@@ -27,7 +27,7 @@ public sealed class DotFawryWalletOperatorTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -54,7 +54,7 @@ public sealed class DotFawryWalletOperatorTests
         await harness.SeedCartAsync(product, variant);
 
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
         Assert.True(initiation.IsSuccess);
 
@@ -76,7 +76,7 @@ public sealed class DotFawryWalletOperatorTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -86,7 +86,7 @@ public sealed class DotFawryWalletOperatorTests
     public async Task Validator_UnknownWallet_FailsValidation()
     {
         var validator = new InitiateDotFawryCheckoutCommandValidator();
-        var command = new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Etisalat");
+        var command = new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Etisalat", "127.0.0.1", "test-agent", "en");
 
         var validation = await validator.ValidateAsync(command);
 
@@ -105,7 +105,7 @@ public sealed class DotFawryWalletOperatorTests
         await harness.SeedCartAsync(product, variant);
 
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
         Assert.True(initiation.IsSuccess);
 
@@ -206,7 +206,7 @@ public sealed class DotFawryWalletOperatorTests
 
         // Charge itself returns "1000 processing" — the expected asynchronous path.
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
         Assert.True(initiation.IsSuccess);
 
@@ -230,7 +230,7 @@ public sealed class DotFawryWalletOperatorTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, wallet, "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);

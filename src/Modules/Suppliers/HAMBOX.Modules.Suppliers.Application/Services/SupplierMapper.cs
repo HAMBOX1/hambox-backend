@@ -61,24 +61,38 @@ public static class SupplierMapper
         SupplierProductMapping mapping,
         string? internalProductName = null,
         string? internalVariantSku = null,
-        SupplierProductAvailability? availability = null) => new(
-        mapping.Id,
-        mapping.SupplierId,
-        mapping.InternalProductId,
-        mapping.InternalProductVariantId,
-        mapping.ExternalProductId,
-        mapping.ExternalSku,
-        mapping.ExternalName,
-        mapping.BuyingPrice,
-        mapping.Currency,
-        mapping.Priority,
-        mapping.Status.ToString(),
-        mapping.CreatedOnUtc,
-        internalProductName,
-        internalVariantSku,
-        availability?.AvailabilityState.ToString(),
-        availability?.AvailableQuantity,
-        availability?.LastCheckedAtUtc);
+        SupplierProductAvailability? availability = null,
+        decimal? defaultMarginPercent = null,
+        Guid? selectedMappingIdForPricing = null)
+    {
+        var effectiveMarginPercent = mapping.MarginPercentOverride ?? defaultMarginPercent;
+        var sellingPrice = effectiveMarginPercent is decimal margin
+            ? mapping.BuyingPrice * (1 + margin / 100m)
+            : (decimal?)null;
+
+        return new(
+            mapping.Id,
+            mapping.SupplierId,
+            mapping.InternalProductId,
+            mapping.InternalProductVariantId,
+            mapping.ExternalProductId,
+            mapping.ExternalSku,
+            mapping.ExternalName,
+            mapping.BuyingPrice,
+            mapping.Currency,
+            mapping.Priority,
+            mapping.Status.ToString(),
+            mapping.CreatedOnUtc,
+            internalProductName,
+            internalVariantSku,
+            availability?.AvailabilityState.ToString(),
+            availability?.AvailableQuantity,
+            availability?.LastCheckedAtUtc,
+            mapping.MarginPercentOverride,
+            effectiveMarginPercent,
+            sellingPrice,
+            selectedMappingIdForPricing == mapping.Id);
+    }
 
     public static SupplierCatalogItemDto ToCatalogItemDto(SupplierCatalogItem item) => new(
         item.ExternalProductId,

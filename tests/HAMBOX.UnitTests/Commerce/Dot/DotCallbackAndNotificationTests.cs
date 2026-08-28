@@ -15,7 +15,7 @@ public sealed class DotCallbackAndNotificationTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash", "127.0.0.1", "test-agent", "en"), CancellationToken.None);
         Assert.True(result.IsSuccess);
 
         var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == result.Value.PaymentAttemptId);

@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Domain.Fulfillments;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Suppliers.Infrastructure.Providers.Visoria;
@@ -11,9 +12,13 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Providers.Visoria;
 /// <c>Providers/Visoria/</c> — <see cref="ISupplierFulfillmentService"/> and everything above it never
 /// sees any of it, only the generic <see cref="ISupplierProvider"/> surface.
 /// </summary>
-internal sealed class VisoriaSupplierProvider(VisoriaHttpClient httpClient, ILogger<VisoriaSupplierProvider> logger) : ISupplierProvider
+internal sealed class VisoriaSupplierProvider(VisoriaHttpClient httpClient, IMemoryCache cache, ILogger<VisoriaSupplierProvider> logger) : ISupplierProvider
 {
     public string ProviderType => VisoriaProviderConstants.ProviderType;
+
+    // No quantity cap is documented anywhere in the Visoria API — an order line already accepts an
+    // arbitrary Quantity, so no cap is declared here.
+    public int? MaxQuantityPerPurchase => null;
 
     public async Task<SupplierConnectionTestResult> TestConnectionAsync(SupplierProviderContext context, CancellationToken cancellationToken = default)
     {
@@ -69,7 +74,11 @@ internal sealed class VisoriaSupplierProvider(VisoriaHttpClient httpClient, ILog
             // against the OpenAPI spec's parameter list — unlike Bamboo's documented `Name` filter) —
             // pulled in bounded pages and filtered client-side here, the same bounded-pull shape
             // GetAvailabilityAsync already uses below for the identical "no per-term lookup" situation.
-            var products = await PullCatalogAsync(context.Credentials, cancellationToken);
+            // Cached briefly per supplier (search only — GetAvailabilityAsync below always pulls fresh):
+            // the admin UI's search box fires one request per keystroke, and without this every keystroke
+            // re-pulled the whole catalog (up to MaxCatalogPages real HTTP calls to Visoria each time),
+            // which is both slow and quick to trip Visoria's own rate limiting.
+            var products = await GetCachedCatalogAsync(context, cancellationToken);
 
             IEnumerable<VisoriaProduct> filtered = products;
             if (!string.IsNullOrWhiteSpace(query.SearchTerm))
@@ -118,6 +127,27 @@ internal sealed class VisoriaSupplierProvider(VisoriaHttpClient httpClient, ILog
 
     /// <summary>Bounded so an unexpectedly large catalog can never turn one call into an unbounded number of HTTP requests.</summary>
     private const int MaxCatalogPages = 10;
+
+    /// <summary>How long a pulled catalog stays fresh enough to reuse across the search box's rapid-fire
+    /// keystroke requests. Short on purpose — this only smooths out one interactive search session, it's
+    /// never relied on for the availability sync's own correctness (that path never reads this cache).</summary>
+    private static readonly TimeSpan SearchCatalogCacheTtl = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Search-only cache in front of <see cref="PullCatalogAsync"/> — <see cref="GetAvailabilityAsync"/>
+    /// still calls <see cref="PullCatalogAsync"/> directly and always gets a live pull, so this can never
+    /// make availability/fulfillment sync see stale data. Keyed per supplier since each supplier carries
+    /// its own credentials and could plausibly resolve to a different Visoria account/catalog.
+    /// </summary>
+    private Task<List<VisoriaProduct>> GetCachedCatalogAsync(SupplierProviderContext context, CancellationToken cancellationToken)
+    {
+        var cacheKey = $"visoria:search-catalog:{context.SupplierId}";
+        return cache.GetOrCreateAsync(cacheKey, entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = SearchCatalogCacheTtl;
+            return PullCatalogAsync(context.Credentials, cancellationToken);
+        })!;
+    }
 
     private async Task<List<VisoriaProduct>> PullCatalogAsync(SupplierProviderCredentials credentials, CancellationToken cancellationToken)
     {

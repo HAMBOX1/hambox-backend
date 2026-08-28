@@ -17,6 +17,9 @@ internal sealed class FakeSupplierProvider(string providerType = "Fake") : ISupp
 
     public string ProviderType => providerType;
 
+    /// <summary>Settable so routing-engine tests can simulate a provider that caps quantity (e.g. GlobeTopper's real 1).</summary>
+    public int? MaxQuantityPerPurchase { get; set; }
+
     public IReadOnlyList<PurchaseCallRecord> PurchaseCalls => _purchaseCalls;
 
     public IReadOnlyList<StatusCallRecord> StatusCalls => _statusCalls;

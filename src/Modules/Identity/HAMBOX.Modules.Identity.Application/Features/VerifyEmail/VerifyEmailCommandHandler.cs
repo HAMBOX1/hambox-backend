@@ -1,5 +1,6 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
+using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -15,8 +16,11 @@ internal sealed class VerifyEmailCommandHandler(IIdentityDbContext dbContext) : 
     /// <inheritdoc />
     public async Task<Result> Handle(VerifyEmailCommand request, CancellationToken cancellationToken)
     {
+        // EmailVerificationTokens.Token stores only the SHA-256 hash — the incoming plaintext (from
+        // the verification link) must be hashed the same way before the lookup can match it.
+        var lookupHash = EmailVerificationToken.GetLookupHash(request.Token);
         var token = await dbContext.EmailVerificationTokens
-            .FirstOrDefaultAsync(t => t.Token == request.Token, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == lookupHash, cancellationToken);
 
         if (token is null)
         {

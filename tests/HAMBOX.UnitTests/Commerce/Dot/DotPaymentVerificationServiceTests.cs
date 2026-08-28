@@ -18,7 +18,7 @@ public sealed class DotPaymentVerificationServiceTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash", "127.0.0.1", "test-agent", "en"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         return (harness, result.Value.PaymentAttemptId, result.Value.OrderId);
@@ -191,7 +191,7 @@ public sealed class DotPaymentVerificationServiceTests
         // the point of this test is isolation during finalize, not another full initiate flow).
         var orderB = Order.Create(
             "user-2", $"ORD-{Guid.NewGuid():N}", "buyer2@example.com", "US", "dot",
-            25m, 0m, 0m, 25m, [(Guid.NewGuid(), "Other Product", 1, 25m, (Guid?)null, (string?)null)]);
+            25m, 0m, 0m, 25m, [(Guid.NewGuid(), "Other Product", 1, 25m, (Guid?)null, (string?)null, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)]);
         var attemptB = PaymentAttempt.CreatePendingDot(
             orderB.Id, "partner-txid-B", "21", "1", 25m, "USD", DateTimeOffset.UtcNow.AddMinutes(30), null);
         harnessA.CommerceDb.Orders.Add(orderB);
@@ -220,7 +220,7 @@ public sealed class DotPaymentVerificationServiceTests
         await harness.SeedCartAsync(product, variant, quantity: 1);
 
         var initiation = await harness.InitiateHandler.Handle(
-            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash"), CancellationToken.None);
+            new InitiateDotCheckoutCommand("buyer@example.com", "US", "OrangeCash", "127.0.0.1", "test-agent", "en"), CancellationToken.None);
         Assert.True(initiation.IsSuccess);
 
         // Stock disappears between initiation and confirmation (e.g. another channel sold it) —

@@ -16,7 +16,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", "Buyer Name", "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", "Buyer Name", "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -61,7 +61,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -83,7 +83,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -109,7 +109,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -126,7 +126,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         await harness.SeedCartAsync(product, variant);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -144,7 +144,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         var harness = DotFawryTestHarness.Create(userId: null);
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -157,7 +157,7 @@ public sealed class InitiateDotFawryCheckoutCommandHandlerTests
         var harness = DotFawryTestHarness.Create();
 
         var result = await harness.InitiateHandler.Handle(
-            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry"),
+            new InitiateDotFawryCheckoutCommand("buyer@example.com", "EG", "201001234567", null, "Fawry", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);

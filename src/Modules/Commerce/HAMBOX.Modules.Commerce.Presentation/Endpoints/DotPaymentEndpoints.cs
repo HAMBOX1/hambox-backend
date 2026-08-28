@@ -31,9 +31,17 @@ internal static class DotPaymentEndpoints
 
         group.MapPost("checkout/dot", async Task<Results<Ok<DotCheckoutInitiationDto>, BadRequest<ProblemDetails>>> (
             [FromBody] InitiateDotCheckoutRequest request,
+            HttpContext httpContext,
             ISender sender) =>
         {
-            var result = await sender.Send(new InitiateDotCheckoutCommand(request.Email, request.Country, request.Wallet));
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() is { Length: > 0 } ua ? ua : "unknown";
+            var language = httpContext.Request.Headers["Accept-Language"].ToString() is { Length: > 0 } acceptLanguage
+                ? acceptLanguage.Split(',')[0].Split(';')[0].Trim()
+                : "en";
+
+            var result = await sender.Send(new InitiateDotCheckoutCommand(
+                request.Email, request.Country, request.Wallet, ipAddress, userAgent, language));
 
             if (result.IsSuccess)
             {

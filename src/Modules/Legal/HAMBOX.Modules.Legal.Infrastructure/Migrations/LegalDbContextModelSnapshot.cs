@@ -143,6 +143,9 @@ namespace HAMBOX.Modules.Legal.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("UserAgent")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -157,6 +160,8 @@ namespace HAMBOX.Modules.Legal.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
 
                     b.HasIndex("UserId", "LegalSectionId", "AcceptedAtUtc");
 

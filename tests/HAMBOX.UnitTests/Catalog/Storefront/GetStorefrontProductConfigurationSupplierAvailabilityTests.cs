@@ -172,7 +172,7 @@ public sealed class GetStorefrontProductConfigurationSupplierAvailabilityTests
 
         var cart = ShoppingCart.CreateForUser("user-1");
         cart.AddOrUpdateItem(product.Id, 1, product.Price, variant.Id);
-        var validator = new CartLineValidator(inventory, router);
+        var validator = new CartLineValidator(inventory, router, new NullSupplierPricingEngine());
         var checkoutResult = await validator.ValidateAsync(
             cart,
             new Dictionary<Guid, Product> { [product.Id] = product },

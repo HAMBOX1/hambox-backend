@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\HAMBOX.Modules.Commerce.Domain\HAMBOX.Modules.Commerce.Domain.csproj" />
     <ProjectReference Include="..\..\Catalog\HAMBOX.Modules.Catalog.Application\HAMBOX.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\Legal\HAMBOX.Modules.Legal.Application\HAMBOX.Modules.Legal.Application.csproj" />
     <ProjectReference Include="..\..\Suppliers\HAMBOX.Modules.Suppliers.Application\HAMBOX.Modules.Suppliers.Application.csproj" />
     <ProjectReference Include="..\..\Themes\HAMBOX.Modules.Themes.Application\HAMBOX.Modules.Themes.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />

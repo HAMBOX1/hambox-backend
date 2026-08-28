@@ -5,6 +5,7 @@ using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Domain.Fulfillments;
 using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Visoria;
 using HAMBOX.UnitTests.Suppliers.TestDoubles;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -33,7 +34,7 @@ public sealed class VisoriaSupplierProviderTests
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri(VisoriaProviderConstants.BaseUrl) };
         var options = Options.Create(new VisoriaProviderOptions { RequestTimeoutSeconds = timeoutSeconds, MaxResponseBytes = 1024 * 1024 });
         var visoriaHttp = new VisoriaHttpClient(httpClient, options, NullLogger<VisoriaHttpClient>.Instance);
-        var provider = new VisoriaSupplierProvider(visoriaHttp, logger ?? NullLogger<VisoriaSupplierProvider>.Instance);
+        var provider = new VisoriaSupplierProvider(visoriaHttp, new MemoryCache(new MemoryCacheOptions()), logger ?? NullLogger<VisoriaSupplierProvider>.Instance);
         return (provider, handler);
     }
 
@@ -250,7 +251,7 @@ public sealed class VisoriaSupplierProviderTests
         var handler = new FakeHttpMessageHandler((req, ct) => throw new InvalidOperationException("must not call Visoria without a currency"));
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri(VisoriaProviderConstants.BaseUrl) };
         var visoriaHttp = new VisoriaHttpClient(httpClient, Options.Create(new VisoriaProviderOptions()), NullLogger<VisoriaHttpClient>.Instance);
-        var provider = new VisoriaSupplierProvider(visoriaHttp, NullLogger<VisoriaSupplierProvider>.Instance);
+        var provider = new VisoriaSupplierProvider(visoriaHttp, new MemoryCache(new MemoryCacheOptions()), NullLogger<VisoriaSupplierProvider>.Instance);
 
         var result = await provider.PurchaseAsync(CreatePurchaseRequest(currency: null), CreateContext());
 

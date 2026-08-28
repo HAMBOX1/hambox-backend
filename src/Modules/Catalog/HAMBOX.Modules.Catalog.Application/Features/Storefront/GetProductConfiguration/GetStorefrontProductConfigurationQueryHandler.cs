@@ -74,12 +74,16 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
             ? await _fulfillmentRouter.GetReadinessBulkAsync(variants.Select(v => v.Id), cancellationToken)
             : new Dictionary<Guid, FulfillmentReadiness>();
 
+        var supplierEffectivePrices = variants.Count > 0
+            ? await _fulfillmentRouter.GetEffectivePriceOverridesBulkAsync(variants.Select(v => v.Id), cancellationToken)
+            : new Dictionary<Guid, decimal>();
+
         if (!request.AllowUnpublished)
         {
             await TryLogProductViewAsync(request.ProductId, cancellationToken);
         }
 
-        return Result.Success(StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock, readiness));
+        return Result.Success(StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock, readiness, supplierEffectivePrices));
     }
 
     private async Task TryLogProductViewAsync(Guid productId, CancellationToken cancellationToken)

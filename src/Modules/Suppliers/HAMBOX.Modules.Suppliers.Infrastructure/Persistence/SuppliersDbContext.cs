@@ -17,6 +17,8 @@ public sealed class SuppliersDbContext(DbContextOptions<SuppliersDbContext> opti
     public DbSet<SupplierAuditLog> SupplierAuditLogs => Set<SupplierAuditLog>();
     public DbSet<SupplierFulfillment> SupplierFulfillments => Set<SupplierFulfillment>();
     public DbSet<SupplierProductAvailability> SupplierProductAvailabilities => Set<SupplierProductAvailability>();
+    public DbSet<SupplierRoutingAuditLog> SupplierRoutingAuditLogs => Set<SupplierRoutingAuditLog>();
+    public DbSet<SupplierDerivedPrice> SupplierDerivedPrices => Set<SupplierDerivedPrice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

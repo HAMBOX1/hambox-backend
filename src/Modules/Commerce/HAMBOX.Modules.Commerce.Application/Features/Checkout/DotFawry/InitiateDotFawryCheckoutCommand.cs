@@ -27,5 +27,8 @@ public sealed record InitiateDotFawryCheckoutCommand(
     string Country,
     string PhoneNumber,
     string? CustomerName,
-    string Wallet)
+    string Wallet,
+    string IpAddress,
+    string UserAgent,
+    string Language)
     : IRequest<Result<DotFawryCheckoutInitiationDto>>, IIdempotentRequest<DotFawryCheckoutInitiationDto>;

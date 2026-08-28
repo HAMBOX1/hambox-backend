@@ -5,7 +5,6 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// </summary>
 public sealed record StorefrontContentDto(
     StorefrontHeroDto Hero,
-    StorefrontAnnouncementBarDto AnnouncementBar,
     StorefrontPromoBannerDto PromoBanner,
     StorefrontFlashDealsDto FlashDeals,
     StorefrontFeaturedCollectionsDto FeaturedCollections,
@@ -28,15 +27,6 @@ public sealed record StorefrontHeroDto(
     string BadgeText,
     string BadgeColor,
     bool Visible);
-
-public sealed record StorefrontAnnouncementBarDto(
-    string Text,
-    string? Link,
-    string? ButtonText,
-    string BackgroundColor,
-    string TextColor,
-    bool Visible,
-    string DisplayPosition);
 
 public sealed record StorefrontPromoBannerDto(
     string Title,

@@ -3,6 +3,7 @@ using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
 using HAMBOX.UnitTests.Catalog.Inventory.VariantLifecycle;
+using HAMBOX.UnitTests.Commerce.TestDoubles;
 using HAMBOX.UnitTests.Suppliers.TestDoubles;
 
 namespace HAMBOX.UnitTests.Suppliers;
@@ -34,7 +35,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
         db.SupplierProductMappings.AddRange(productWideMapping, variantMapping);
         await db.SaveChangesAsync();
 
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb);
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
         var result = await handler.Handle(new GetSupplierMappingsQuery(supplier.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -59,7 +60,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
         db.SupplierProductMappings.Add(mapping);
         await db.SaveChangesAsync();
 
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb);
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
         var result = await handler.Handle(new GetSupplierMappingsQuery(supplier.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -73,7 +74,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
     {
         await using var db = SuppliersTestDbContextFactory.Create();
         var catalogDb = TestCatalogDbContextFactory.Create();
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb);
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
 
         var result = await handler.Handle(new GetSupplierMappingsQuery(Guid.NewGuid()), CancellationToken.None);
 

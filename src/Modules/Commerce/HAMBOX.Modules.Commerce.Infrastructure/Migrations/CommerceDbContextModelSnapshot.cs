@@ -1392,6 +1392,9 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<decimal>("LineTotal")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("MarginPercentAppliedAtOrderTime")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<Guid?>("MembershipPlanId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1414,6 +1417,15 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("SelectedSupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SelectedSupplierProductMappingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("SupplierBuyingPriceAtOrderTime")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");

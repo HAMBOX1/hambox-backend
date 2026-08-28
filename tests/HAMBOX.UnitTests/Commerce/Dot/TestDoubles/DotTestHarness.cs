@@ -62,12 +62,13 @@ internal sealed class DotTestHarness
         var cartResponseBuilder = new CartResponseBuilder(
             commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
         var fulfillmentRouter = new FakeFulfillmentRouter();
-        var cartLineValidator = new CartLineValidator(inventoryEngine, fulfillmentRouter);
+        var cartLineValidator = new CartLineValidator(inventoryEngine, fulfillmentRouter, new NullSupplierPricingEngine());
         var membershipAccess = new FakeMembershipAccessProvider();
 
         var initiateHandler = new InitiateDotCheckoutCommandHandler(
             commerceDb,
             catalogDb,
+            LegalTestDbContextFactory.Create(),
             currentUser,
             inventoryEngine,
             cartResponseBuilder,
@@ -81,7 +82,9 @@ internal sealed class DotTestHarness
 
         var transactionService = new FakeCommerceTransactionService();
         var fulfillmentService = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), fulfillmentRouter, NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), fulfillmentRouter,
+            new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+            NullLogger<OrderFulfillmentService>.Instance);
         var promotionRedemptionService = new PromotionRedemptionService(commerceDb);
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(

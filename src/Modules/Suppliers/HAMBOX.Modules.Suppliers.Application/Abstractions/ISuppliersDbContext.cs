@@ -11,6 +11,8 @@ public interface ISuppliersDbContext
     DbSet<SupplierAuditLog> SupplierAuditLogs { get; }
     DbSet<SupplierFulfillment> SupplierFulfillments { get; }
     DbSet<SupplierProductAvailability> SupplierProductAvailabilities { get; }
+    DbSet<SupplierRoutingAuditLog> SupplierRoutingAuditLogs { get; }
+    DbSet<SupplierDerivedPrice> SupplierDerivedPrices { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

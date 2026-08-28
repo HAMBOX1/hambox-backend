@@ -21,6 +21,15 @@ public sealed class RateLimitingSettings
     /// Limiter applied to account-action endpoints (register, forgot/reset password, resend verification).
     /// </summary>
     public RateLimitPolicySettings AccountActions { get; init; } = new() { PermitLimit = 10, WindowSeconds = 60 };
+
+    /// <summary>
+    /// Limiter applied to the cookie-authenticated <c>refresh</c>/<c>logout</c> endpoints. Deliberately
+    /// more generous than <see cref="Login"/>: refresh is not a credential-guessing surface (it requires
+    /// an already-issued HttpOnly cookie, not a guessable secret) and legitimate traffic can call it
+    /// often — multiple open tabs each independently recovering from a 401, background token renewal,
+    /// etc. This exists purely as abuse/DoS backstop, not brute-force defense.
+    /// </summary>
+    public RateLimitPolicySettings Refresh { get; init; } = new() { PermitLimit = 30, WindowSeconds = 60 };
 }
 
 /// <summary>

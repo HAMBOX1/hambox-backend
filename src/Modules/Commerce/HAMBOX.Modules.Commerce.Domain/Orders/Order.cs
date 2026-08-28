@@ -152,7 +152,8 @@ public sealed class Order : AggregateRoot
         decimal discountAmount,
         decimal taxAmount,
         decimal totalAmount,
-        IEnumerable<(Guid ProductId, string ProductNameEn, int Quantity, decimal UnitPrice, Guid? ProductVariantId, string? VariantSku)> items)
+        IEnumerable<(Guid ProductId, string ProductNameEn, int Quantity, decimal UnitPrice, Guid? ProductVariantId, string? VariantSku,
+            Guid? SelectedSupplierId, Guid? SelectedSupplierProductMappingId, decimal? SupplierBuyingPriceAtOrderTime, decimal? MarginPercentAppliedAtOrderTime)> items)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(orderNumber);
@@ -181,7 +182,11 @@ public sealed class Order : AggregateRoot
                 item.Quantity,
                 item.UnitPrice,
                 item.ProductVariantId,
-                item.VariantSku));
+                item.VariantSku,
+                item.SelectedSupplierId,
+                item.SelectedSupplierProductMappingId,
+                item.SupplierBuyingPriceAtOrderTime,
+                item.MarginPercentAppliedAtOrderTime));
         }
 
         return order;

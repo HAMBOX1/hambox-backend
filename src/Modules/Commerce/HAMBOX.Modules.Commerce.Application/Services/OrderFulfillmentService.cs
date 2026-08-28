@@ -6,6 +6,8 @@ using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
+using HAMBOX.Modules.Suppliers.Application.Contracts;
+using HAMBOX.Modules.Suppliers.Domain.Fulfillments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -25,6 +27,8 @@ public sealed class OrderFulfillmentService
     private readonly IInventoryEngine _inventoryEngine;
     private readonly ISupplierFulfillmentService _supplierFulfillmentService;
     private readonly IFulfillmentRouter _router;
+    private readonly ISupplierPricingEngine _pricingEngine;
+    private readonly ISuppliersDbContext _suppliersDb;
     private readonly ILogger<OrderFulfillmentService> _logger;
 
     public OrderFulfillmentService(
@@ -32,12 +36,16 @@ public sealed class OrderFulfillmentService
         IInventoryEngine inventoryEngine,
         ISupplierFulfillmentService supplierFulfillmentService,
         IFulfillmentRouter router,
+        ISupplierPricingEngine pricingEngine,
+        ISuppliersDbContext suppliersDb,
         ILogger<OrderFulfillmentService> logger)
     {
         _commerceDb = commerceDb;
         _inventoryEngine = inventoryEngine;
         _supplierFulfillmentService = supplierFulfillmentService;
         _router = router;
+        _pricingEngine = pricingEngine;
+        _suppliersDb = suppliersDb;
         _logger = logger;
     }
 
@@ -273,54 +281,197 @@ public sealed class OrderFulfillmentService
 
             shortfallLines++;
 
-            var candidate = readiness.SupplierCandidate;
-            if (candidate is null)
+            // Cheapest-eligible-supplier selection, ranked by SELLING price (cost + margin) via
+            // ISupplierPricingEngine — this guarantees the supplier actually purchased from here is
+            // always the same one the customer's displayed price was computed from (see that
+            // interface's remarks for why ranking by raw cost alone would not guarantee this when
+            // suppliers have different margins). Never any live provider call (still a "fast local
+            // decision", inherited from ISupplierRoutingEngine).
+            var routing = await _pricingEngine.ResolveAsync(
+                new SupplierRoutingRequest(item.ProductId!.Value, variantId, shortfall), cancellationToken);
+
+            if (routing.RankedBySellingPriceAscending.Count == 0)
             {
                 _logger.LogInformation(
-                    "FulfillmentRouting: order {OrderId} item {OrderItemId} mode {Mode} — no READY automated supplier candidate, shortfall {Shortfall} left uncovered.",
+                    "FulfillmentRouting: order {OrderId} item {OrderItemId} mode {Mode} — no eligible automated supplier candidate, shortfall {Shortfall} left uncovered.",
                     order.Id, item.Id, readiness.Mode, shortfall);
                 noSupplierAvailable++;
+                await RecordRoutingDecisionAsync(order.Id, item.Id, selected: null, routing, fallbackOccurred: false, cancellationToken);
                 continue;
             }
 
-            _logger.LogInformation(
-                "FulfillmentRouting: order {OrderId} item {OrderItemId} mode {Mode} — routing {Shortfall} unit(s) to supplier {SupplierId}.",
-                order.Id, item.Id, readiness.Mode, shortfall, candidate.SupplierId);
+            SupplierPricingCandidate? selectedCandidate = null;
+            var fallbackOccurred = false;
+            var exhausted = true;
+            var anyAttemptQueued = false;
 
-            try
+            for (var i = 0; i < routing.RankedBySellingPriceAscending.Count; i++)
             {
-                var requestResult = await _supplierFulfillmentService.RequestFulfillmentAsync(
-                    new SupplierFulfillmentRequest(order.Id, item.Id, candidate.SupplierId, candidate.SupplierProductMappingId, shortfall),
-                    cancellationToken);
+                var candidate = routing.RankedBySellingPriceAscending[i];
+                var isLastCandidate = i == routing.RankedBySellingPriceAscending.Count - 1;
 
-                if (requestResult.IsFailure)
+                _logger.LogInformation(
+                    "FulfillmentRouting: order {OrderId} item {OrderItemId} mode {Mode} — attempting {Shortfall} unit(s) via supplier {SupplierId} (attempt {Attempt}/{Total}).",
+                    order.Id, item.Id, readiness.Mode, shortfall, candidate.SupplierId, i + 1, routing.RankedBySellingPriceAscending.Count);
+
+                try
                 {
-                    _logger.LogWarning(
-                        "Automated supplier fulfillment request was rejected for order {OrderId} item {OrderItemId}: {ErrorCode}.",
-                        order.Id, item.Id, requestResult.Error.Code);
-                    continue;
+                    var requestResult = await _supplierFulfillmentService.RequestFulfillmentAsync(
+                        new SupplierFulfillmentRequest(order.Id, item.Id, candidate.SupplierId, candidate.SupplierProductMappingId, shortfall),
+                        cancellationToken);
+
+                    if (requestResult.IsFailure)
+                    {
+                        // Rejected before any external call was ever made (e.g. a race where the mapping
+                        // was disabled between routing and this attempt, or another worker currently owns
+                        // the claim) — safe to consider the next candidate, per the "definitive failure
+                        // before creating the supplier order" rule. ConcurrentClaimLost is the one
+                        // exception: another in-flight worker already owns this exact candidate, so this
+                        // invocation backs off entirely rather than risking a second worker also failing
+                        // over onto a different supplier for the same shortfall.
+                        _logger.LogWarning(
+                            "Automated supplier fulfillment request was rejected for order {OrderId} item {OrderItemId}, supplier {SupplierId}: {ErrorCode}.",
+                            order.Id, item.Id, candidate.SupplierId, requestResult.Error.Code);
+
+                        if (requestResult.Error == HAMBOX.Modules.Suppliers.Application.Errors.SupplierErrors.ConcurrentClaimLost)
+                        {
+                            exhausted = false; // another worker is legitimately handling this — not "no supplier available"
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    // Counted once per SHORTFALL LINE (not per failover attempt) — an admin-facing coarse
+                    // count of "how many lines got at least one automated attempt", matching this
+                    // counter's meaning before failover existed; per-attempt/per-candidate detail lives
+                    // in the routing audit log instead (see RecordRoutingDecisionAsync).
+                    anyAttemptQueued = true;
+
+                    // Never re-purchase a resumed non-terminal attempt — mirrors the background sweep's
+                    // own rule (ProcessDueFulfillmentsAsync only ever calls ProcessAsync for Pending rows,
+                    // ReconcileAsync for everything else). A brand-new attempt (Pending) is the only case
+                    // safe to submit; Unknown/Submitted/Submitting means a purchase call already happened
+                    // for this exact candidate and must only ever be resolved via status lookup.
+                    var outcomeResult = requestResult.Value.Status == SupplierFulfillmentStatus.Pending
+                        ? await _supplierFulfillmentService.ProcessAsync(requestResult.Value.FulfillmentId, cancellationToken)
+                        : await _supplierFulfillmentService.ReconcileAsync(requestResult.Value.FulfillmentId, cancellationToken);
+
+                    if (outcomeResult.IsFailure)
+                    {
+                        // Claim race lost on this exact candidate, or the candidate became unusable
+                        // between the request and now — another worker/attempt owns this candidate's
+                        // outcome; never treated as "try the next supplier" since a real attempt may
+                        // already be in flight against it.
+                        exhausted = false;
+                        break;
+                    }
+
+                    var status = outcomeResult.Value.Status;
+                    if (status is SupplierFulfillmentStatus.Succeeded or SupplierFulfillmentStatus.PartialFailed)
+                    {
+                        // Delivered codes (resolved here or, for PartialFailed's remainder, later by the
+                        // existing sweep against this SAME supplier) are attached to OrderLicenseKey by
+                        // CommerceOrderLicenseKeyDeliverySink, invoked by SupplierFulfillmentService
+                        // itself — never here.
+                        selectedCandidate = candidate;
+                        exhausted = false;
+                        break;
+                    }
+
+                    if (status == SupplierFulfillmentStatus.Failed)
+                    {
+                        // Definite, zero-delivered outcome — safe to consider the next cheapest candidate.
+                        if (!isLastCandidate)
+                        {
+                            fallbackOccurred = true;
+                        }
+
+                        continue;
+                    }
+
+                    // Submitted/Submitting/Unknown — the outcome is ambiguous or still genuinely pending
+                    // (e.g. Bamboo's always-async acceptance). Per the explicit "ambiguous → stop, never
+                    // blindly try another supplier" requirement: this candidate is the one being resolved;
+                    // the existing reconciliation sweep will finish the job. Recorded as selected (an
+                    // attempt genuinely happened here) even though the terminal outcome isn't known yet.
+                    selectedCandidate = candidate;
+                    exhausted = false;
+                    break;
                 }
-
-                queued++;
-
-                // Best-effort immediate submission — if this fails or times out ambiguously, the
-                // fulfillment stays Pending/Unknown and the existing sweep (SupplierFulfillmentSweepJobHandler)
-                // picks it up; nothing here is load-bearing for correctness, only for speed. Delivered
-                // codes (whether resolved here synchronously or later by the sweep's reconciliation)
-                // are attached to OrderLicenseKey by CommerceOrderLicenseKeyDeliverySink, invoked by
-                // SupplierFulfillmentService itself — never here — so exactly one code path attaches
-                // codes regardless of which caller/timing actually resolved the purchase.
-                await _supplierFulfillmentService.ProcessAsync(requestResult.Value.FulfillmentId, cancellationToken);
+                catch (Exception ex)
+                {
+                    // An unexpected exception from RequestFulfillmentAsync/ProcessAsync/ReconcileAsync
+                    // themselves (not a provider-reported outcome) is ambiguous by the same rule — stop,
+                    // never fail over. The background sweep will retry this exact candidate.
+                    _logger.LogWarning(
+                        ex,
+                        "Automated supplier fulfillment attempt failed unexpectedly for order {OrderId} item {OrderItemId}, supplier {SupplierId} — the background sweep will retry.",
+                        order.Id, item.Id, candidate.SupplierId);
+                    selectedCandidate = candidate;
+                    exhausted = false;
+                    break;
+                }
             }
-            catch (Exception ex)
+
+            if (anyAttemptQueued)
             {
-                _logger.LogWarning(
-                    ex,
-                    "Automated supplier fulfillment attempt failed for order {OrderId} item {OrderItemId} — the background sweep will retry.",
-                    order.Id, item.Id);
+                queued++;
             }
+
+            if (exhausted)
+            {
+                // Every eligible candidate was tried and every one came back with a definite, zero-delivered failure.
+                noSupplierAvailable++;
+            }
+
+            await RecordRoutingDecisionAsync(order.Id, item.Id, selectedCandidate, routing, fallbackOccurred, cancellationToken);
         }
 
         return new AutomatedSupplierFulfillmentSummary(shortfallLines, queued, noSupplierAvailable);
     }
+
+    /// <summary>
+    /// Best-effort admin-audit write — never allowed to fail the actual fulfillment attempt it's
+    /// describing, mirroring <c>SupplierFulfillmentService.NotifyDeliverySinkAsync</c>'s identical
+    /// "log and move on" posture for a non-critical side write. See <c>SupplierRoutingAuditLog</c>'s own
+    /// remarks for why its contents are safe for an admin to see but must never be customer-facing.
+    /// </summary>
+    private async Task RecordRoutingDecisionAsync(
+        Guid orderId,
+        Guid orderItemId,
+        SupplierPricingCandidate? selected,
+        SupplierPricingResult routing,
+        bool fallbackOccurred,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var candidateSummaries = routing.RankedBySellingPriceAscending
+                .Select(c => new SupplierRoutingCandidateSummaryDto(
+                    c.SupplierName, c.ProviderType, Eligible: true, Selected: c.SupplierId == selected?.SupplierId && c.SupplierProductMappingId == selected?.SupplierProductMappingId,
+                    c.CostInBaseCurrency, c.OriginalCurrency, c.OriginalCost, RejectionReason: null))
+                .Concat(routing.Rejected.Select(r => new SupplierRoutingCandidateSummaryDto(
+                    r.SupplierName, ProviderType: string.Empty, Eligible: false, Selected: false,
+                    CostInBaseCurrency: null, OriginalCurrency: null, OriginalCost: null, RejectionReason: r.Reason)))
+                .ToList();
+
+            var candidatesJson = System.Text.Json.JsonSerializer.Serialize(candidateSummaries, JsonOptions);
+
+            var log = SupplierRoutingAuditLog.Create(
+                orderId, orderItemId, selected?.SupplierId, selected?.SupplierProductMappingId,
+                selected?.CostInBaseCurrency, routing.BaseCurrency, fallbackOccurred, candidatesJson);
+
+            _suppliersDb.SupplierRoutingAuditLogs.Add(log);
+            await _suppliersDb.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to record supplier routing audit for order {OrderId} item {OrderItemId} — the fulfillment attempt itself is unaffected.",
+                orderId, orderItemId);
+        }
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
 }

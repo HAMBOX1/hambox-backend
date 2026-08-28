@@ -60,22 +60,25 @@ public sealed class CheckoutCommandHandlerTests
         var handler = new CheckoutCommandHandler(
             commerceDb,
             catalogDb,
+            LegalTestDbContextFactory.Create(),
             new FakeCommerceTransactionService(),
             currentUser,
             inventoryEngine,
             cartResponseBuilder,
-            new CartLineValidator(inventoryEngine, new FakeFulfillmentRouter()),
+            new CartLineValidator(inventoryEngine, new FakeFulfillmentRouter(), new NullSupplierPricingEngine()),
             new PromotionRedemptionService(commerceDb),
             [new FakePaymentProvider()],
             new FakeCommunicationService(),
             new FakeMembershipAccessProvider(),
             referralLifecycle,
             new OrderFulfillmentService(
-                commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(), NullLogger<OrderFulfillmentService>.Instance),
+                commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
+                new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
+                NullLogger<OrderFulfillmentService>.Instance),
             NullLogger<CheckoutCommandHandler>.Instance);
 
         var result = await handler.Handle(
-            new CheckoutCommand("buyer@example.com", "US", "development"),
+            new CheckoutCommand("buyer@example.com", "US", "development", "127.0.0.1", "test-agent", "en"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);

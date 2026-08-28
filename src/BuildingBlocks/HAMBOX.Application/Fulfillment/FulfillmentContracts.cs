@@ -42,6 +42,17 @@ public interface IFulfillmentRouter
     /// </summary>
     Task<IReadOnlyDictionary<Guid, FulfillmentReadiness>> GetReadinessBulkAsync(
         IEnumerable<Guid> variantIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Bulk, cost-free read of the supplier-derived effective price for whichever of the given variants
+    /// currently have one — backed by a persisted cache (never a live computation, never a supplier
+    /// call), so this is safe to call for every variant on a storefront list/PDP response. A variant id
+    /// absent from the result has no supplier-derived override; the caller falls back to
+    /// <c>variant.PriceOverride ?? product.Price</c>. Never returns a supplier id, mapping id, or cost —
+    /// only the final customer-facing price.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, decimal>> GetEffectivePriceOverridesBulkAsync(
+        IEnumerable<Guid> variantIds, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

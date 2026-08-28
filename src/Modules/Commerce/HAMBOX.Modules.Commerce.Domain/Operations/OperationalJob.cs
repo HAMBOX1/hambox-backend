@@ -31,6 +31,7 @@ public static class OperationalJobTypes
     public const string ScanPriceDropAlerts = "ScanPriceDropAlerts";
     public const string ReconcileDotPayments = "ReconcileDotPayments";
     public const string ReconcileDotFawryPayments = "ReconcileDotFawryPayments";
+    public const string RecomputeSupplierDerivedPricing = "RecomputeSupplierDerivedPricing";
 }
 
 /// <summary>

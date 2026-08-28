@@ -11,6 +11,8 @@ using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Legal.Application.Abstractions;
+using HAMBOX.Modules.Legal.Application.Services;
 using HAMBOX.SharedKernel.Errors;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -23,6 +25,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 {
     private readonly ICommerceDbContext _commerceDbContext;
     private readonly ICatalogDbContext _catalogDbContext;
+    private readonly ILegalDbContext _legalDbContext;
     private readonly ICommerceTransactionService _transactionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IInventoryEngine _inventoryEngine;
@@ -39,6 +42,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     public CheckoutCommandHandler(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
+        ILegalDbContext legalDbContext,
         ICommerceTransactionService transactionService,
         ICurrentUserService currentUserService,
         IInventoryEngine inventoryEngine,
@@ -54,6 +58,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
+        _legalDbContext = legalDbContext;
         _transactionService = transactionService;
         _currentUserService = currentUserService;
         _inventoryEngine = inventoryEngine;
@@ -128,6 +133,9 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         {
             return Result.Failure<Contracts.OrderDto>(lineValidation.Error);
         }
+
+        CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
+        var resolvedPricingByLine = lineValidation.Value.Lines.ToDictionary(l => (l.ProductId, l.ProductVariantId));
 
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
             await _cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken);
@@ -221,13 +229,19 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                             sku = variant.Sku;
                         }
 
+                        var resolved = resolvedPricingByLine[(item.ProductId, variantId)];
+
                         return (
                             item.ProductId,
                             products[item.ProductId].NameEn,
                             item.Quantity,
                             item.UnitPrice,
                             variantId,
-                            sku);
+                            sku,
+                            resolved.SelectedSupplierId,
+                            resolved.SelectedSupplierProductMappingId,
+                            resolved.SupplierBuyingPriceAtOrderTime,
+                            resolved.MarginPercentAppliedAtOrderTime);
                     })
                     .ToList();
 
@@ -353,6 +367,20 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         // so today this is normally a no-op, but it becomes load-bearing the moment manual stock for a
         // mapped product runs out.
         await _orderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync(createdOrder!, cancellationToken);
+
+        // Compliance-audit row, not money/inventory-critical — same "sequential, not
+        // cross-schema-atomic" treatment RegisterCommandHandler gives this. Ties the acceptance of
+        // every currently-published, acceptance-required legal section to this order, per contract
+        // §33.1 (User ID, Order ID, Policy Version, Timestamp, IP, Device).
+        await LegalAcceptanceRecorder.RecordAsync(
+            _legalDbContext,
+            _currentUserService.UserId!,
+            request.IpAddress,
+            request.UserAgent,
+            request.Language,
+            createdOrder!.Id,
+            cancellationToken);
+        await _legalDbContext.SaveChangesAsync(cancellationToken);
 
         await _communicationService.SendAsync(new CommunicationRequest(
             UserId: _currentUserService.UserId!,

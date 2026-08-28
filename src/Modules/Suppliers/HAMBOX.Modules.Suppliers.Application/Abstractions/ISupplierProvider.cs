@@ -17,6 +17,17 @@ public interface ISupplierProvider
     /// </summary>
     string ProviderType { get; }
 
+    /// <summary>
+    /// The most units this provider's documented purchase API accepts in a single
+    /// <see cref="PurchaseAsync"/> call, or <see langword="null"/> when no such cap is documented — never
+    /// guessed. A provider-agnostic caller (e.g. a cheapest-supplier routing engine) uses this to exclude
+    /// a candidate whose declared cap is below the requested quantity, without needing to know why the
+    /// cap exists or branch on <see cref="ProviderType"/>. Purely descriptive: <see cref="PurchaseAsync"/>
+    /// itself remains the authoritative enforcement (see e.g. GlobeTopper's own quantity check) — this
+    /// property must never disagree with what that call actually accepts.
+    /// </summary>
+    int? MaxQuantityPerPurchase { get; }
+
     Task<SupplierConnectionTestResult> TestConnectionAsync(
         SupplierProviderContext context, CancellationToken cancellationToken = default);
 

@@ -78,6 +78,18 @@ public sealed class RefreshToken : Entity
     public bool IsPersistent { get; private set; }
 
     /// <summary>
+    /// SQL Server <c>rowversion</c> concurrency token. Without this, two truly-concurrent refresh
+    /// requests presenting the same still-active token both read the row, both pass the
+    /// <see cref="IsActive"/> check, and both successfully revoke+rotate independently — replaying a
+    /// stolen-but-not-yet-rotated cookie concurrently with the legitimate holder would silently mint
+    /// two live sessions instead of the second request failing. EF's SaveChangesAsync includes this
+    /// column in every UPDATE's WHERE clause, so the loser of the race gets a
+    /// <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/> instead of a second
+    /// silently-successful rotation.
+    /// </summary>
+    public byte[]? RowVersion { get; private set; }
+
+    /// <summary>
     /// Gets a value indicating whether the token has expired.
     /// </summary>
     public bool IsExpired => DateTimeOffset.UtcNow >= ExpiresOnUtc;

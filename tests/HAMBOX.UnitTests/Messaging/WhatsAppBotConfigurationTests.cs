@@ -41,7 +41,7 @@ public sealed class WhatsAppBotConfigurationTests
         var sender = new MultiHandlerFakeSender(
             new HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryTree.GetCategoryTreeQueryHandler(catalogDb),
             new HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts.GetProductsQueryHandler(
-                catalogDb, currentUser, new FakeMembershipAccessProvider(), NullLogger<HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts.GetProductsQueryHandler>.Instance),
+                catalogDb, currentUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts.GetProductsQueryHandler>.Instance),
             new HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById.GetProductByIdQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider()),
             new HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration.GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
             new HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem.AddCartItemCommandHandler(

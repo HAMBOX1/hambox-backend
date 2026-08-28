@@ -481,6 +481,55 @@ public sealed class SupplierFulfillmentServiceTests
         }
     }
 
+    // ===================== Concurrency (routing-engine failover support) =====================
+
+    /// <summary>
+    /// Two "workers" (separate <see cref="SupplierFulfillmentService"/>/<see cref="SuppliersDbContext"/>
+    /// instances, as two API instances would be) racing <see cref="SupplierFulfillmentService.RequestFulfillmentAsync"/>
+    /// for the exact same (order, order item, supplier, mapping) scope at once — the scenario a
+    /// cheapest-supplier routing engine computing the same ranking on two instances simultaneously could
+    /// trigger. Proves <c>IX_SupplierFulfillments_Scope_NonTerminal</c> (the new filtered unique index)
+    /// plus <see cref="SupplierFulfillmentService.RequestFulfillmentAsync"/>'s catch-and-recover logic
+    /// together close the gap the <see cref="SupplierFulfillment.RowVersion"/> claim alone does not: only
+    /// ONE row is ever created, both callers converge on it, and neither throws.
+    /// </summary>
+    [Fact]
+    public async Task RequestFulfillmentAsync_TwoConcurrentCallersForTheSameScope_CreateExactlyOneRow()
+    {
+        var databaseName = $"concurrency-{Guid.NewGuid():N}";
+        var dbForSeeding = SuppliersTestDbContextFactory.Create(databaseName);
+        var (supplier, mapping) = await SeedSupplierAsync(dbForSeeding);
+        var orderId = Guid.NewGuid();
+        var orderItemId = Guid.NewGuid();
+
+        // Each "worker" gets its own DbContext instance against the SAME underlying database — exactly
+        // how two API instances would each hold their own scoped context.
+        var serviceA = new SupplierFulfillmentService(
+            SuppliersTestDbContextFactory.Create(databaseName), new SupplierProviderRegistry([new FakeSupplierProvider("Fake")]), NullLogger<SupplierFulfillmentService>.Instance);
+        var serviceB = new SupplierFulfillmentService(
+            SuppliersTestDbContextFactory.Create(databaseName), new SupplierProviderRegistry([new FakeSupplierProvider("Fake")]), NullLogger<SupplierFulfillmentService>.Instance);
+
+        var request = new SupplierFulfillmentRequest(orderId, orderItemId, supplier.Id, mapping.Id, 1);
+
+        // Genuinely concurrent — both start their "does this scope already have an open attempt" read
+        // before either has committed its insert, which is the actual race the new unique index (and
+        // RequestFulfillmentAsync's catch-and-recover around it) exists to close.
+        var taskA = serviceA.RequestFulfillmentAsync(request);
+        var taskB = serviceB.RequestFulfillmentAsync(request);
+        var results = await Task.WhenAll(taskA, taskB);
+        var (resultA, resultB) = (results[0], results[1]);
+
+        Assert.True(resultA.IsSuccess);
+        Assert.True(resultB.IsSuccess);
+        // Both callers converged on the SAME row — never two separate fulfillments for one scope.
+        Assert.Equal(resultA.Value.FulfillmentId, resultB.Value.FulfillmentId);
+
+        var verificationDb = SuppliersTestDbContextFactory.Create(databaseName);
+        var count = await verificationDb.SupplierFulfillments.CountAsync(f =>
+            f.OrderId == orderId && f.OrderItemId == orderItemId && f.SupplierId == supplier.Id && f.SupplierProductMappingId == mapping.Id);
+        Assert.Equal(1, count);
+    }
+
     private sealed class RecordingLogger<T> : ILogger<T>
     {
         public List<string> Messages { get; } = [];

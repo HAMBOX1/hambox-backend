@@ -99,14 +99,6 @@ internal static class PlatformSettingsDefaultsFactory
                 BadgeText: "NEW SEASON LIVE",
                 BadgeColor: "#22d3ee",
                 Visible: true),
-            AnnouncementBar: new StorefrontAnnouncementBarSettings(
-                Text: "Free instant delivery on all digital codes this week.",
-                Link: "/products",
-                ButtonText: "Shop deals",
-                BackgroundColor: "#0f172a",
-                TextColor: "#ffffff",
-                Visible: true,
-                DisplayPosition: "top"),
             PromotionalBanner: new StorefrontPromotionalBannerSettings(
                 Title: "Cyberpunk Sale Event",
                 Subtitle: "Up to 80% off premium digital titles. Instant global delivery.",
@@ -271,7 +263,7 @@ internal static class PlatformSettingsDefaultsFactory
         new(false, true, "HAMBOX Admin", 6, 30);
 
     private static CommerceSettingsPayload CreateCommerce() =>
-        new(0m, false, 15, 24, 14, "INV-");
+        new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 20m);
 
     private static CheckoutSettingsPayload CreateCheckout() =>
         new(true, false, "Card", 60);

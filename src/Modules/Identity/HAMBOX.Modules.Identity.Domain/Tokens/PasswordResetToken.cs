@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using HAMBOX.Domain.Entities;
 
 namespace HAMBOX.Modules.Identity.Domain.Tokens;
@@ -15,11 +17,11 @@ public sealed class PasswordResetToken : Entity
     {
     }
 
-    private PasswordResetToken(Guid id, Guid userId, string token, DateTimeOffset expiresOnUtc)
+    private PasswordResetToken(Guid id, Guid userId, string tokenHash, DateTimeOffset expiresOnUtc)
         : base(id)
     {
         UserId = userId;
-        Token = token;
+        Token = tokenHash;
         ExpiresOnUtc = expiresOnUtc;
     }
 
@@ -29,7 +31,8 @@ public sealed class PasswordResetToken : Entity
     public Guid UserId { get; private set; }
 
     /// <summary>
-    /// Gets the token value.
+    /// Gets the SHA-256 hash of the reset token value. The plaintext is never persisted — it exists
+    /// only for the moment it's generated and emailed to the user.
     /// </summary>
     public string Token { get; private set; } = string.Empty;
 
@@ -55,31 +58,53 @@ public sealed class PasswordResetToken : Entity
     public bool IsUsed => UsedOnUtc.HasValue;
 
     /// <summary>
-    /// Creates a new password reset token.
+    /// Creates a new password reset token, persisting only the SHA-256 hash of the plaintext value.
     /// </summary>
     /// <param name="userId">The identifier of the user.</param>
-    /// <param name="token">The token value.</param>
+    /// <param name="plaintextToken">The plaintext token value returned to the caller for emailing — never stored.</param>
     /// <param name="expiresOnUtc">The expiration date and time in UTC.</param>
     /// <returns>A new <see cref="PasswordResetToken"/> instance.</returns>
     /// <exception cref="ArgumentException">
     /// Thrown when the user identifier is empty or the token is null or whitespace.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the expiration is not in the future.</exception>
-    public static PasswordResetToken Create(Guid userId, string token, DateTimeOffset expiresOnUtc)
+    public static PasswordResetToken Create(Guid userId, string plaintextToken, DateTimeOffset expiresOnUtc)
     {
         if (userId == Guid.Empty)
         {
             throw new ArgumentException("User identifier is required.", nameof(userId));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        ArgumentException.ThrowIfNullOrWhiteSpace(plaintextToken);
 
         if (expiresOnUtc <= DateTimeOffset.UtcNow)
         {
             throw new ArgumentOutOfRangeException(nameof(expiresOnUtc), "Expiration must be in the future.");
         }
 
-        return new PasswordResetToken(Guid.NewGuid(), userId, token, expiresOnUtc);
+        return new PasswordResetToken(Guid.NewGuid(), userId, ComputeHash(plaintextToken), expiresOnUtc);
+    }
+
+    /// <summary>
+    /// Computes the stored lookup hash for a plaintext password reset token.
+    /// </summary>
+    /// <param name="plaintextToken">The plaintext token supplied by the caller (e.g. from the reset link).</param>
+    /// <returns>The SHA-256 hash used for database lookups.</returns>
+    public static string GetLookupHash(string plaintextToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(plaintextToken);
+        return ComputeHash(plaintextToken);
+    }
+
+    /// <summary>
+    /// Determines whether the supplied plaintext token matches this persisted token hash.
+    /// </summary>
+    public bool Matches(string plaintextToken) => Token == GetLookupHash(plaintextToken);
+
+    private static string ComputeHash(string plaintextToken)
+    {
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(plaintextToken));
+        return Convert.ToHexString(hashBytes);
     }
 
     /// <summary>

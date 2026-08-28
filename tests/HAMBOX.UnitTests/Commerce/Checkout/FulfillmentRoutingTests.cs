@@ -1,5 +1,6 @@
 using HAMBOX.Application.Fulfillment;
 using HAMBOX.Application.Membership;
+using HAMBOX.Infrastructure.Currency;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Categories;
@@ -11,6 +12,7 @@ using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Carts;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Commerce.Infrastructure.Services;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Application.Options;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
@@ -19,6 +21,8 @@ using HAMBOX.SharedKernel.Results;
 using HAMBOX.UnitTests.Commerce.TestDoubles;
 using HAMBOX.UnitTests.Suppliers.TestDoubles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using DomainAvailabilityState = HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierAvailabilityState;
@@ -394,7 +398,7 @@ public sealed class FulfillmentRoutingTests
         int availableStock,
         IFulfillmentRouter router)
     {
-        var validator = new CartLineValidator(new FakeInventoryEngine(catalogDb), router);
+        var validator = new CartLineValidator(new FakeInventoryEngine(catalogDb), router, new NullSupplierPricingEngine());
         var products = new Dictionary<Guid, Product> { [product.Id] = product };
         var variants = new Dictionary<Guid, ProductVariant> { [variant.Id] = variant };
         var stock = new Dictionary<Guid, VariantStockSnapshot>
@@ -493,8 +497,18 @@ public sealed class FulfillmentRoutingTests
         var supplierFulfillmentService = new HAMBOX.Modules.Suppliers.Application.Services.SupplierFulfillmentService(
             suppliersDb, registry, NullLogger<HAMBOX.Modules.Suppliers.Application.Services.SupplierFulfillmentService>.Instance, deliverySink);
         var router = CreateRouter(catalogDb, suppliersDb, registry);
+
+        var exchangeRateService = new CurrencyExchangeRateService(
+            new FakeCurrencyExchangeRateProvider(),
+            new MemoryCache(new MemoryCacheOptions()),
+            Options.Create(new CurrencySettings()),
+            TimeProvider.System,
+            new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>());
+        var routingEngine = new SupplierRoutingEngine(suppliersDb, registry, exchangeRateService, Options.Create(new SupplierAvailabilityOptions()));
+        var pricingEngine = new SupplierPricingEngine(routingEngine, new FakeCommerceSettingsProvider { Commerce = new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 0m) });
+
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, supplierFulfillmentService, router, NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, supplierFulfillmentService, router, pricingEngine, suppliersDb, NullLogger<OrderFulfillmentService>.Instance);
 
         return new Harness(service, provider, inventoryEngine, suppliersDb, commerceDb, catalogDb);
     }
@@ -504,7 +518,7 @@ public sealed class FulfillmentRoutingTests
         var order = Order.Create(
             userId: "user-1", orderNumber: $"ORD-{Guid.NewGuid():N}", email: "buyer@example.com", country: "US",
             paymentMethod: "development", subtotal: 10m, discountAmount: 0m, taxAmount: 0m, totalAmount: 10m,
-            items: [(productId, "Test Product", quantity, 10m, (Guid?)variantId, (string?)null)]);
+            items: [(productId, "Test Product", quantity, 10m, (Guid?)variantId, (string?)null, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)]);
         order.RecordPayment("development", $"txn-{Guid.NewGuid():N}");
         return order;
     }

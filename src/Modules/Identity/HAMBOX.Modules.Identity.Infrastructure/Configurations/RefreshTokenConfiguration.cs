@@ -46,6 +46,11 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .IsRequired()
             .HasDefaultValue(false);
 
+        // Physically added by migration AddRefreshTokenRowVersionConcurrency (20260823181553); this
+        // mapping was never wired into the entity until now — see RefreshToken.RowVersion's own docs.
+        builder.Property(t => t.RowVersion)
+            .IsRowVersion();
+
         // Base entity properties
         builder.Property(t => t.CreatedOnUtc)
             .IsRequired();

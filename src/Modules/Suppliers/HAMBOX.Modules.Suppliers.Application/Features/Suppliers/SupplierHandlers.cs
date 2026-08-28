@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Application.Contracts;
@@ -125,7 +126,8 @@ public sealed record GetSupplierMappingsQuery(Guid SupplierId) : IRequest<Result
 /// writes anything, and a product/variant that can no longer be found simply yields a null name rather
 /// than failing the whole list.
 /// </summary>
-internal sealed class GetSupplierMappingsQueryHandler(ISuppliersDbContext dbContext, ICatalogDbContext catalogDbContext)
+internal sealed class GetSupplierMappingsQueryHandler(
+    ISuppliersDbContext dbContext, ICatalogDbContext catalogDbContext, IPlatformSettingsProvider platformSettings)
     : IRequestHandler<GetSupplierMappingsQuery, Result<IReadOnlyList<SupplierMappingDto>>>
 {
     public async Task<Result<IReadOnlyList<SupplierMappingDto>>> Handle(GetSupplierMappingsQuery request, CancellationToken cancellationToken)
@@ -160,12 +162,28 @@ internal sealed class GetSupplierMappingsQueryHandler(ISuppliersDbContext dbCont
             .Where(a => mappingIds.Contains(a.SupplierProductMappingId))
             .ToDictionaryAsync(a => a.SupplierProductMappingId, cancellationToken);
 
+        var commerceSettings = await platformSettings.GetAsync<CommerceSettingsPayload>(
+            PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+
+        // Keyed by variant id (or the product id itself for a product-wide-only variant) so each
+        // mapping can tell whether it's the one currently driving that variant's storefront price —
+        // read directly from the persisted cache, never recomputed here.
+        var mappedVariantIds = mappings.Where(m => m.InternalProductVariantId.HasValue)
+            .Select(m => m.InternalProductVariantId!.Value).Distinct().ToList();
+        var selectedMappingByVariant = mappedVariantIds.Count == 0
+            ? new Dictionary<Guid, Guid>()
+            : await dbContext.SupplierDerivedPrices.AsNoTracking()
+                .Where(p => mappedVariantIds.Contains(p.InternalProductVariantId))
+                .ToDictionaryAsync(p => p.InternalProductVariantId, p => p.SelectedSupplierProductMappingId, cancellationToken);
+
         var result = mappings
             .Select(m => SupplierMapper.ToMappingDto(
                 m,
                 productNames.GetValueOrDefault(m.InternalProductId),
                 m.InternalProductVariantId.HasValue ? variantSkus.GetValueOrDefault(m.InternalProductVariantId.Value) : null,
-                availabilityByMapping.GetValueOrDefault(m.Id)))
+                availabilityByMapping.GetValueOrDefault(m.Id),
+                commerceSettings.DefaultSupplierMarginPercent,
+                m.InternalProductVariantId.HasValue ? selectedMappingByVariant.GetValueOrDefault(m.InternalProductVariantId.Value) : null))
             .ToList();
 
         return Result.Success<IReadOnlyList<SupplierMappingDto>>(result);
@@ -496,7 +514,7 @@ internal sealed class CreateSupplierMappingCommandHandler(ISuppliersDbContext db
 
         var mapping = SupplierProductMapping.Create(
             request.SupplierId, r.InternalProductId, r.ExternalProductId, r.ExternalSku, r.ExternalName, r.BuyingPrice, r.Currency, r.Priority,
-            r.InternalProductVariantId);
+            r.InternalProductVariantId, r.MarginPercentOverride);
 
         dbContext.SupplierProductMappings.Add(mapping);
         SupplierAuditWriter.Record(dbContext, request.SupplierId, SupplierAuditAction.MappingCreated, currentUser.UserId);
@@ -526,7 +544,7 @@ internal sealed class UpdateSupplierMappingCommandHandler(ISuppliersDbContext db
             status = SupplierMappingStatus.Active;
         }
 
-        mapping.Update(r.ExternalProductId, r.ExternalSku, r.ExternalName, r.BuyingPrice, r.Currency, r.Priority, status);
+        mapping.Update(r.ExternalProductId, r.ExternalSku, r.ExternalName, r.BuyingPrice, r.Currency, r.Priority, status, r.MarginPercentOverride);
 
         SupplierAuditWriter.Record(dbContext, request.SupplierId, SupplierAuditAction.MappingUpdated, currentUser.UserId);
         await dbContext.SaveChangesAsync(cancellationToken);

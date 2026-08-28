@@ -54,7 +54,32 @@ public sealed record AdminOrderDetailDto(
     string? InvoiceUrl,
     DateTimeOffset CreatedOnUtc,
     string? LastEditedByName,
-    DateTimeOffset? LastEditedOnUtc);
+    DateTimeOffset? LastEditedOnUtc,
+    IReadOnlyList<AdminOrderSupplierRoutingDto> SupplierRouting);
+
+/// <summary>
+/// One automated-supplier routing decision for one order item, admin-visible only — see
+/// <c>SupplierRoutingAuditLog</c>'s own remarks for why this is safe for an admin to see (acquisition
+/// cost, never the customer's selling price) but must never be exposed anywhere customer-facing.
+/// </summary>
+public sealed record AdminOrderSupplierRoutingDto(
+    Guid OrderItemId,
+    string? SelectedSupplierName,
+    decimal? SelectedCostInBaseCurrency,
+    string BaseCurrency,
+    bool FallbackOccurred,
+    IReadOnlyList<AdminOrderSupplierRoutingCandidateDto> Candidates,
+    DateTimeOffset CreatedOnUtc);
+
+public sealed record AdminOrderSupplierRoutingCandidateDto(
+    string SupplierName,
+    string ProviderType,
+    bool Eligible,
+    bool Selected,
+    decimal? CostInBaseCurrency,
+    string? OriginalCurrency,
+    decimal? OriginalCost,
+    string? RejectionReason);
 
 public sealed record AdminOrderItemDto(
     Guid Id,

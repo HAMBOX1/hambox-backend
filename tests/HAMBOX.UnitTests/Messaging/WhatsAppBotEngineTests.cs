@@ -53,7 +53,7 @@ public sealed class WhatsAppBotEngineTests
 
         var sender = new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
-            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), NullLogger<GetProductsQueryHandler>.Instance),
+            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
             new GetProductByIdQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider()),
             new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, guestUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),
@@ -128,7 +128,7 @@ public sealed class WhatsAppBotEngineTests
 
         var sender = new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
-            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), NullLogger<GetProductsQueryHandler>.Instance),
+            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
             new GetProductByIdQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider()),
             new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, guestUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),

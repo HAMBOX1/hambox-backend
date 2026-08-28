@@ -109,6 +109,20 @@ internal sealed class FulfillmentRouter(
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetEffectivePriceOverridesBulkAsync(
+        IEnumerable<Guid> variantIds, CancellationToken cancellationToken = default)
+    {
+        var ids = variantIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, decimal>();
+        }
+
+        return await suppliersDb.SupplierDerivedPrices.AsNoTracking()
+            .Where(p => ids.Contains(p.InternalProductVariantId))
+            .ToDictionaryAsync(p => p.InternalProductVariantId, p => p.EffectivePrice, cancellationToken);
+    }
+
     private sealed record MappingRow(SupplierProductMapping Mapping, Supplier Supplier);
 
     /// <summary>
@@ -150,7 +164,7 @@ internal sealed class FulfillmentRouter(
             // that answer must still be fresh. A mapping with no row yet (never synced) or a stale one
             // is treated identically to an explicit Unavailable — never optimistically assumed
             // available just because the supplier itself is reachable.
-            if (!IsAvailableAndFresh(availabilityByMapping.GetValueOrDefault(row.Mapping.Id), staleAfter, utcNow))
+            if (!SupplierAvailabilityFreshness.IsAvailableAndFresh(availabilityByMapping.GetValueOrDefault(row.Mapping.Id), staleAfter, utcNow))
             {
                 continue;
             }
@@ -159,15 +173,5 @@ internal sealed class FulfillmentRouter(
         }
 
         return null;
-    }
-
-    private static bool IsAvailableAndFresh(SupplierProductAvailability? availability, TimeSpan staleAfter, DateTimeOffset utcNow)
-    {
-        if (availability is not { AvailabilityState: HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierAvailabilityState.Available, LastCheckedAtUtc: DateTimeOffset checkedAtUtc })
-        {
-            return false;
-        }
-
-        return utcNow - checkedAtUtc <= staleAfter;
     }
 }

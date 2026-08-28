@@ -45,7 +45,7 @@ public sealed class GetCustomerLibraryQueryHandlerTests
             discountAmount: 0m,
             taxAmount: 0m,
             totalAmount: 19.99m,
-            items: [(product.Id, "Test Product", 1, 19.99m, variant.Id, variant.Sku)]);
+            items: [(product.Id, "Test Product", 1, 19.99m, (Guid?)variant.Id, variant.Sku, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)]);
 
         order.RecordPayment("development", $"txn-{Guid.NewGuid():N}");
         order.Complete();

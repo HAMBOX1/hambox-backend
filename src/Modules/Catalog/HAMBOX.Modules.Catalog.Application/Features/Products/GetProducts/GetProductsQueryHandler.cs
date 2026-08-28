@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Fulfillment;
 using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
@@ -22,17 +23,20 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
     private readonly ICatalogDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
     private readonly IMembershipAccessProvider _membershipAccess;
+    private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly ILogger<GetProductsQueryHandler> _logger;
 
     public GetProductsQueryHandler(
         ICatalogDbContext dbContext,
         ICurrentUserService currentUser,
         IMembershipAccessProvider membershipAccess,
+        IFulfillmentRouter fulfillmentRouter,
         ILogger<GetProductsQueryHandler> logger)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _membershipAccess = membershipAccess;
+        _fulfillmentRouter = fulfillmentRouter;
         _logger = logger;
     }
 
@@ -132,6 +136,35 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         products = products
             .Select(p => p with { AvailableStock = stockByProduct.GetValueOrDefault(p.Id, 0) })
             .ToList();
+
+        // "Starting from" price for products fulfilled (fully or partly) by automated suppliers — the
+        // cheapest eligible supplier's price (via EffectivePriceResolver's same fallback chain) across
+        // the product's SupplierFirst/SupplierOnly variants. Products with no such variant, or none
+        // currently priced by a supplier, keep the unchanged Product.Price column read above.
+        var routedVariantRows = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v => productIds.Contains(v.ProductId)
+                && (v.FulfillmentMode == FulfillmentMode.SupplierFirst || v.FulfillmentMode == FulfillmentMode.SupplierOnly))
+            .Select(v => new { v.Id, v.ProductId })
+            .ToListAsync(cancellationToken);
+
+        if (routedVariantRows.Count > 0)
+        {
+            var supplierEffectivePrices = await _fulfillmentRouter.GetEffectivePriceOverridesBulkAsync(
+                routedVariantRows.Select(v => v.Id), cancellationToken);
+
+            var minEffectivePriceByProduct = routedVariantRows
+                .Where(v => supplierEffectivePrices.ContainsKey(v.Id))
+                .GroupBy(v => v.ProductId)
+                .ToDictionary(g => g.Key, g => g.Min(v => supplierEffectivePrices[v.Id]));
+
+            if (minEffectivePriceByProduct.Count > 0)
+            {
+                products = products
+                    .Select(p => minEffectivePriceByProduct.TryGetValue(p.Id, out var minPrice) ? p with { Price = minPrice } : p)
+                    .ToList();
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {

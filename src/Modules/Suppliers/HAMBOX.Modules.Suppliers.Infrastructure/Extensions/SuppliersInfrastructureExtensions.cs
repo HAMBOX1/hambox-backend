@@ -5,6 +5,9 @@ using HAMBOX.Modules.Suppliers.Application.Options;
 using HAMBOX.Modules.Suppliers.Infrastructure.BackgroundJobs.Handlers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Persistence;
 using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Bamboo;
+using HAMBOX.Modules.Suppliers.Infrastructure.Providers.CodesWholesale;
+using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Eneba;
+using HAMBOX.Modules.Suppliers.Infrastructure.Providers.GlobeTopper;
 using HAMBOX.Modules.Suppliers.Infrastructure.Providers.Visoria;
 using HAMBOX.Modules.Suppliers.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +34,9 @@ public static class SuppliersInfrastructureExtensions
         services.AddScoped<ISupplierProvider, ManualSupplierProvider>();
         services.AddScoped<ISupplierProvider, BambooSupplierProvider>();
         services.AddScoped<ISupplierProvider, VisoriaSupplierProvider>();
+        services.AddScoped<ISupplierProvider, GlobeTopperSupplierProvider>();
+        services.AddScoped<ISupplierProvider, EnebaSupplierProvider>();
+        services.AddScoped<ISupplierProvider, CodesWholesaleSupplierProvider>();
         services.AddScoped<ISupplierProviderRegistry, SupplierProviderRegistry>();
 
         // Non-secret HTTP tuning only — Bamboo credentials come from the encrypted Supplier entity per
@@ -63,6 +69,60 @@ public static class SuppliersInfrastructureExtensions
                 var visoriaOptions = sp.GetRequiredService<IOptions<VisoriaProviderOptions>>().Value;
                 client.Timeout = TimeSpan.FromSeconds(visoriaOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = visoriaOptions.MaxResponseBytes;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        // Same non-secret-only shape as Bamboo/Visoria above — GlobeTopper's key/secret pair lives only
+        // in the encrypted Supplier.ApiKey/ApiSecret columns, never in configuration.
+        services.AddSingleton<IValidateOptions<GlobeTopperProviderOptions>, GlobeTopperProviderOptionsValidator>();
+        services.AddOptions<GlobeTopperProviderOptions>()
+            .Bind(configuration.GetSection(GlobeTopperProviderOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddHttpClient<GlobeTopperHttpClient>((sp, client) =>
+            {
+                client.BaseAddress = new Uri(GlobeTopperProviderConstants.BaseUrl);
+                var globeTopperOptions = sp.GetRequiredService<IOptions<GlobeTopperProviderOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(globeTopperOptions.RequestTimeoutSeconds);
+                client.MaxResponseContentBufferSize = globeTopperOptions.MaxResponseBytes;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        // Same non-secret-only shape as Bamboo/Visoria/GlobeTopper above — Eneba's Auth ID/Auth
+        // Secret/account email live only in the encrypted Supplier.OAuthSettingsJson column, never in
+        // configuration. IMemoryCache (already registered elsewhere in the host) backs the OAuth
+        // access-token cache inside EnebaHttpClient.
+        services.AddSingleton<IValidateOptions<EnebaProviderOptions>, EnebaProviderOptionsValidator>();
+        services.AddOptions<EnebaProviderOptions>()
+            .Bind(configuration.GetSection(EnebaProviderOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddHttpClient<EnebaHttpClient>((sp, client) =>
+            {
+                client.BaseAddress = new Uri(EnebaProviderConstants.BaseUrl);
+                var enebaOptions = sp.GetRequiredService<IOptions<EnebaProviderOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(enebaOptions.RequestTimeoutSeconds);
+                client.MaxResponseContentBufferSize = Math.Max(enebaOptions.MaxResponseBytes, enebaOptions.MaxArchiveBytes);
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+        // Same non-secret-only shape as Bamboo/Visoria/GlobeTopper/Eneba above — CodesWholesale's Client
+        // ID/Client Secret live only in the encrypted Supplier.ApiKey/ApiSecret columns, never in
+        // configuration. No BaseAddress is set here (unlike every other provider's typed client) —
+        // CodesWholesale genuinely has two different hosts (Sandbox/Production), chosen per-Supplier-row
+        // by CodesWholesaleHttpClient.ResolveBaseUrl from the non-secret Supplier.SettingsJson
+        // "environment" field, so every request builds its own absolute URL. IMemoryCache (already
+        // registered elsewhere in the host) backs the OAuth access-token cache, same as Eneba.
+        services.AddSingleton<IValidateOptions<CodesWholesaleProviderOptions>, CodesWholesaleProviderOptionsValidator>();
+        services.AddOptions<CodesWholesaleProviderOptions>()
+            .Bind(configuration.GetSection(CodesWholesaleProviderOptions.SectionName))
+            .ValidateOnStart();
+
+        services.AddHttpClient<CodesWholesaleHttpClient>((sp, client) =>
+            {
+                var cwOptions = sp.GetRequiredService<IOptions<CodesWholesaleProviderOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(cwOptions.RequestTimeoutSeconds);
+                client.MaxResponseContentBufferSize = cwOptions.MaxResponseBytes;
             })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 

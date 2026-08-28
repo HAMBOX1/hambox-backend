@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
@@ -76,7 +77,14 @@ internal sealed class UpdateCartItemCommandHandler : IRequestHandler<UpdateCartI
                 return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantNotFound);
             }
 
-            unitPrice = variant.PriceOverride ?? product.Price;
+            decimal? supplierEffectivePrice = null;
+            if (variant.FulfillmentMode is FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly)
+            {
+                var overrides = await _fulfillmentRouter.GetEffectivePriceOverridesBulkAsync([variantId], cancellationToken);
+                supplierEffectivePrice = overrides.TryGetValue(variantId, out var overridePrice) ? overridePrice : null;
+            }
+
+            unitPrice = EffectivePriceResolver.Resolve(variant, product, supplierEffectivePrice);
 
             var stock = await _inventoryEngine.GetVariantStockAsync(variantId, cancellationToken);
             var readiness = await _fulfillmentRouter.GetReadinessAsync(variantId, cancellationToken);

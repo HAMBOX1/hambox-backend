@@ -15,7 +15,7 @@ public static class LegalDataSeeder
         ("terms", "Terms", "Legal", "pi pi-file-check", true),
         ("privacy", "Privacy", "Legal", "pi pi-shield", true),
         ("refund", "Refund", "Legal", "pi pi-replay", true),
-        ("delivery", "DigitalDelivery", "Commerce", "pi pi-bolt", false),
+        ("delivery", "DigitalDelivery", "Commerce", "pi pi-bolt", true),
         ("cookie", "Cookie", "Legal", "pi pi-info-circle", false),
         ("about", "AboutUs", "General", "pi pi-info-circle", false),
         ("contact", "Contact", "General", "pi pi-envelope", false),

@@ -34,7 +34,8 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
         string? externalName,
         decimal buyingPrice,
         string currency,
-        int priority)
+        int priority,
+        decimal? marginPercentOverride)
         : base(id)
     {
         SupplierId = supplierId;
@@ -46,6 +47,7 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
         BuyingPrice = buyingPrice;
         Currency = currency;
         Priority = priority;
+        MarginPercentOverride = marginPercentOverride;
         Status = SupplierMappingStatus.Active;
     }
 
@@ -58,6 +60,13 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
     public decimal BuyingPrice { get; private set; }
     public string Currency { get; private set; } = "USD";
     public int Priority { get; private set; }
+
+    /// <summary>
+    /// Overrides <c>Commerce</c> Platform Settings' <c>DefaultSupplierMarginPercent</c> for this one
+    /// mapping when set. Applied by <c>ISupplierPricingEngine</c> (Commerce) — never read here, since
+    /// Suppliers has no dependency on the platform-settings-driven default.
+    /// </summary>
+    public decimal? MarginPercentOverride { get; private set; }
     public SupplierMappingStatus Status { get; private set; }
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
@@ -71,7 +80,8 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
         decimal buyingPrice,
         string currency,
         int priority,
-        Guid? internalProductVariantId = null)
+        Guid? internalProductVariantId = null,
+        decimal? marginPercentOverride = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(externalProductId);
 
@@ -85,7 +95,8 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
             string.IsNullOrWhiteSpace(externalName) ? null : externalName.Trim(),
             buyingPrice,
             currency.Trim().ToUpperInvariant(),
-            priority);
+            priority,
+            marginPercentOverride);
     }
 
     /// <summary>
@@ -103,7 +114,8 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
         decimal buyingPrice,
         string currency,
         int priority,
-        SupplierMappingStatus status)
+        SupplierMappingStatus status,
+        decimal? marginPercentOverride = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(externalProductId);
 
@@ -114,5 +126,6 @@ public sealed class SupplierProductMapping : AggregateRoot, IAuditable
         Currency = currency.Trim().ToUpperInvariant();
         Priority = priority;
         Status = status;
+        MarginPercentOverride = marginPercentOverride;
     }
 }

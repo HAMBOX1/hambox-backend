@@ -10,4 +10,7 @@ public static class RateLimitPolicies
 
     /// <summary>Applied to account-action endpoints (register, forgot/reset password, resend verification).</summary>
     public const string AccountActions = "auth:account-actions";
+
+    /// <summary>Applied to the cookie-authenticated refresh/logout endpoints.</summary>
+    public const string Refresh = "auth:refresh";
 }

@@ -29,7 +29,7 @@ public sealed class RevealCustomerLibraryKeyAuditTests
             discountAmount: 0m,
             taxAmount: 0m,
             totalAmount: 19.99m,
-            items: [(productId, "Test Product", 1, 19.99m, null, null)]);
+            items: [(productId, "Test Product", 1, 19.99m, (Guid?)null, (string?)null, (Guid?)null, (Guid?)null, (decimal?)null, (decimal?)null)]);
 
         order.RecordPayment("development", $"txn-{Guid.NewGuid():N}");
         order.Complete();

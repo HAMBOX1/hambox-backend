@@ -120,7 +120,67 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
                         .HasDatabaseName("IX_SupplierFulfillments_SupplierId_ProviderOrderId")
                         .HasFilter("ProviderOrderId IS NOT NULL");
 
+                    b.HasIndex("OrderId", "OrderItemId", "SupplierId", "SupplierProductMappingId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierFulfillments_Scope_NonTerminal")
+                        .HasFilter("Status <> 'Succeeded' AND Status <> 'PartialFailed' AND Status <> 'Failed'");
+
                     b.ToTable("SupplierFulfillments", "suppliers");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Fulfillments.SupplierRoutingAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("CandidatesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("FallbackOccurred")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("SelectedCostInBaseCurrency")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("SelectedSupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SelectedSupplierProductMappingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "CreatedOnUtc")
+                        .HasDatabaseName("IX_SupplierRoutingAuditLogs_OrderId_CreatedOnUtc");
+
+                    b.ToTable("SupplierRoutingAuditLogs", "suppliers");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.Supplier", b =>
@@ -271,6 +331,64 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
                     b.ToTable("SupplierAuditLogs", "suppliers");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierDerivedPrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AppliedMarginPercent")
+                        .HasColumnType("decimal(8,2)");
+
+                    b.Property<string>("BaseCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTimeOffset>("ComputedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("EffectivePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("InternalProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InternalProductVariantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("SelectedSupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SelectedSupplierProductMappingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InternalProductId")
+                        .HasDatabaseName("IX_SupplierDerivedPrices_InternalProductId");
+
+                    b.HasIndex("InternalProductVariantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SupplierDerivedPrices_InternalProductVariantId");
+
+                    b.ToTable("SupplierDerivedPrices", "suppliers");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierProductAvailability", b =>
                 {
                     b.Property<Guid>("Id")
@@ -374,6 +492,9 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
 
                     b.Property<Guid?>("InternalProductVariantId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("MarginPercentOverride")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(128)

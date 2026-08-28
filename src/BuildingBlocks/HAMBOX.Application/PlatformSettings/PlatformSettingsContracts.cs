@@ -90,15 +90,6 @@ public sealed record StorefrontHeroSectionSettings(
     string BadgeColor,
     bool Visible);
 
-public sealed record StorefrontAnnouncementBarSettings(
-    string Text,
-    string? Link,
-    string? ButtonText,
-    string BackgroundColor,
-    string TextColor,
-    bool Visible,
-    string DisplayPosition);
-
 public sealed record StorefrontPromotionalBannerSettings(
     string Title,
     string Subtitle,
@@ -172,7 +163,6 @@ public sealed record StorefrontSeoDefaultsSettings(
 
 public sealed record StorefrontContentSettingsPayload(
     StorefrontHeroSectionSettings Hero,
-    StorefrontAnnouncementBarSettings AnnouncementBar,
     StorefrontPromotionalBannerSettings PromotionalBanner,
     StorefrontFlashDealsSettings FlashDeals,
     StorefrontFeaturedCollectionsSettings FeaturedCollections,
@@ -252,7 +242,8 @@ public sealed record CommerceSettingsPayload(
     int ReservationTimeoutMinutes,
     int OrderExpirationHours,
     int RefundWindowDays,
-    string InvoicePrefix);
+    string InvoicePrefix,
+    decimal DefaultSupplierMarginPercent = 20m);
 
 public sealed record CheckoutSettingsPayload(
     bool GuestCheckoutAllowed,
