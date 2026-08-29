@@ -12,6 +12,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Cart.UpdateCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.Membership;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.GetOrderById;
+using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -19,6 +20,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 
 namespace HAMBOX.Modules.Commerce.Presentation.Endpoints;
@@ -273,7 +275,8 @@ internal static class CartEndpoints
         })
         .WithName("Checkout")
         .RequireAuthorization()
-        .RequireCustomerContext();
+        .RequireCustomerContext()
+        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
 
         group.MapGet("checkout/membership/preview", async Task<Results<Ok<MembershipCheckoutPreviewDto>, BadRequest<ProblemDetails>>> (
             [FromQuery] Guid planId,
@@ -327,7 +330,8 @@ internal static class CartEndpoints
         })
         .WithName("MembershipCheckout")
         .RequireAuthorization()
-        .RequireCustomerContext();
+        .RequireCustomerContext()
+        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
 
         group.MapGet("orders/{id:guid}", async Task<Results<Ok<OrderDetailDto>, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
             Guid id,

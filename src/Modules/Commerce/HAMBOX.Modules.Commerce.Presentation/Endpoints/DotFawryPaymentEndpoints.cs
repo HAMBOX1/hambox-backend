@@ -1,12 +1,14 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.DotFawry;
+using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 
 namespace HAMBOX.Modules.Commerce.Presentation.Endpoints;
@@ -58,7 +60,8 @@ internal static class DotFawryPaymentEndpoints
         })
         .WithName("InitiateDotFawryCheckout")
         .RequireAuthorization()
-        .RequireCustomerContext();
+        .RequireCustomerContext()
+        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
 
         group.MapGet("payments/dot-fawry/{paymentAttemptId:guid}/status", async Task<Results<Ok<DotFawryPaymentStatusDto>, BadRequest<ProblemDetails>>> (
             Guid paymentAttemptId,
@@ -113,7 +116,8 @@ internal static class DotFawryPaymentEndpoints
             return Results.Text("1", "text/plain");
         })
         .WithName("DotFawryNotification")
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .RequireRateLimiting(CommerceRateLimitPolicies.PaymentCallback);
     }
 }
 

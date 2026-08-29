@@ -2,12 +2,14 @@ using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.Dot;
 using HAMBOX.Modules.Commerce.Application.Options;
+using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
 
@@ -58,7 +60,8 @@ internal static class DotPaymentEndpoints
         })
         .WithName("InitiateDotCheckout")
         .RequireAuthorization()
-        .RequireCustomerContext();
+        .RequireCustomerContext()
+        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
 
         group.MapGet("payments/dot/{paymentAttemptId:guid}/status", async Task<Results<Ok<DotPaymentStatusDto>, BadRequest<ProblemDetails>>> (
             Guid paymentAttemptId,
@@ -139,7 +142,8 @@ internal static class DotPaymentEndpoints
             return Results.Text("1", "text/plain");
         })
         .WithName("DotNotification")
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .RequireRateLimiting(CommerceRateLimitPolicies.PaymentCallback);
     }
 }
 

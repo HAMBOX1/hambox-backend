@@ -90,6 +90,29 @@ public sealed class RateLimitingPolicyTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// <c>POST api/v1/checkout/dot</c> shares <c>CommerceRateLimitPolicies.CheckoutInitiation</c>
+    /// with <c>checkout</c> — this is the dedicated coverage for that second checkout-initiation
+    /// variant (proving the policy is actually attached there too, not just on the plain checkout
+    /// route). No Authorization header is attached, so every request the limiter admits is rejected
+    /// 401, exactly like <see cref="Checkout_AllowsTwentyRequests_ThenBlocksTwentyFirstWith429"/>.
+    /// </summary>
+    [Fact]
+    public async Task CheckoutDot_AllowsTwentyRequests_ThenBlocksTwentyFirstWith429()
+    {
+        var statuses = new List<HttpStatusCode>();
+        for (var i = 0; i < 21; i++)
+        {
+            using var response = await _client.PostAsJsonAsync(
+                "api/v1/checkout/dot",
+                new { Email = "shopper@example.com", Country = "US", Wallet = "OrangeCash" });
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.All(statuses.Take(20), status => Assert.Equal(HttpStatusCode.Unauthorized, status));
+        Assert.Equal(HttpStatusCode.TooManyRequests, statuses[20]);
+    }
+
+    /// <summary>
     /// <c>POST api/v1/payments/dot-fawry/notify</c> is protected by
     /// <c>CommerceRateLimitPolicies.PaymentCallback</c> (30 requests / 60s). It is anonymous, so —
     /// unlike checkout — nothing except the endpoint's own IP allowlist stands between the limiter
