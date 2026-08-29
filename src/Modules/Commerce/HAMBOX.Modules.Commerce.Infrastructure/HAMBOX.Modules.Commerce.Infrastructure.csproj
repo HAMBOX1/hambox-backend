@@ -32,6 +32,7 @@
     <ProjectReference Include="..\HAMBOX.Modules.Commerce.Domain\HAMBOX.Modules.Commerce.Domain.csproj" />
     <ProjectReference Include="..\HAMBOX.Modules.Commerce.Application\HAMBOX.Modules.Commerce.Application.csproj" />
     <ProjectReference Include="..\..\Catalog\HAMBOX.Modules.Catalog.Infrastructure\HAMBOX.Modules.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Suppliers\HAMBOX.Modules.Suppliers.Application\HAMBOX.Modules.Suppliers.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Application\HAMBOX.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\HAMBOX.Infrastructure\HAMBOX.Infrastructure.csproj" />
   </ItemGroup>
