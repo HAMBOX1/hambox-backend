@@ -19,7 +19,7 @@ internal sealed class LoggingEmailService(
     private readonly EmailSettings _settings = emailSettings.Value;
 
     /// <inheritdoc />
-    public Task SendEmailVerificationAsync(
+    public Task<bool> SendEmailVerificationAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -27,11 +27,11 @@ internal sealed class LoggingEmailService(
         CancellationToken cancellationToken = default)
     {
         LogEmail("EmailVerification", userId, email, expiresAt, token, _settings.VerificationPath);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
     /// <inheritdoc />
-    public Task SendPasswordResetAsync(
+    public Task<bool> SendPasswordResetAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -39,11 +39,11 @@ internal sealed class LoggingEmailService(
         CancellationToken cancellationToken = default)
     {
         LogEmail("PasswordReset", userId, email, expiresAt, token, _settings.ResetPasswordPath);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
     /// <inheritdoc />
-    public Task SendAdminLoginOtpAsync(
+    public Task<bool> SendAdminLoginOtpAsync(
         Guid userId,
         string email,
         string code,
@@ -51,7 +51,7 @@ internal sealed class LoggingEmailService(
         CancellationToken cancellationToken = default)
     {
         LogOtp("AdminLoginOtp", userId, email, expiresAt, code);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
     /// <inheritdoc />

@@ -32,6 +32,7 @@ internal sealed class UnusedIdentityDbContext : IIdentityDbContext
     public DbSet<LoginHistory> LoginHistory => throw NotNeeded();
     public DbSet<AdminLoginChallenge> AdminLoginChallenges => throw NotNeeded();
     public DbSet<AdminOtpAuditLog> AdminOtpAuditLogs => throw NotNeeded();
+    public DbSet<CustomerOtpAuditLog> CustomerOtpAuditLogs => throw NotNeeded();
     public DbSet<PlatformSettingsCategory> PlatformSettingsCategories => throw NotNeeded();
     public DbSet<PlatformSettingsAuditLog> PlatformSettingsAuditLogs => throw NotNeeded();
     public DbSet<BlockedEmail> BlockedEmails => throw NotNeeded();

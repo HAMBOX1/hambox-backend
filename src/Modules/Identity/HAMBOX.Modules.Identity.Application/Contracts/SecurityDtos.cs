@@ -75,6 +75,26 @@ public sealed record SecurityEventDto(
     string? ResolutionNotes);
 
 /// <summary>
+/// A single customer OTP/verification-token lifecycle event for admin/support investigation.
+/// Never carries the token or code value itself.
+/// </summary>
+public sealed record CustomerOtpEventDto(
+    Guid Id,
+    string Purpose,
+    string Status,
+    Guid? UserId,
+    string? UserEmail,
+    DateTimeOffset? IssuedOnUtc,
+    DateTimeOffset? ExpiresOnUtc,
+    DateTimeOffset? UsedOnUtc,
+    string? IpAddress,
+    string? UserAgent,
+    string? CorrelationId,
+    string EmailDeliveryStatus,
+    string? Description,
+    DateTimeOffset OccurredOnUtc);
+
+/// <summary>
 /// A single point in the "logins over time" chart series.
 /// </summary>
 public sealed record LoginTrendPointDto(DateOnly Date, int SuccessfulLogins, int FailedLogins);

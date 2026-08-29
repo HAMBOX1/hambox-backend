@@ -1,4 +1,6 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Audit;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -34,6 +36,23 @@ internal sealed class ResendVerificationCommandHandler(
         if (unusedTokens.Count > 0)
         {
             dbContext.EmailVerificationTokens.RemoveRange(unusedTokens);
+
+            // The old token rows are hard-deleted above — this audit row is the only surviving trace
+            // that they ever existed, so record it before the delete is saved.
+            foreach (var superseded in unusedTokens)
+            {
+                dbContext.CustomerOtpAuditLogs.Add(CustomerOtpAuditLog.Record(
+                    CustomerOtpPurpose.EmailVerification,
+                    CustomerOtpEventStatus.Invalidated,
+                    superseded.CreatedOnUtc,
+                    superseded.ExpiresOnUtc,
+                    user.Id,
+                    superseded.Id,
+                    ipAddress: request.IpAddress,
+                    userAgent: request.UserAgent,
+                    correlationId: request.CorrelationId,
+                    description: "Superseded by a resend."));
+            }
         }
 
         var verificationTokenValue = tokenGenerator.GenerateSecureToken();
@@ -45,12 +64,26 @@ internal sealed class ResendVerificationCommandHandler(
         dbContext.EmailVerificationTokens.Add(verificationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await emailService.SendEmailVerificationAsync(
+        var delivered = await emailService.SendEmailVerificationAsync(
             user.Id,
             user.Email,
             verificationToken.ExpiresOnUtc,
             verificationTokenValue,
             cancellationToken);
+
+        dbContext.CustomerOtpAuditLogs.Add(CustomerOtpAuditLog.Record(
+            CustomerOtpPurpose.EmailVerification,
+            CustomerOtpEventStatus.Pending,
+            DateTimeOffset.UtcNow,
+            verificationToken.ExpiresOnUtc,
+            user.Id,
+            verificationToken.Id,
+            ipAddress: request.IpAddress,
+            userAgent: request.UserAgent,
+            correlationId: request.CorrelationId,
+            emailDeliveryStatus: delivered ? CustomerOtpEmailDeliveryStatus.Sent : CustomerOtpEmailDeliveryStatus.Failed,
+            description: "Verification token resent."));
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

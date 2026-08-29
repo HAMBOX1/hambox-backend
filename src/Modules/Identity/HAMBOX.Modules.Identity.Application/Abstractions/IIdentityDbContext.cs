@@ -86,6 +86,11 @@ public interface IIdentityDbContext
     DbSet<AdminOtpAuditLog> AdminOtpAuditLogs { get; }
 
     /// <summary>
+    /// Gets the customer OTP/verification-token audit logs database set.
+    /// </summary>
+    DbSet<CustomerOtpAuditLog> CustomerOtpAuditLogs { get; }
+
+    /// <summary>
     /// Gets the platform settings categories database set.
     /// </summary>
     DbSet<PlatformSettingsCategory> PlatformSettingsCategories { get; }

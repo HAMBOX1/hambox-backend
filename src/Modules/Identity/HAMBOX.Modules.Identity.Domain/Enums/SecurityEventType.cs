@@ -15,5 +15,10 @@ public enum SecurityEventType
     PermissionDenied = 7,
     AdminUnlock = 8,
     AdminBlock = 9,
-    DeviceBlock = 10
+    DeviceBlock = 10,
+
+    /// <summary>A customer-facing OTP/verification-token event worth surfacing (a failed/expired
+    /// verification attempt) — see <see cref="HAMBOX.Modules.Identity.Domain.Audit.CustomerOtpAuditLog"/>
+    /// for the full lifecycle detail.</summary>
+    CustomerOtpEvent = 11
 }

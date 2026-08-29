@@ -84,6 +84,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<AdminOtpAuditLog> AdminOtpAuditLogs => Set<AdminOtpAuditLog>();
 
     /// <summary>
+    /// Gets or sets the customer OTP/verification-token audit logs table.
+    /// </summary>
+    public DbSet<CustomerOtpAuditLog> CustomerOtpAuditLogs => Set<CustomerOtpAuditLog>();
+
+    /// <summary>
     /// Gets or sets the platform settings categories table.
     /// </summary>
     public DbSet<PlatformSettingsCategory> PlatformSettingsCategories => Set<PlatformSettingsCategory>();

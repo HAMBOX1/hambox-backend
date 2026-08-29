@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
+using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
 using HAMBOX.Modules.Identity.Application.Features.ResetPassword;
 using HAMBOX.Modules.Identity.Application.Features.VerifyEmail;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Roles;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
@@ -37,6 +39,24 @@ public sealed class AccountTokenHashingTests
     {
         public string HashPassword(string password) => $"hashed:{password}";
         public bool VerifyPassword(string hashedPassword, string providedPassword) => hashedPassword == $"hashed:{providedPassword}";
+    }
+
+    /// <summary>No-op stand-in for the real DB/email-backed <see cref="ISecurityEventLogger"/> — these
+    /// tests only need the handlers to compile and run, not to assert on Security Center side effects.</summary>
+    private sealed class FakeSecurityEventLogger : ISecurityEventLogger
+    {
+        public Task LogAsync(
+            SecurityEventType eventType,
+            SecurityEventSeverity severity,
+            string description,
+            Guid? actorUserId = null,
+            Guid? targetUserId = null,
+            string? ipAddress = null,
+            string? country = null,
+            string? userAgent = null,
+            string? correlationId = null,
+            string? city = null,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     // --- PasswordResetToken: storage & hash-matching in isolation ---------------------------------
@@ -116,7 +136,7 @@ public sealed class AccountTokenHashingTests
         Assert.NotEqual(Plaintext, persisted.Token);
         Assert.DoesNotContain(Plaintext, persisted.Token, StringComparison.Ordinal);
 
-        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher());
+        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher(), new FakeSecurityEventLogger());
         var result = await handler.Handle(new ResetPasswordCommand(Plaintext, "NewPassword123!"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -134,7 +154,7 @@ public sealed class AccountTokenHashingTests
         db.PasswordResetTokens.Add(PasswordResetToken.Create(user.Id, Plaintext, DateTimeOffset.UtcNow.AddHours(1)));
         await db.SaveChangesAsync();
 
-        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher());
+        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher(), new FakeSecurityEventLogger());
         var result = await handler.Handle(
             new ResetPasswordCommand("this-is-not-the-right-token", "NewPassword123!"), CancellationToken.None);
 
@@ -157,7 +177,7 @@ public sealed class AccountTokenHashingTests
         db.Entry(resetToken).Property(nameof(PasswordResetToken.ExpiresOnUtc)).CurrentValue = DateTimeOffset.UtcNow.AddMinutes(-1);
         await db.SaveChangesAsync();
 
-        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher());
+        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher(), new FakeSecurityEventLogger());
         var result = await handler.Handle(new ResetPasswordCommand(Plaintext, "NewPassword123!"), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -176,7 +196,7 @@ public sealed class AccountTokenHashingTests
         db.PasswordResetTokens.Add(resetToken);
         await db.SaveChangesAsync();
 
-        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher());
+        var handler = new ResetPasswordCommandHandler(db, new FakePasswordHasher(), new FakeSecurityEventLogger());
         var result = await handler.Handle(new ResetPasswordCommand(Plaintext, "NewPassword123!"), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -210,7 +230,7 @@ public sealed class AccountTokenHashingTests
         Assert.NotEqual(Plaintext, persisted.Token);
         Assert.DoesNotContain(Plaintext, persisted.Token, StringComparison.Ordinal);
 
-        var handler = new VerifyEmailCommandHandler(db);
+        var handler = new VerifyEmailCommandHandler(db, new FakeSecurityEventLogger());
         var result = await handler.Handle(new VerifyEmailCommand(Plaintext), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -229,7 +249,7 @@ public sealed class AccountTokenHashingTests
         db.EmailVerificationTokens.Add(EmailVerificationToken.Create(user.Id, Plaintext, DateTimeOffset.UtcNow.AddHours(24)));
         await db.SaveChangesAsync();
 
-        var handler = new VerifyEmailCommandHandler(db);
+        var handler = new VerifyEmailCommandHandler(db, new FakeSecurityEventLogger());
         var result = await handler.Handle(new VerifyEmailCommand("this-is-not-the-right-token"), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -253,7 +273,7 @@ public sealed class AccountTokenHashingTests
         db.Entry(verificationToken).Property(nameof(EmailVerificationToken.ExpiresOnUtc)).CurrentValue = DateTimeOffset.UtcNow.AddMinutes(-1);
         await db.SaveChangesAsync();
 
-        var handler = new VerifyEmailCommandHandler(db);
+        var handler = new VerifyEmailCommandHandler(db, new FakeSecurityEventLogger());
         var result = await handler.Handle(new VerifyEmailCommand(Plaintext), CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -273,7 +293,7 @@ public sealed class AccountTokenHashingTests
         db.EmailVerificationTokens.Add(verificationToken);
         await db.SaveChangesAsync();
 
-        var handler = new VerifyEmailCommandHandler(db);
+        var handler = new VerifyEmailCommandHandler(db, new FakeSecurityEventLogger());
         var result = await handler.Handle(new VerifyEmailCommand(Plaintext), CancellationToken.None);
 
         Assert.False(result.IsSuccess);

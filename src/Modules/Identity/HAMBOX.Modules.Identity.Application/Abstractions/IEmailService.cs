@@ -13,7 +13,8 @@ public interface IEmailService
     /// <param name="expiresAt">The verification token expiration time in UTC.</param>
     /// <param name="token">The email verification token.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    Task SendEmailVerificationAsync(
+    /// <returns><see langword="true"/> if the email was sent successfully; otherwise <see langword="false"/>.</returns>
+    Task<bool> SendEmailVerificationAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -28,7 +29,8 @@ public interface IEmailService
     /// <param name="expiresAt">The reset token expiration time in UTC.</param>
     /// <param name="token">The password reset token.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    Task SendPasswordResetAsync(
+    /// <returns><see langword="true"/> if the email was sent successfully; otherwise <see langword="false"/>.</returns>
+    Task<bool> SendPasswordResetAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -38,7 +40,8 @@ public interface IEmailService
     /// <summary>
     /// Sends an admin portal login OTP code to the specified address.
     /// </summary>
-    Task SendAdminLoginOtpAsync(
+    /// <returns><see langword="true"/> if the email was sent successfully; otherwise <see langword="false"/>.</returns>
+    Task<bool> SendAdminLoginOtpAsync(
         Guid userId,
         string email,
         string code,

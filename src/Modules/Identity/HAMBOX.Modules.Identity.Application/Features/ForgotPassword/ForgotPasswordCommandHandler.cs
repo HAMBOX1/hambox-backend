@@ -1,4 +1,6 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Audit;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -36,12 +38,26 @@ internal sealed class ForgotPasswordCommandHandler(
         dbContext.PasswordResetTokens.Add(resetToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await emailService.SendPasswordResetAsync(
+        var delivered = await emailService.SendPasswordResetAsync(
             user.Id,
             user.Email,
             resetToken.ExpiresOnUtc,
             tokenValue,
             cancellationToken);
+
+        dbContext.CustomerOtpAuditLogs.Add(CustomerOtpAuditLog.Record(
+            CustomerOtpPurpose.PasswordReset,
+            CustomerOtpEventStatus.Pending,
+            DateTimeOffset.UtcNow,
+            resetToken.ExpiresOnUtc,
+            user.Id,
+            resetToken.Id,
+            ipAddress: request.IpAddress,
+            userAgent: request.UserAgent,
+            correlationId: request.CorrelationId,
+            emailDeliveryStatus: delivered ? CustomerOtpEmailDeliveryStatus.Sent : CustomerOtpEmailDeliveryStatus.Failed,
+            description: "Password reset token requested."));
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

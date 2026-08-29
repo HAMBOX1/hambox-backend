@@ -7,7 +7,7 @@ internal sealed class PlatformRoutingEmailService(
     SmtpEmailService smtpEmailService,
     LoggingEmailService loggingEmailService) : IEmailService
 {
-    public async Task SendEmailVerificationAsync(
+    public async Task<bool> SendEmailVerificationAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -15,10 +15,10 @@ internal sealed class PlatformRoutingEmailService(
         CancellationToken cancellationToken = default)
     {
         var service = await ResolveAsync(cancellationToken);
-        await service.SendEmailVerificationAsync(userId, email, expiresAt, token, cancellationToken);
+        return await service.SendEmailVerificationAsync(userId, email, expiresAt, token, cancellationToken);
     }
 
-    public async Task SendPasswordResetAsync(
+    public async Task<bool> SendPasswordResetAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -26,10 +26,10 @@ internal sealed class PlatformRoutingEmailService(
         CancellationToken cancellationToken = default)
     {
         var service = await ResolveAsync(cancellationToken);
-        await service.SendPasswordResetAsync(userId, email, expiresAt, token, cancellationToken);
+        return await service.SendPasswordResetAsync(userId, email, expiresAt, token, cancellationToken);
     }
 
-    public async Task SendAdminLoginOtpAsync(
+    public async Task<bool> SendAdminLoginOtpAsync(
         Guid userId,
         string email,
         string code,
@@ -37,7 +37,7 @@ internal sealed class PlatformRoutingEmailService(
         CancellationToken cancellationToken = default)
     {
         var service = await ResolveAsync(cancellationToken);
-        await service.SendAdminLoginOtpAsync(userId, email, code, expiresAt, cancellationToken);
+        return await service.SendAdminLoginOtpAsync(userId, email, code, expiresAt, cancellationToken);
     }
 
     public async Task SendTemplatedEmailAsync(

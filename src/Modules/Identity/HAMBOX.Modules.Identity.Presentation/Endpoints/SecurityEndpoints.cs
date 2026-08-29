@@ -8,6 +8,7 @@ using HAMBOX.Modules.Identity.Application.Features.Security.BlockedUsers;
 using HAMBOX.Modules.Identity.Application.Features.Security.CountryRestrictions;
 using HAMBOX.Modules.Identity.Application.Features.Security.Devices;
 using HAMBOX.Modules.Identity.Application.Features.Security.LoginHistory;
+using HAMBOX.Modules.Identity.Application.Features.Security.OtpEvents;
 using HAMBOX.Modules.Identity.Application.Features.Security.SecurityEvents;
 using HAMBOX.Modules.Identity.Application.Features.Security.Sessions;
 using HAMBOX.Modules.Identity.Domain.Enums;
@@ -67,6 +68,27 @@ internal static class SecurityEndpoints
             return MapResult(result);
         })
         .WithName("GetSecurityEvents")
+        .RequirePermission(PermissionConstants.Security.ViewEvents);
+
+        group.MapGet("otp-events", async Task<IResult> (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] Guid? userId,
+            [FromQuery] string? purpose,
+            [FromQuery] string? status,
+            [FromQuery] DateTimeOffset? fromUtc,
+            [FromQuery] DateTimeOffset? toUtc,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            pageNumber = pageNumber <= 0 ? 1 : pageNumber;
+            pageSize = pageSize <= 0 ? 20 : pageSize;
+
+            var result = await sender.Send(
+                new GetCustomerOtpEventsQuery(pageNumber, pageSize, userId, purpose, status, fromUtc, toUtc), ct);
+            return MapResult(result);
+        })
+        .WithName("GetCustomerOtpEvents")
         .RequirePermission(PermissionConstants.Security.ViewEvents);
 
         group.MapPut("events/{id:guid}/status", async Task<IResult> (

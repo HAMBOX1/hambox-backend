@@ -67,7 +67,8 @@ public static class AuthEndpoints
                 userAgent,
                 language,
                 request.ReferralCode,
-                request.TurnstileToken);
+                request.TurnstileToken,
+                GetCorrelationId(httpContext));
 
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -275,7 +276,9 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new VerifyEmailCommand(request.Token);
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var command = new VerifyEmailCommand(request.Token, ipAddress, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -287,7 +290,9 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var command = new ForgotPasswordCommand(request.Email, ipAddress, request.TurnstileToken);
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var command = new ForgotPasswordCommand(
+                request.Email, ipAddress, request.TurnstileToken, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -298,7 +303,10 @@ public static class AuthEndpoints
             ISender sender,
             CancellationToken ct) =>
         {
-            var command = new ResetPasswordCommand(request.Token, request.NewPassword);
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var command = new ResetPasswordCommand(
+                request.Token, request.NewPassword, ipAddress, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -310,7 +318,9 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var command = new ResendVerificationCommand(request.Email, ipAddress, request.TurnstileToken);
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var command = new ResendVerificationCommand(
+                request.Email, ipAddress, request.TurnstileToken, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireRateLimiting(RateLimitPolicies.AccountActions);
@@ -380,6 +390,11 @@ public static class AuthEndpoints
         httpContext.Items.TryGetValue(GeoLocationHttpContextKeys.ResolvedGeoLocation, out var value)
             ? value as GeoLocationResult
             : null;
+
+    /// <summary>Reads the per-request correlation ID set by <c>CorrelationIdMiddleware</c>, for
+    /// threading into audit records that need to cross-reference a request's logs/traces.</summary>
+    private static string? GetCorrelationId(HttpContext httpContext) =>
+        httpContext.Items.TryGetValue("CorrelationId", out var value) ? value?.ToString() : null;
 
     /// <summary>
     /// Writes (or rotates) both the HttpOnly refresh cookie and its paired non-HttpOnly CSRF cookie —

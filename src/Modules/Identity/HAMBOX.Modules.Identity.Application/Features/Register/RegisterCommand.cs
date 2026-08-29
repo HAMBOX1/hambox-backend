@@ -15,6 +15,7 @@ namespace HAMBOX.Modules.Identity.Application.Features.Register;
 /// <param name="Language">The client's preferred language, used to record legal acceptance.</param>
 /// <param name="ReferralCode">Optional referral code the registrant was invited with.</param>
 /// <param name="TurnstileToken">Cloudflare Turnstile response token, verified by the validator.</param>
+/// <param name="CorrelationId">The request correlation ID, for audit-trail cross-referencing.</param>
 public sealed record RegisterCommand(
     string Email,
     string Password,
@@ -24,4 +25,5 @@ public sealed record RegisterCommand(
     string UserAgent,
     string Language,
     string? ReferralCode,
-    string TurnstileToken) : IRequest<Result>;
+    string TurnstileToken,
+    string? CorrelationId = null) : IRequest<Result>;

@@ -2,6 +2,7 @@ using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
 using HAMBOX.Modules.Identity.Application.Options;
+using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.Modules.Identity.Domain.Users;
@@ -101,12 +102,26 @@ internal sealed class RegisterCommandHandler(
 
         if (emailSettings.Value.Enabled)
         {
-            await emailService.SendEmailVerificationAsync(
+            var delivered = await emailService.SendEmailVerificationAsync(
                 user.Id,
                 user.Email,
                 verificationToken.ExpiresOnUtc,
                 verificationTokenValue,
                 cancellationToken);
+
+            dbContext.CustomerOtpAuditLogs.Add(CustomerOtpAuditLog.Record(
+                CustomerOtpPurpose.EmailVerification,
+                CustomerOtpEventStatus.Pending,
+                DateTimeOffset.UtcNow,
+                verificationToken.ExpiresOnUtc,
+                user.Id,
+                verificationToken.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                correlationId: request.CorrelationId,
+                emailDeliveryStatus: delivered ? CustomerOtpEmailDeliveryStatus.Sent : CustomerOtpEmailDeliveryStatus.Failed,
+                description: "Verification token issued at registration."));
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         return Result.Success();

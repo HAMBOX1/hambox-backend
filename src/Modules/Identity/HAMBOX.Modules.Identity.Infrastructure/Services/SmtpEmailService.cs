@@ -20,7 +20,7 @@ internal sealed class SmtpEmailService(
     ILogger<SmtpEmailService> logger) : IEmailService
 {
     /// <inheritdoc />
-    public async Task SendEmailVerificationAsync(
+    public async Task<bool> SendEmailVerificationAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -29,11 +29,11 @@ internal sealed class SmtpEmailService(
     {
         var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
         var message = EmailMessageBuilder.BuildVerificationMessage(settings, email, token, expiresAt);
-        await SendAsync("EmailVerification", userId, email, message, settings, cancellationToken);
+        return await SendAsync("EmailVerification", userId, email, message, settings, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task SendPasswordResetAsync(
+    public async Task<bool> SendPasswordResetAsync(
         Guid userId,
         string email,
         DateTimeOffset expiresAt,
@@ -42,11 +42,11 @@ internal sealed class SmtpEmailService(
     {
         var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
         var message = EmailMessageBuilder.BuildPasswordResetMessage(settings, email, token, expiresAt);
-        await SendAsync("PasswordReset", userId, email, message, settings, cancellationToken);
+        return await SendAsync("PasswordReset", userId, email, message, settings, cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task SendAdminLoginOtpAsync(
+    public async Task<bool> SendAdminLoginOtpAsync(
         Guid userId,
         string email,
         string code,
@@ -64,7 +64,7 @@ internal sealed class SmtpEmailService(
 
         var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
         var message = EmailMessageBuilder.BuildAdminOtpMessage(settings, email, code, expiresAt);
-        await SendAsync("AdminLoginOtp", userId, email, message, settings, cancellationToken);
+        return await SendAsync("AdminLoginOtp", userId, email, message, settings, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -85,7 +85,7 @@ internal sealed class SmtpEmailService(
         }
     }
 
-    private async Task SendAsync(
+    private async Task<bool> SendAsync(
         string emailType,
         Guid userId,
         string email,
