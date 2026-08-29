@@ -22,6 +22,7 @@ internal sealed class OperationalJobWorker(
     IServiceScopeFactory scopeFactory,
     IWorkerRuntimeState workerState,
     IRecurringJobScheduler recurringJobScheduler,
+    IJobQueueNotifier jobQueueNotifier,
     ILogger<OperationalJobWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -77,7 +78,7 @@ internal sealed class OperationalJobWorker(
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), stoppingToken);
+                await DelayOrWakeEarlyAsync(TimeSpan.FromSeconds(delaySeconds), stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -211,5 +212,44 @@ internal sealed class OperationalJobWorker(
         var exponentialSeconds = baseDelaySeconds * Math.Pow(2, Math.Max(0, attempts - 1));
         var cappedSeconds = Math.Min(exponentialSeconds, Math.Max(baseDelaySeconds, retrySettings.TimeoutSeconds));
         return TimeSpan.FromSeconds(cappedSeconds);
+    }
+
+    /// <summary>
+    /// Sleeps for <paramref name="delay"/> like before, but wakes up early if
+    /// <see cref="IJobQueueNotifier"/> reports a job was enqueued in the meantime — pure latency
+    /// optimization (see that interface's remarks). With no Redis configured,
+    /// <see cref="NullJobQueueNotifier"/>'s subscription never fires, so this behaves identically to
+    /// the plain <c>Task.Delay</c> it replaced. Re-subscribes fresh every tick rather than holding one
+    /// subscription for the worker's whole lifetime — simpler to reason about, and the per-tick
+    /// subscribe/unsubscribe cost is negligible next to a multi-second poll interval.
+    /// </summary>
+    private async Task DelayOrWakeEarlyAsync(TimeSpan delay, CancellationToken stoppingToken)
+    {
+        using var wakeCts = new CancellationTokenSource();
+        await using var subscription = jobQueueNotifier.Subscribe(OperationalJobQueues.Default, () =>
+        {
+            try
+            {
+                wakeCts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The delay already finished naturally (or the worker is shutting down) and this
+                // token was disposed before a late notification arrived — nothing to wake up for.
+            }
+
+            return Task.CompletedTask;
+        });
+
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, wakeCts.Token);
+        try
+        {
+            await Task.Delay(delay, linked.Token);
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            // Woken early by a notification, not by shutdown — fall through and let the caller's own
+            // stoppingToken check decide whether to loop again immediately.
+        }
     }
 }

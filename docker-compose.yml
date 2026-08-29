@@ -22,6 +22,23 @@ services:
       - "1025:1025"
     restart: unless-stopped
 
+  # Optional job-queue wake-up transport (IJobQueueNotifier) — a pure latency optimization on top of
+  # the durable, DB-polled OperationalJob queue. Not exposed on a host port: only hambox-api's own
+  # container network can reach it, matching how it must be run in production (never publicly exposed,
+  # see docs/PRODUCTION_REDIS.md). If this container is stopped, the app keeps working correctly at
+  # its normal DB-polling interval — nothing here is load-bearing for correctness.
+  redis:
+    image: redis:7-alpine
+    container_name: hambox-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   hambox-api:
     image: hambox-api
     container_name: hambox-api
@@ -41,11 +58,14 @@ services:
       - EmailSettings__FromAddress=noreply@hambox.local
       - EmailSettings__FromName=HAMBOX
       - EmailSettings__ApplicationBaseUrl=http://localhost:4200
+      - Redis__ConnectionString=redis:6379
     depends_on:
       sqlserver:
         condition: service_healthy
       mailpit:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

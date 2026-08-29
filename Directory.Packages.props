@@ -10,6 +10,7 @@
     <PackageVersion Include="MailKit" Version="4.16.0" />
     <PackageVersion Include="MaxMind.GeoIP2" Version="6.1.0" />
     <PackageVersion Include="MediatR" Version="14.1.0" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />

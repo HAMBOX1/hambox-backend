@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace HAMBOX.Infrastructure.Extensions;
 
@@ -126,6 +127,33 @@ public static class InfrastructureExtensions
         services.AddSingleton<RecurringJobRegistry>();
         services.AddSingleton<IRecurringJobScheduler>(sp => sp.GetRequiredService<RecurringJobRegistry>());
         services.AddSingleton<IRecurringJobRegistry>(sp => sp.GetRequiredService<RecurringJobRegistry>());
+
+        // 6.1 Job-queue wake-up notifier (Redis, optional) — a pure latency optimization layered on
+        // top of the durable DB-polled job queue above (see IJobQueueNotifier's remarks). Redis is
+        // never a source of truth: falls back to a no-op notifier when unconfigured, so the whole
+        // system behaves identically — just at the worker's normal polling-interval latency — with
+        // zero Redis present at all. Never commit a connection string: this reads from configuration
+        // only (environment variable / user-secrets / deployment config).
+        services.Configure<RedisSettings>(configuration.GetSection(RedisSettings.SectionName));
+        var redisConnectionString = configuration.GetSection(RedisSettings.SectionName)["ConnectionString"];
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                var options = ConfigurationOptions.Parse(redisConnectionString);
+                // Never block or crash app startup on a down/unreachable Redis — connect lazily in the
+                // background and let every caller's own try/catch (RedisJobQueueNotifier) degrade to a
+                // no-op until it reconnects. This is the actual "system remains recoverable if Redis is
+                // temporarily unavailable" guarantee, enforced at the connection layer.
+                options.AbortOnConnectFail = false;
+                return ConnectionMultiplexer.Connect(options);
+            });
+            services.AddSingleton<IJobQueueNotifier, RedisJobQueueNotifier>();
+        }
+        else
+        {
+            services.AddSingleton<IJobQueueNotifier, NullJobQueueNotifier>();
+        }
 
         return services;
     }

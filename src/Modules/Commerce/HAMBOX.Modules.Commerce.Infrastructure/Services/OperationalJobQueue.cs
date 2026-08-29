@@ -2,6 +2,7 @@ using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
@@ -11,7 +12,8 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// the same table — one enqueue path, two surfaces. A future engine (Hangfire, etc.) replaces this
 /// class's <see cref="IBackgroundJobScheduler"/> registration only; no caller of either interface changes.
 /// </summary>
-internal sealed class OperationalJobQueue(ICommerceDbContext db, IBackgroundJobSerializer serializer)
+internal sealed class OperationalJobQueue(
+    ICommerceDbContext db, IBackgroundJobSerializer serializer, IJobQueueNotifier notifier, ILogger<OperationalJobQueue> logger)
     : IOperationalJobQueue, IBackgroundJobScheduler
 {
     public async Task<OperationalJob> EnqueueAsync(
@@ -37,6 +39,21 @@ internal sealed class OperationalJobQueue(ICommerceDbContext db, IBackgroundJobS
 
         db.OperationalJobs.Add(job);
         await db.SaveChangesAsync(cancellationToken);
+
+        // The SQL row above is the durable job — already committed by the time this runs. This is
+        // purely "consider waking up sooner than the next scheduled poll"; see IJobQueueNotifier.
+        // Defensive catch here too, on top of every implementation's own "never throws" contract —
+        // enqueueing a job (and the caller that triggered it, e.g. checkout) must never fail just
+        // because a wake-up notification couldn't be published.
+        try
+        {
+            await notifier.NotifyAsync(queue, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Job wake-up notification failed for job {JobId} on queue '{Queue}' — the job itself was still enqueued successfully.", job.Id, queue);
+        }
+
         return job;
     }
 

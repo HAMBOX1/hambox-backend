@@ -136,6 +136,36 @@ public interface IBackgroundJobSerializer
     TPayload? Deserialize<TPayload>(string json);
 }
 
+/// <summary>
+/// Best-effort "a job was just enqueued, consider waking up early" signal — a pure latency
+/// optimization layered on top of the durable, DB-polled job queue (<see cref="IBackgroundJobScheduler"/>/
+/// <c>OperationalJob</c>), never a replacement for it. The SQL row created by the scheduler remains the
+/// single source of truth for whether a job exists, what state it's in, and who has claimed it — this
+/// interface only shortens how long a worker waits before its next poll notices a new row.
+/// </summary>
+/// <remarks>
+/// A missed, failed, or entirely absent notification (no implementation registered, the backing
+/// transport down, a dropped message) must never lose a job — the worst case is simply that the
+/// worker's next already-scheduled poll picks it up, exactly as if this interface didn't exist.
+/// Implementations MUST NOT throw out of either member; swallow and log instead, so a transport outage
+/// degrades this to a no-op rather than affecting job durability, enqueueing, or claiming in any way.
+/// </remarks>
+public interface IJobQueueNotifier
+{
+    /// <summary>Publishes a best-effort wake-up for <paramref name="queue"/>. Never throws.</summary>
+    Task NotifyAsync(string queue, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Subscribes to wake-up notifications for <paramref name="queue"/>. <paramref name="onNotified"/>
+    /// is invoked (fire-and-forget; the implementation is responsible for not letting an exception from
+    /// it escape) whenever a notification arrives. Returns a disposable subscription — dispose it to
+    /// stop listening. An implementation with no real transport (e.g. no Redis configured) returns a
+    /// subscription that simply never invokes the callback, so the caller transparently falls back to
+    /// its own polling interval.
+    /// </summary>
+    IAsyncDisposable Subscribe(string queue, Func<Task> onNotified);
+}
+
 public enum BackgroundJobPriority
 {
     Low = 0,
