@@ -8,12 +8,15 @@ using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Carts;
+using HAMBOX.Modules.Commerce.Domain.Enums;
+using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Infrastructure.Services;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Application.Options;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Services;
 using DomainAvailabilityState = HAMBOX.Modules.Suppliers.Domain.Suppliers.SupplierAvailabilityState;
+using HAMBOX.UnitTests.Commerce.Dot.TestDoubles;
 using HAMBOX.UnitTests.Commerce.TestDoubles;
 using HAMBOX.UnitTests.Suppliers.TestDoubles;
 using Microsoft.Extensions.Caching.Memory;
@@ -36,7 +39,8 @@ public sealed class SupplierPricedCheckoutTests
         HAMBOX.Modules.Catalog.Infrastructure.Persistence.CatalogDbContext CatalogDb,
         HAMBOX.Modules.Suppliers.Infrastructure.Persistence.SuppliersDbContext SuppliersDb,
         CheckoutCommandHandler Handler,
-        FakeCurrentUserService CurrentUser);
+        FakeCurrentUserService CurrentUser,
+        HAMBOX.UnitTests.Commerce.Dot.TestDoubles.FakeOperationalJobQueue JobQueue);
 
     private static async Task<(Harness Harness, Product Product, HAMBOX.Modules.Catalog.Domain.Inventory.ProductVariant Variant)>
         CreateHarnessWithSupplierFirstVariantAsync(decimal defaultMarginPercent = 20m)
@@ -115,17 +119,14 @@ public sealed class SupplierPricedCheckoutTests
         var referralLifecycle = new ReferralLifecycleService(
             commerceDb, settingsProvider, referralRewardService, new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
-        var orderFulfillmentService = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), fulfillmentRouter,
-            new NullSupplierPricingEngine(), suppliersDb, NullLogger<OrderFulfillmentService>.Instance);
-
+        var jobQueue = new FakeOperationalJobQueue();
         var handler = new CheckoutCommandHandler(
             commerceDb, catalogDb, LegalTestDbContextFactory.Create(), new FakeCommerceTransactionService(), currentUser, inventoryEngine,
             cartResponseBuilder, cartLineValidator, new PromotionRedemptionService(commerceDb),
             [new FakePaymentProvider()], new FakeCommunicationService(), new FakeMembershipAccessProvider(),
-            referralLifecycle, orderFulfillmentService, NullLogger<CheckoutCommandHandler>.Instance);
+            referralLifecycle, jobQueue, NullLogger<CheckoutCommandHandler>.Instance);
 
-        return (new Harness(commerceDb, catalogDb, suppliersDb, handler, currentUser), product, variant);
+        return (new Harness(commerceDb, catalogDb, suppliersDb, handler, currentUser, jobQueue), product, variant);
     }
 
     // 1 & 4 & 8: cheapest supplier (by selling price) determines the storefront/checkout price; the
@@ -207,5 +208,26 @@ public sealed class SupplierPricedCheckoutTests
         var reloadedItem = harness.CommerceDb.Orders.Single().Items.Single(i => i.ProductVariantId == variant.Id);
         Assert.Equal(8.28m, reloadedItem.UnitPrice);
         Assert.Equal(6.90m, reloadedItem.SupplierBuyingPriceAtOrderTime);
+    }
+
+    // Sprint 4: SupplierFirst has no manual stock reserved inline (see the reservation loop's own
+    // skip-for-Supplier*-modes comment), so this order must never complete synchronously at checkout —
+    // it must stay Processing until the automated-supplier job (enqueued here, executed by the worker)
+    // actually delivers the code. Checkout must return successfully regardless; the customer isn't
+    // blocked on the external supplier call.
+    [Fact]
+    public async Task Checkout_SupplierFirstVariant_OrderStaysProcessing_AndEnqueuesTheFulfillmentJob_NeverCallsSupplierInline()
+    {
+        var (harness, _, _) = await CreateHarnessWithSupplierFirstVariantAsync();
+
+        var result = await harness.Handler.Handle(
+            new CheckoutCommand("buyer@example.com", "US", "development", "127.0.0.1", "test-agent", "en"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var persistedOrder = harness.CommerceDb.Orders.Single();
+        Assert.Equal(OrderStatus.Processing, persistedOrder.Status);
+
+        var enqueuedJobType = Assert.Single(harness.JobQueue.EnqueuedJobTypes);
+        Assert.Equal(OperationalJobTypes.ExecuteOrderFulfillment, enqueuedJobType);
     }
 }

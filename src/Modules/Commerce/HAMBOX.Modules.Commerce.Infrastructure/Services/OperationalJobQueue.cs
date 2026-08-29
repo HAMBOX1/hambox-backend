@@ -113,17 +113,31 @@ internal sealed class OperationalJobQueue(
             .Take(size)
             .ToListAsync(cancellationToken);
 
+        // Claimed one row (one SaveChangesAsync) at a time, not the whole batch in one call: with
+        // OperationalJob.RowVersion now a real optimistic-concurrency token, a second worker instance
+        // that already claimed one of these same candidate rows would otherwise fail the ENTIRE batch's
+        // single SaveChangesAsync — losing rows this worker genuinely won the race on, not just the
+        // contested one. Losing the claim on a single row is expected and safe (the other worker owns
+        // it); it must never take down the rest of this worker's legitimately-won batch.
+        var claimed = new List<OperationalJob>(candidates.Count);
         foreach (var job in candidates)
         {
             job.MarkRunning(workerId);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                claimed.Add(job);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another worker's claim committed first — this is the expected, safe outcome of the
+                // race, mirroring SupplierFulfillment.Claim()'s identical contract. Nothing to clean up:
+                // this DbContext is scoped to one worker tick (a fresh scope every iteration — see
+                // OperationalJobWorker) and no later save in this method touches this same entity again.
+            }
         }
 
-        if (candidates.Count > 0)
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        return candidates;
+        return claimed;
     }
 
     public async Task<bool> RetryAsync(Guid jobId, CancellationToken cancellationToken = default)

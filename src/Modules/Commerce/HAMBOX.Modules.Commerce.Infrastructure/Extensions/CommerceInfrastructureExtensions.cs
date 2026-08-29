@@ -95,6 +95,7 @@ public static class CommerceInfrastructureExtensions
         // SuppliersInfrastructureExtensions' ISupplierProvider registration block.
         services.AddScoped<IBackgroundJobHandler, ExpireInventoryReservationsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, RetryOrderFulfillmentJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ExecuteOrderFulfillmentJobHandler>();
         services.AddScoped<IBackgroundJobHandler, RetryDeliveryJobHandler>();
         services.AddScoped<IBackgroundJobHandler, HealthProbeJobHandler>();
         services.AddScoped<IBackgroundJobHandler, GenerateOperationalAlertsJobHandler>();

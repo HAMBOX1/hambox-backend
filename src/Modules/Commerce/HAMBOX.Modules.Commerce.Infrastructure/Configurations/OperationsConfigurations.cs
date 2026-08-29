@@ -21,6 +21,7 @@ internal sealed class OperationalJobConfiguration : IEntityTypeConfiguration<Ope
         builder.Property(x => x.RelatedEntityId).HasMaxLength(128);
         builder.Property(x => x.LastError).HasMaxLength(2000);
         builder.Property(x => x.ExceptionDetails).HasMaxLength(4000);
+        builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasIndex(x => new { x.Status, x.NextVisibleOnUtc, x.Priority });
         builder.HasIndex(x => x.CreatedOnUtc);
         builder.HasIndex(x => x.JobType);

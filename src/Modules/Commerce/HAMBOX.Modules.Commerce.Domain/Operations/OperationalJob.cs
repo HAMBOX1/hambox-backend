@@ -22,6 +22,16 @@ public enum OperationalJobPriority
 public static class OperationalJobTypes
 {
     public const string ExpireInventoryReservations = "ExpireInventoryReservations";
+
+    /// <summary>
+    /// Runs a just-paid order's automated-supplier fulfillment attempt off the checkout HTTP request.
+    /// Enqueued by <c>CheckoutCommandHandler</c> exactly once per order that still has a shortfall after
+    /// manual inventory — never for orders manual reservation already fully covered. Distinct from
+    /// <see cref="RetryOrderFulfillment"/>, which drives the MANUAL-inventory retry path for an
+    /// already-existing order via <c>OrderFulfillmentService.FulfillMissingAsync</c>.
+    /// </summary>
+    public const string ExecuteOrderFulfillment = "ExecuteOrderFulfillment";
+
     public const string RetryOrderFulfillment = "RetryOrderFulfillment";
     public const string RetryDelivery = "RetryDelivery";
     public const string HealthProbe = "HealthProbe";
@@ -93,6 +103,16 @@ public sealed class OperationalJob
     public DateTimeOffset? FinishedOnUtc { get; private set; }
     public DateTimeOffset? LastRetryOnUtc { get; private set; }
     public DateTimeOffset? NextVisibleOnUtc { get; private set; }
+
+    /// <summary>
+    /// EF optimistic-concurrency token — the same double-claim guard
+    /// <c>SupplierFulfillment.RowVersion</c> already uses for its own <c>Claim()</c>. Two workers may
+    /// both load the same claimable row and both call <see cref="MarkRunning"/> in memory, but only the
+    /// first <c>SaveChangesAsync</c> to commit wins; the second fails with
+    /// <c>DbUpdateConcurrencyException</c>, which the claiming code must treat as "another worker won,
+    /// skip this row" rather than retry or crash the batch.
+    /// </summary>
+    public byte[] RowVersion { get; private set; } = [];
 
     public static OperationalJob Create(
         string jobType,

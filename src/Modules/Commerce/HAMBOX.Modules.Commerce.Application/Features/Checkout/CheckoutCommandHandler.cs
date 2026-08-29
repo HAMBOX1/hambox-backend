@@ -10,6 +10,7 @@ using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
+using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.Modules.Legal.Application.Abstractions;
 using HAMBOX.Modules.Legal.Application.Services;
@@ -36,7 +37,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly ICommunicationService _communicationService;
     private readonly IMembershipAccessProvider _membershipAccess;
     private readonly ReferralLifecycleService _referralLifecycle;
-    private readonly OrderFulfillmentService _orderFulfillmentService;
+    private readonly IOperationalJobQueue _jobQueue;
     private readonly ILogger<CheckoutCommandHandler> _logger;
 
     public CheckoutCommandHandler(
@@ -53,7 +54,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         ICommunicationService communicationService,
         IMembershipAccessProvider membershipAccess,
         ReferralLifecycleService referralLifecycle,
-        OrderFulfillmentService orderFulfillmentService,
+        IOperationalJobQueue jobQueue,
         ILogger<CheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -69,7 +70,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         _communicationService = communicationService;
         _membershipAccess = membershipAccess;
         _referralLifecycle = referralLifecycle;
-        _orderFulfillmentService = orderFulfillmentService;
+        _jobQueue = jobQueue;
         _logger = logger;
     }
 
@@ -153,6 +154,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         }
 
         Order? createdOrder = null;
+        var needsAutomatedSupplierFulfillment = false;
         var reservedCodesByLine = new Dictionary<(Guid ProductId, Guid? VariantId), List<ReservedCodeSnapshot>>();
 
         try
@@ -259,14 +261,9 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 
                 order.RecordPayment(paymentResult!.Provider, paymentResult.TransactionId!);
                 OrderPaymentCallbackRecorder.Record(_commerceDbContext, order.Id, paymentResult);
-                order.Complete();
 
                 await _promotionRedemptionService.RedeemAsync(
                     order, evaluation.AppliedPromotions, _currentUserService.UserId, ct);
-
-                // Awards the referrer's points if this order qualifies (the referred user's first
-                // completed order) — points-only, nothing priced into this order depends on the outcome.
-                await _referralLifecycle.ProcessOrderCompletedAsync(order, ct);
 
                 var commitAssignments = new List<(Guid OrderItemId, Guid CodeId)>();
                 var reservedCodeCursor = new Dictionary<(Guid ProductId, Guid? VariantId), int>();
@@ -293,9 +290,11 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     }
                 }
 
+                var manuallyDeliveredCount = 0;
                 if (commitAssignments.Count > 0)
                 {
                     var committed = await _inventoryEngine.CommitReservationsAsync(order.Id, commitAssignments, ct);
+                    manuallyDeliveredCount = committed.Count;
                     foreach (var code in committed)
                     {
                         var orderItem = order.Items.First(i => i.Id == code.OrderItemId);
@@ -309,6 +308,35 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
 
                         _commerceDbContext.OrderLicenseKeys.Add(licenseKey);
                     }
+                }
+
+                // Order.Complete() must never fire before every required digital unit actually has a
+                // license key — SupplierFirst/SupplierOnly lines were deliberately skipped above (see
+                // the reservation loop's own comment) and are never covered by manual reservation, so
+                // completing unconditionally here would mark the order Completed before the automated
+                // supplier step (now a background job, queued below, strictly after this transaction
+                // commits) has even attempted a purchase. Mirrors the exact same
+                // "count keys vs required, complete only if fully covered, else MarkProcessing" check
+                // OrderFulfillmentService.FulfillMissingAsync and CommerceOrderLicenseKeyDeliverySink
+                // already use for their own completion decisions — not a new rule, the same one applied
+                // a third time, consistently.
+                var requiredQuantity = order.Items
+                    .Where(i => i.LineItemType == OrderLineItemType.Product)
+                    .Sum(i => i.Quantity);
+                if (requiredQuantity > 0 && manuallyDeliveredCount >= requiredQuantity)
+                {
+                    order.Complete();
+
+                    // Awards the referrer's points if this order qualifies (the referred user's first
+                    // completed order) — points-only, nothing priced into this order depends on the
+                    // outcome. Only fired here on the fast (fully manual) completion path; the job
+                    // below fires the same call for anything that completes later via automated supply.
+                    await _referralLifecycle.ProcessOrderCompletedAsync(order, ct);
+                }
+                else
+                {
+                    order.MarkProcessing();
+                    needsAutomatedSupplierFulfillment = true;
                 }
 
                 _commerceDbContext.Orders.Add(order);
@@ -360,13 +388,24 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                 new Error("Checkout.Failed", ex.Message));
         }
 
-        // Strictly after the payment transaction above has committed — see
-        // OrderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync's remarks for why this must
-        // never move inside _transactionService.ExecuteAsync. Covers whatever manual inventory could
-        // not: every cart line was already fully reserved against real stock earlier in this handler,
-        // so today this is normally a no-op, but it becomes load-bearing the moment manual stock for a
-        // mapped product runs out.
-        await _orderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync(createdOrder!, cancellationToken);
+        // Job → Worker, not inline: the automated-supplier step makes real outbound calls to whichever
+        // provider is cheapest-eligible (Bamboo/Visoria/GlobeTopper/Eneba/CodesWholesale), and must
+        // never block the checkout HTTP response on that. Enqueued strictly after the payment
+        // transaction above has committed — see OrderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync's
+        // remarks for why that call itself must never run inside a transaction; enqueueing here instead
+        // of calling it is the only thing that changed — ExecuteOrderFulfillmentJobHandler calls that
+        // exact same method, unmodified, once the worker claims this job. Only enqueued when manual
+        // reservation didn't already cover every line (see the completion decision above) — a pure
+        // ManualOnly order with full stock needs no automated-supplier attempt at all.
+        if (needsAutomatedSupplierFulfillment)
+        {
+            await _jobQueue.EnqueueAsync(
+                OperationalJobTypes.ExecuteOrderFulfillment,
+                priority: OperationalJobPriority.High,
+                relatedEntityType: "Order",
+                relatedEntityId: createdOrder!.Id.ToString(),
+                cancellationToken: cancellationToken);
+        }
 
         // Compliance-audit row, not money/inventory-critical — same "sequential, not
         // cross-schema-atomic" treatment RegisterCommandHandler gives this. Ties the acceptance of
