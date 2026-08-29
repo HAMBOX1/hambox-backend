@@ -15,6 +15,7 @@ internal sealed class ImmediatePaymentProvider(
     public string ProviderName => "Immediate";
 
     public bool CanHandle(string paymentMethod) =>
+        environment.IsDevelopment() &&
         !string.Equals(paymentMethod, DevelopmentPaymentProvider.PaymentMethodKey, StringComparison.OrdinalIgnoreCase);
 
     public Task<PaymentProviderResult> ProcessAsync(
