@@ -207,7 +207,7 @@ public static class AuthEndpoints
             var command = new VerifyMaintenanceBypassCommand(request.Password);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("refresh", async (
             HttpContext httpContext,
