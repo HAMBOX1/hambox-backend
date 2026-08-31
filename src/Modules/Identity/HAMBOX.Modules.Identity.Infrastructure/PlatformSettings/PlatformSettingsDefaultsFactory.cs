@@ -242,7 +242,6 @@ internal static class PlatformSettingsDefaultsFactory
             lockout.MaxFailedAccessAttempts,
             lockout.LockoutDurationMinutes,
             RequireEmailVerification: true,
-            EnforceHttps: true,
             SecurityAlertsEnabled: true,
             SecurityAlertMinSeverity: "High",
             SecurityAlertThrottleMinutes: 15);
@@ -262,8 +261,10 @@ internal static class PlatformSettingsDefaultsFactory
     private static TotpSettingsPayload CreateTotp() =>
         new(false, true, "HAMBOX Admin", 6, 30);
 
+    // InvoicePrefix default matches the "ORD-" literal every checkout handler hardcoded before this
+    // setting was wired in — an install that never touches this field must see no behavior change.
     private static CommerceSettingsPayload CreateCommerce() =>
-        new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 20m);
+        new(0m, false, 15, 24, 14, "ORD-", DefaultSupplierMarginPercent: 20m);
 
     private static CheckoutSettingsPayload CreateCheckout() =>
         new(true, false, "Card", 60);

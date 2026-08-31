@@ -14,17 +14,14 @@ using Microsoft.EntityFrameworkCore;
 namespace HAMBOX.UnitTests.Identity;
 
 /// <summary>
-/// Proves <see cref="LoginCommandHandler"/> returns the exact same <see cref="Error"/>
-/// (<see cref="IdentityErrors.InvalidCredentials"/>) for every pre-token-issuance failure branch —
-/// nonexistent email, unconfirmed email, inactive account, pre-locked account, wrong password, and
-/// wrong password that itself triggers lockout — so nothing externally observable (HTTP status,
-/// error code, or localized message, since <c>LocalizedEndpointResults.FromResult</c> maps 1:1 from
-/// <see cref="Result.Error"/>) lets a caller distinguish "this email isn't registered" from "this
-/// email is registered but something else is wrong", closing the account-enumeration gap. Internal
-/// logging (LoginHistory, SecurityEventLogger) is intentionally left untouched by this fix and not
-/// re-asserted here — only the caller-visible Result is in scope.
+/// Proves <see cref="LoginCommandHandler"/> actually consults
+/// <see cref="SecuritySettingsPayload.RequireEmailVerification"/> (Admin Settings → Security) instead
+/// of unconditionally rejecting unverified customers. A "Pending"-status account exclusively means
+/// "not yet email-verified" in this codebase (<see cref="ApplicationUser.Activate"/> is only ever
+/// called alongside <see cref="ApplicationUser.ConfirmEmail"/>), so disabling the flag must also let
+/// the account past the account-status gate, not just the explicit EmailConfirmed check.
 /// </summary>
-public sealed class LoginAccountEnumerationTests
+public sealed class RequireEmailVerificationLoginTests
 {
     private static IdentityDbContext CreateDbContext()
     {
@@ -34,13 +31,16 @@ public sealed class LoginAccountEnumerationTests
         return new IdentityDbContext(options);
     }
 
-    private static LoginCommandHandler CreateHandler(IIdentityDbContext dbContext, bool passwordMatches) =>
+    private static LoginCommandHandler CreateHandler(
+        IIdentityDbContext dbContext,
+        bool requireEmailVerification,
+        int maxFailedAccessAttempts = 5) =>
         new(
             dbContext,
-            new FakePasswordHasher(passwordMatches),
+            new FakePasswordHasher(),
             new FakeAdminAccessResolver(),
-            new NeverInvokedAuthTokenIssuer(),
-            new FakePlatformSettingsProvider(),
+            new FakeAuthTokenIssuer(),
+            new FakePlatformSettingsProvider(requireEmailVerification, maxFailedAccessAttempts),
             new FakeSecurityBlocklistService(),
             new FakeSecurityEventLogger(),
             new FakeClientInfoParser(),
@@ -49,76 +49,45 @@ public sealed class LoginAccountEnumerationTests
 
     private static async Task<ApplicationUser> SeedUserAsync(IdentityDbContext db, Action<ApplicationUser>? configure = null)
     {
-        var user = ApplicationUser.Create($"user-{Guid.NewGuid():N}@example.com", "hashed", "Test", "User");
+        var user = ApplicationUser.Create($"user-{Guid.NewGuid():N}@example.com", "correct-password", "Test", "User");
         configure?.Invoke(user);
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
     }
 
-    private static LoginCommand CommandFor(string email) =>
-        new(email, "wrong-or-right-password", "203.0.113.1", "test-agent");
+    private static LoginCommand CommandFor(string email, string password = "correct-password") =>
+        new(email, password, "203.0.113.1", "test-agent");
 
-    private static void AssertGenericInvalidCredentials(Result<AuthTokenResponse> result)
+    [Fact]
+    public async Task FlagOn_UnverifiedUser_IsRejectedWithEmailNotConfirmed()
     {
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db); // Create() leaves Pending + EmailConfirmed = false
+        var handler = CreateHandler(db, requireEmailVerification: true);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
         Assert.False(result.IsSuccess);
-        Assert.Equal(IdentityErrors.InvalidCredentials.Code, result.Error.Code);
+        Assert.Equal(IdentityErrors.EmailNotConfirmed.Code, result.Error.Code);
     }
 
     [Fact]
-    public async Task NonexistentEmail_ReturnsGenericInvalidCredentials()
+    public async Task FlagOff_UnverifiedUser_IsAllowedToLogIn()
     {
         await using var db = CreateDbContext();
-        var handler = CreateHandler(db, passwordMatches: false);
-
-        var result = await handler.Handle(CommandFor("nobody@example.com"), CancellationToken.None);
-
-        AssertGenericInvalidCredentials(result);
-    }
-
-    [Fact]
-    public async Task UnconfirmedEmail_ReturnsGenericInvalidCredentials_NotEmailNotConfirmed()
-    {
-        await using var db = CreateDbContext();
-        var user = await SeedUserAsync(db); // Create() leaves EmailConfirmed = false
-        var handler = CreateHandler(db, passwordMatches: true);
+        var user = await SeedUserAsync(db); // Pending + EmailConfirmed = false
+        var handler = CreateHandler(db, requireEmailVerification: false);
 
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
-        AssertGenericInvalidCredentials(result);
+        Assert.True(result.IsSuccess);
     }
 
-    [Fact]
-    public async Task InactiveAccount_ReturnsGenericInvalidCredentials_NotAccountNotActive()
-    {
-        await using var db = CreateDbContext();
-        var user = await SeedUserAsync(db, u => u.ConfirmEmail()); // confirmed but still Pending (not Active)
-        var handler = CreateHandler(db, passwordMatches: true);
-
-        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
-
-        AssertGenericInvalidCredentials(result);
-    }
-
-    [Fact]
-    public async Task PreLockedAccount_ReturnsGenericInvalidCredentials_NotAccountLocked()
-    {
-        await using var db = CreateDbContext();
-        var user = await SeedUserAsync(db, u =>
-        {
-            u.ConfirmEmail();
-            u.Activate();
-            u.RecordAccessFailure(maxFailedAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(15));
-        });
-        var handler = CreateHandler(db, passwordMatches: true);
-
-        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
-
-        AssertGenericInvalidCredentials(result);
-    }
-
-    [Fact]
-    public async Task WrongPassword_ActiveConfirmedAccount_ReturnsGenericInvalidCredentials()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task VerifiedUser_IsAllowedRegardlessOfFlag(bool requireEmailVerification)
     {
         await using var db = CreateDbContext();
         var user = await SeedUserAsync(db, u =>
@@ -126,35 +95,55 @@ public sealed class LoginAccountEnumerationTests
             u.ConfirmEmail();
             u.Activate();
         });
-        var handler = CreateHandler(db, passwordMatches: false);
+        var handler = CreateHandler(db, requireEmailVerification);
 
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
-        AssertGenericInvalidCredentials(result);
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]
-    public async Task WrongPassword_ThatItselfTriggersLockout_StillReturnsGenericInvalidCredentials()
+    public async Task FlagOff_SuspendedUser_IsStillRejected()
     {
+        // Suspended is an explicit, separate status reached only via Suspend() — never conflated
+        // with "Pending because unverified" — so disabling email verification must not open this gate.
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db, u =>
+        {
+            u.ConfirmEmail();
+            u.Activate();
+            u.Suspend("policy violation");
+        });
+        var handler = CreateHandler(db, requireEmailVerification: false);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(IdentityErrors.AccountNotActive.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task FlagOff_WrongPassword_StillLocksOutAfterMaxAttempts()
+    {
+        // Lockout/failed-attempt tracking must remain intact regardless of the verification flag.
         await using var db = CreateDbContext();
         var user = await SeedUserAsync(db, u =>
         {
             u.ConfirmEmail();
             u.Activate();
         });
-        // FakePlatformSettingsProvider.GetSecurityAsync returns MaxFailedAccessAttempts = 1, so this
-        // single wrong-password attempt locks the account inside the handler itself.
-        var handler = CreateHandler(db, passwordMatches: false);
+        var handler = CreateHandler(db, requireEmailVerification: false, maxFailedAccessAttempts: 1);
 
-        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+        var result = await handler.Handle(CommandFor(user.Email, password: "wrong-password"), CancellationToken.None);
 
-        AssertGenericInvalidCredentials(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(IdentityErrors.AccountLocked.Code, result.Error.Code);
     }
 
-    private sealed class FakePasswordHasher(bool matches) : IPasswordHasher
+    private sealed class FakePasswordHasher : IPasswordHasher
     {
         public string HashPassword(string password) => password;
-        public bool VerifyPassword(string hashedPassword, string providedPassword) => matches;
+        public bool VerifyPassword(string hashedPassword, string providedPassword) => hashedPassword == providedPassword;
     }
 
     private sealed class FakeAdminAccessResolver : IAdminAccessResolver
@@ -163,24 +152,25 @@ public sealed class LoginAccountEnumerationTests
             Task.FromResult(false);
     }
 
-    private sealed class NeverInvokedAuthTokenIssuer : IAuthTokenIssuer
+    private sealed class FakeAuthTokenIssuer : IAuthTokenIssuer
     {
         public Task<Result<AuthTokenResponse>> IssueAsync(
             ApplicationUser user, string authContext, bool otpVerified, string ipAddress, string userAgent,
             bool rememberMe = false, LoginContext? context = null, CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException(
-                "Every scenario in this test class is a failure path — token issuance must never be reached.");
+            Task.FromResult(Result.Success(new AuthTokenResponse(
+                "access-token", "refresh-token", DateTimeOffset.UtcNow.AddHours(1), DateTimeOffset.UtcNow.AddDays(30))));
     }
 
-    private sealed class FakePlatformSettingsProvider : IPlatformSettingsProvider
+    private sealed class FakePlatformSettingsProvider(bool requireEmailVerification, int maxFailedAccessAttempts)
+        : IPlatformSettingsProvider
     {
         private static NotSupportedException NotNeeded() => new("Not needed by this test.");
 
         public Task<SecuritySettingsPayload> GetSecurityAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new SecuritySettingsPayload(
-                MaxFailedAccessAttempts: 1,
+                MaxFailedAccessAttempts: maxFailedAccessAttempts,
                 LockoutDurationMinutes: 15,
-                RequireEmailVerification: true));
+                RequireEmailVerification: requireEmailVerification));
 
         public Task<T> GetAsync<T>(string categoryKey, CancellationToken cancellationToken = default) => throw NotNeeded();
         public Task<GeneralSettingsPayload> GetGeneralAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
@@ -232,15 +222,13 @@ public sealed class LoginAccountEnumerationTests
         public Task<bool> RecordLoginAsync(
             Guid userId, string fingerprint, LoginContext context, string ipAddress,
             CancellationToken cancellationToken = default) =>
-            throw new InvalidOperationException(
-                "Every scenario in this test class is a failure path — device recording only happens on success.");
+            Task.FromResult(false);
     }
 
     private sealed class FakeLoginRiskScorer : ILoginRiskScorer
     {
         public SecurityEventSeverity ScoreSuccessfulLogin(bool isNewDevice, bool isNewCountry) =>
-            throw new InvalidOperationException(
-                "Every scenario in this test class is a failure path — success scoring is never reached.");
+            SecurityEventSeverity.Low;
 
         public SecurityEventSeverity ScoreFailedPassword(int accessFailedCount, int maxFailedAccessAttempts) =>
             SecurityEventSeverity.Medium;

@@ -1,9 +1,11 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Communication;
 using HAMBOX.Application.Idempotency;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
@@ -36,6 +38,7 @@ internal sealed class MembershipCheckoutCommandHandler
     private readonly IEnumerable<IPaymentProvider> _paymentProviders;
     private readonly ICommunicationService _communicationService;
     private readonly ReferralLifecycleService _referralLifecycle;
+    private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ILogger<MembershipCheckoutCommandHandler> _logger;
 
     public MembershipCheckoutCommandHandler(
@@ -46,6 +49,7 @@ internal sealed class MembershipCheckoutCommandHandler
         IEnumerable<IPaymentProvider> paymentProviders,
         ICommunicationService communicationService,
         ReferralLifecycleService referralLifecycle,
+        IPlatformSettingsProvider platformSettings,
         ILogger<MembershipCheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -55,6 +59,7 @@ internal sealed class MembershipCheckoutCommandHandler
         _paymentProviders = paymentProviders;
         _communicationService = communicationService;
         _referralLifecycle = referralLifecycle;
+        _platformSettings = platformSettings;
         _logger = logger;
     }
 
@@ -113,6 +118,9 @@ internal sealed class MembershipCheckoutCommandHandler
         var totalAmount = plan.Price;
         Order? createdOrder = null;
 
+        var commerceSettings = await _platformSettings.GetAsync<CommerceSettingsPayload>(
+            PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+
         try
         {
             PaymentProviderResult? paymentResult = null;
@@ -134,7 +142,7 @@ internal sealed class MembershipCheckoutCommandHandler
                         paymentResult.FailureReason ?? CommerceErrors.PaymentFailed.Description);
                 }
 
-                var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+                var orderNumber = OrderNumberGenerator.Generate(commerceSettings.InvoicePrefix);
                 var order = Order.CreateForMembership(
                     userId,
                     orderNumber,

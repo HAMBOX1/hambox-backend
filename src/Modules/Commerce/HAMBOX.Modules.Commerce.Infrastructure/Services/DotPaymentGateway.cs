@@ -39,7 +39,8 @@ internal sealed class DotPaymentGateway(
             $"partner_txid={Uri.EscapeDataString(request.PartnerTxId)}",
             $"op_id={Uri.EscapeDataString(request.OperatorId)}",
             $"rurl={Uri.EscapeDataString(request.RedirectUrl)}",
-            $"amount={request.Amount.ToString(CultureInfo.InvariantCulture)}");
+            $"amount={request.Amount.ToString(CultureInfo.InvariantCulture)}",
+            $"partner_tx_timestamp={request.PartnerTxTimestampUnix}");
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"{AccessTokenPath}?{query}");
         ApplyAuthHeaders(httpRequest, settings, includePartnerIdHeader: false);

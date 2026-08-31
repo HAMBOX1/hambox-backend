@@ -17,15 +17,7 @@ public static class CurrencyServiceCollectionExtensions
         services.AddSingleton<ConfigurationCurrencyExchangeRateProvider>();
         services.AddHttpClient<HttpCurrencyExchangeRateProvider>();
 
-        services.AddSingleton<ICurrencyExchangeRateProvider>(sp =>
-        {
-            var settings = configuration.GetSection(CurrencySettings.SectionName).Get<CurrencySettings>()
-                ?? new CurrencySettings();
-
-            return string.Equals(settings.Provider, "Http", StringComparison.OrdinalIgnoreCase)
-                ? sp.GetRequiredService<HttpCurrencyExchangeRateProvider>()
-                : sp.GetRequiredService<ConfigurationCurrencyExchangeRateProvider>();
-        });
+        services.AddSingleton<ICurrencyExchangeRateProvider, DynamicCurrencyExchangeRateProvider>();
 
         services.AddSingleton<CurrencyExchangeRateService>();
         return services;

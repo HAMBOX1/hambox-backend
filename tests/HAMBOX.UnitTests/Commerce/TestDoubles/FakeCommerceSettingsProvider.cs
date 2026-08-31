@@ -11,12 +11,14 @@ namespace HAMBOX.UnitTests.Commerce.TestDoubles;
 /// </summary>
 internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
 {
-    public CommerceSettingsPayload Commerce { get; set; } = new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 20m);
+    public CommerceSettingsPayload Commerce { get; set; } = new(0m, false, 15, 24, 14, "ORD-", DefaultSupplierMarginPercent: 20m);
 
     /// <summary>Disabled by default — checkout flows that complete an order exercise <c>ReferralLifecycleService</c>
     /// as a side effect, and this fake exists to let that no-op cleanly rather than throw, for tests
     /// that are exclusively about supplier pricing.</summary>
     public ReferralSettingsPayload Referral { get; set; } = new(Enabled: false, PointsPerReferral: 0, PointValueUsd: 0m, RewardExpiryDays: 0);
+
+    public RetryPoliciesSettingsPayload RetryPolicies { get; set; } = new(3, 30, 120, 5, UseExponentialBackoff: false);
 
     private static NotSupportedException NotNeeded() => new("Not needed by these tests.");
 
@@ -30,6 +32,11 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
         if (categoryKey == PlatformSettingsCategoryKeys.Referral && Referral is T referral)
         {
             return Task.FromResult(referral);
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.RetryPolicies && RetryPolicies is T retryPolicies)
+        {
+            return Task.FromResult(retryPolicies);
         }
 
         throw NotNeeded();

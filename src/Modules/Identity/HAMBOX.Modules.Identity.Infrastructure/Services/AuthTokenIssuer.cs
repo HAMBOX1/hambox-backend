@@ -45,7 +45,7 @@ internal sealed class AuthTokenIssuer(
             new(IdentityClaimTypes.SessionId, session.Id.ToString()),
         };
 
-        var (accessToken, expiresAt) = jwtTokenService.GenerateAccessToken(user, claims);
+        var (accessToken, expiresAt) = await jwtTokenService.GenerateAccessTokenAsync(user, claims, cancellationToken);
 
         var refreshTokenValue = tokenGenerator.GenerateSecureToken();
         var refreshExpiresAt = await ResolveRefreshExpirationAsync(rememberMe, cancellationToken);

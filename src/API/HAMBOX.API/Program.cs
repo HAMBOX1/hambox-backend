@@ -224,6 +224,7 @@ try
         await MembershipDataSeeder.SeedAsync(app.Services);
         await ThemeDataSeeder.SeedAsync(app.Services);
         await LegalDataSeeder.SeedAsync(app.Services);
+        await LegalRequiredContentSeeder.SeedAsync(app.Services);
         await CommunicationDataSeeder.SeedAsync(app.Services);
         await LandingPageDataSeeder.SeedAsync(app.Services);
         await SupportDataSeeder.SeedAsync(app.Services);

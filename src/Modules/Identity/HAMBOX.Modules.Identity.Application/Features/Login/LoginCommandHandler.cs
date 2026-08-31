@@ -82,7 +82,9 @@ internal sealed class LoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
-        if (!user.EmailConfirmed)
+        var security = await platformSettings.GetSecurityAsync(cancellationToken);
+
+        if (security.RequireEmailVerification && !user.EmailConfirmed)
         {
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email not confirmed", context);
             dbContext.LoginHistory.Add(failure);
@@ -90,7 +92,13 @@ internal sealed class LoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.EmailNotConfirmed);
         }
 
-        if (user.Status != UserStatus.Active)
+        // Pending exclusively means "not yet email-verified" (ApplicationUser.Activate() is only ever
+        // called alongside ConfirmEmail() — see VerifyEmailCommandHandler/RegisterCommandHandler). With
+        // verification disabled, a Pending-only-because-unverified account must not be blocked here too,
+        // or disabling RequireEmailVerification above would have no observable effect.
+        var isPendingOnlyDueToUnverifiedEmail = user.Status == UserStatus.Pending && !security.RequireEmailVerification;
+
+        if (user.Status != UserStatus.Active && !isPendingOnlyDueToUnverifiedEmail)
         {
             var isBlockedStatus = user.Status is UserStatus.Blocked or UserStatus.Banned or UserStatus.Suspended;
             var failure = LoginHistory.RecordFailure(
@@ -127,7 +135,6 @@ internal sealed class LoginCommandHandler(
         var isPasswordValid = passwordHasher.VerifyPassword(user.PasswordHash, request.Password);
         if (!isPasswordValid)
         {
-            var security = await platformSettings.GetSecurityAsync(cancellationToken);
             user.RecordAccessFailure(
                 security.MaxFailedAccessAttempts,
                 TimeSpan.FromMinutes(security.LockoutDurationMinutes));

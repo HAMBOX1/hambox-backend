@@ -67,8 +67,8 @@ public sealed class OperationalJobConcurrencyTests : IAsyncLifetime
 
         await using var dbA = CreateContext();
         await using var dbB = CreateContext();
-        var queueA = new OperationalJobQueue(dbA, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
-        var queueB = new OperationalJobQueue(dbB, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
+        var queueA = new OperationalJobQueue(dbA, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), new NotNeededPlatformSettingsProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
+        var queueB = new OperationalJobQueue(dbB, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), new NotNeededPlatformSettingsProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
 
         var claimTaskA = queueA.ClaimNextBatchAsync("worker-a", batchSize: 10);
         var claimTaskB = queueB.ClaimNextBatchAsync("worker-b", batchSize: 10);
@@ -98,7 +98,7 @@ public sealed class OperationalJobConcurrencyTests : IAsyncLifetime
         var tasks = Enumerable.Range(0, workerCount).Select(async i =>
         {
             await using var db = CreateContext();
-            var queue = new OperationalJobQueue(db, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
+            var queue = new OperationalJobQueue(db, new FakeBackgroundJobSerializer(), new HAMBOX.Infrastructure.Services.NullJobQueueNotifier(), new NotNeededPlatformSettingsProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Infrastructure.Services.OperationalJobQueue>.Instance);
             var claimed = await queue.ClaimNextBatchAsync($"worker-{i}", batchSize: 10);
             return claimed.Any(j => j.Id == jobId);
         });
@@ -120,5 +120,28 @@ public sealed class OperationalJobConcurrencyTests : IAsyncLifetime
         public string Serialize<TPayload>(TPayload payload) => System.Text.Json.JsonSerializer.Serialize(payload);
 
         public TPayload? Deserialize<TPayload>(string json) => System.Text.Json.JsonSerializer.Deserialize<TPayload>(json);
+    }
+
+    /// <summary>None of this file's tests call <c>EnqueueAsync</c> (only <c>ClaimNextBatchAsync</c>,
+    /// which never reads settings) — every member throws so an unexpected call fails loudly.</summary>
+    private sealed class NotNeededPlatformSettingsProvider : IPlatformSettingsProvider
+    {
+        private static NotSupportedException NotNeeded() => new("Not needed by this test.");
+
+        public Task<T> GetAsync<T>(string categoryKey, CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.GeneralSettingsPayload> GetGeneralAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.BrandingSettingsPayload> GetBrandingAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.EmailSettingsPayload> GetEmailAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.AuthenticationSettingsPayload> GetAuthenticationAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.SecuritySettingsPayload> GetSecurityAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.OtpSettingsPayload> GetOtpAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.InventorySettingsPayload> GetInventoryAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.CurrencySettingsPayload> GetCurrencyAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.MediaSettingsPayload> GetMediaAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.MaintenanceSettingsPayload> GetMaintenanceAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<bool> VerifyMaintenanceBypassPasswordAsync(string password, CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.StorefrontContentSettingsPayload> GetStorefrontAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public Task<HAMBOX.Application.PlatformSettings.PublicPlatformSettingsDto> GetPublicSettingsAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+        public void InvalidateCache(string? categoryKey = null) => throw NotNeeded();
     }
 }

@@ -1,6 +1,7 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Communication;
 using HAMBOX.Application.Membership;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -38,6 +39,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly IMembershipAccessProvider _membershipAccess;
     private readonly ReferralLifecycleService _referralLifecycle;
     private readonly IOperationalJobQueue _jobQueue;
+    private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ILogger<CheckoutCommandHandler> _logger;
 
     public CheckoutCommandHandler(
@@ -55,6 +57,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         IMembershipAccessProvider membershipAccess,
         ReferralLifecycleService referralLifecycle,
         IOperationalJobQueue jobQueue,
+        IPlatformSettingsProvider platformSettings,
         ILogger<CheckoutCommandHandler> logger)
     {
         _commerceDbContext = commerceDbContext;
@@ -71,6 +74,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         _membershipAccess = membershipAccess;
         _referralLifecycle = referralLifecycle;
         _jobQueue = jobQueue;
+        _platformSettings = platformSettings;
         _logger = logger;
     }
 
@@ -153,6 +157,9 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
             return Result.Failure<Contracts.OrderDto>(CommerceErrors.PaymentMethodNotSupported);
         }
 
+        var commerceSettings = await _platformSettings.GetAsync<CommerceSettingsPayload>(
+            PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+
         Order? createdOrder = null;
         var needsAutomatedSupplierFulfillment = false;
         var reservedCodesByLine = new Dictionary<(Guid ProductId, Guid? VariantId), List<ReservedCodeSnapshot>>();
@@ -220,7 +227,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                         paymentResult.FailureReason ?? CommerceErrors.PaymentFailed.Description);
                 }
 
-                var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+                var orderNumber = OrderNumberGenerator.Generate(commerceSettings.InvoicePrefix);
                 var orderItems = cart.Items
                     .Select(item =>
                     {

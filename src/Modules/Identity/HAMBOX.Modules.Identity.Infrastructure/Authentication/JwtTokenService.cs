@@ -21,11 +21,12 @@ internal sealed class JwtTokenService(
     private readonly JwtSettings _settings = jwtSettings.Value;
 
     /// <inheritdoc />
-    public (string Token, DateTimeOffset ExpiresAt) GenerateAccessToken(
+    public async Task<(string Token, DateTimeOffset ExpiresAt)> GenerateAccessTokenAsync(
         ApplicationUser user,
-        IEnumerable<Claim> claims)
+        IEnumerable<Claim> claims,
+        CancellationToken cancellationToken = default)
     {
-        var auth = platformSettings.GetAuthenticationAsync().GetAwaiter().GetResult();
+        var auth = await platformSettings.GetAuthenticationAsync(cancellationToken);
         var expirationMinutes = auth.SessionTimeoutMinutes > 0
             ? auth.SessionTimeoutMinutes
             : _settings.AccessTokenExpirationMinutes;

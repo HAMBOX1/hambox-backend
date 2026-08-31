@@ -217,7 +217,6 @@ public sealed record SecuritySettingsPayload(
     int MaxFailedAccessAttempts,
     int LockoutDurationMinutes,
     bool RequireEmailVerification,
-    bool EnforceHttps,
     bool SecurityAlertsEnabled = true,
     string SecurityAlertMinSeverity = "High",
     int SecurityAlertThrottleMinutes = 15);

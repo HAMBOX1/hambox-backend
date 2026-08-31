@@ -28,7 +28,31 @@ public sealed class MaintenanceModeMiddleware(RequestDelegate next)
         && !path.Contains("/platform-settings", StringComparison.OrdinalIgnoreCase))
     {
       var maintenance = await settingsProvider.GetMaintenanceAsync(context.RequestAborted);
+
+      // Maintenance mode (an operator-triggered outage message) takes precedence over the
+      // General settings "Store Status" business toggle when both are somehow active at once.
+      string? gateCode = null;
+      var gateMessage = string.Empty;
+
       if (maintenance.Enabled)
+      {
+        gateCode = "MAINTENANCE";
+        gateMessage = maintenance.Message;
+      }
+      else
+      {
+        var general = await settingsProvider.GetGeneralAsync(context.RequestAborted);
+        if (string.Equals(general.StoreStatus, "Closed", StringComparison.OrdinalIgnoreCase))
+        {
+          gateCode = "STORE_CLOSED";
+        }
+        else if (string.Equals(general.StoreStatus, "ComingSoon", StringComparison.OrdinalIgnoreCase))
+        {
+          gateCode = "COMING_SOON";
+        }
+      }
+
+      if (gateCode is not null)
       {
         var role = context.User.FindFirst("role")?.Value
             ?? context.User.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value;
@@ -46,8 +70,8 @@ public sealed class MaintenanceModeMiddleware(RequestDelegate next)
           context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
           await context.Response.WriteAsJsonAsync(new
           {
-            code = "MAINTENANCE",
-            message = maintenance.Message,
+            code = gateCode,
+            message = gateMessage,
           });
           return;
         }

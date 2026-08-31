@@ -7,6 +7,7 @@ using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
@@ -127,7 +128,9 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         // DotWalletOperator member name through before this handler ever runs.
         var wallet = Enum.Parse<DotWalletOperator>(request.Wallet, ignoreCase: true);
 
-        var orderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
+        var commerceSettings = await platformSettings.GetAsync<CommerceSettingsPayload>(
+            PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+        var orderNumber = OrderNumberGenerator.Generate(commerceSettings.InvoicePrefix);
         var orderItems = cart.Items
             .Select(item =>
             {
@@ -167,8 +170,6 @@ internal sealed class InitiateDotCheckoutCommandHandler(
             orderItems);
 
         var partnerTxId = RandomNumberGenerator.GetHexString(40, lowercase: true);
-        var commerceSettings = await platformSettings.GetAsync<CommerceSettingsPayload>(
-            PlatformSettingsCategoryKeys.Commerce, cancellationToken);
         var reservationMinutes = commerceSettings.ReservationTimeoutMinutes > 0
             ? commerceSettings.ReservationTimeoutMinutes
             : 30;

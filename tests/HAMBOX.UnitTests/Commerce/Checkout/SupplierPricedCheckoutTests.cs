@@ -124,7 +124,7 @@ public sealed class SupplierPricedCheckoutTests
             commerceDb, catalogDb, LegalTestDbContextFactory.Create(), new FakeCommerceTransactionService(), currentUser, inventoryEngine,
             cartResponseBuilder, cartLineValidator, new PromotionRedemptionService(commerceDb),
             [new FakePaymentProvider()], new FakeCommunicationService(), new FakeMembershipAccessProvider(),
-            referralLifecycle, jobQueue, NullLogger<CheckoutCommandHandler>.Instance);
+            referralLifecycle, jobQueue, settingsProvider, NullLogger<CheckoutCommandHandler>.Instance);
 
         return (new Harness(commerceDb, catalogDb, suppliersDb, handler, currentUser, jobQueue), product, variant);
     }

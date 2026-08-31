@@ -30,7 +30,7 @@ public sealed class OperationalJobQueueTests
     public async Task EnqueueAsync_NotifierThrows_JobIsStillDurablyPersisted()
     {
         var (commerceDb, _) = CommerceTestDbContextFactory.Create();
-        var queue = new OperationalJobQueue(commerceDb, new FakeBackgroundJobSerializer(), new AlwaysThrowsNotifier(), NullLogger<OperationalJobQueue>.Instance);
+        var queue = new OperationalJobQueue(commerceDb, new FakeBackgroundJobSerializer(), new AlwaysThrowsNotifier(), new FakeCommerceSettingsProvider(), NullLogger<OperationalJobQueue>.Instance);
 
         // The real assertion: this call itself must not throw just because Redis is unreachable.
         var job = await queue.EnqueueAsync(OperationalJobTypes.ExpireInventoryReservations, relatedEntityId: "order-1");
@@ -45,7 +45,7 @@ public sealed class OperationalJobQueueTests
     {
         var (commerceDb, _) = CommerceTestDbContextFactory.Create();
         var notifier = new RecordingNotifier();
-        var queue = new OperationalJobQueue(commerceDb, new FakeBackgroundJobSerializer(), notifier, NullLogger<OperationalJobQueue>.Instance);
+        var queue = new OperationalJobQueue(commerceDb, new FakeBackgroundJobSerializer(), notifier, new FakeCommerceSettingsProvider(), NullLogger<OperationalJobQueue>.Instance);
 
         var job = await queue.EnqueueAsync(OperationalJobTypes.ExpireInventoryReservations, queue: "default");
 

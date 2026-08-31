@@ -15,7 +15,8 @@ public interface IJwtTokenService
     /// <param name="user">The user to generate the token for.</param>
     /// <param name="claims">The custom claims (roles and permissions) to include in the token.</param>
     /// <returns>A tuple containing the token string and its expiration date.</returns>
-    (string Token, DateTimeOffset ExpiresAt) GenerateAccessToken(
+    Task<(string Token, DateTimeOffset ExpiresAt)> GenerateAccessTokenAsync(
         ApplicationUser user,
-        IEnumerable<Claim> claims);
+        IEnumerable<Claim> claims,
+        CancellationToken cancellationToken = default);
 }

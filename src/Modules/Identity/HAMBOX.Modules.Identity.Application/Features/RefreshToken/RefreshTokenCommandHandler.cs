@@ -92,7 +92,7 @@ internal sealed class RefreshTokenCommandHandler(
             new(IdentityClaimTypes.SessionId, existingToken.SessionId.ToString()),
         };
 
-        var (accessToken, expiresAt) = jwtTokenService.GenerateAccessToken(user, claims);
+        var (accessToken, expiresAt) = await jwtTokenService.GenerateAccessTokenAsync(user, claims, cancellationToken);
 
         session.LinkRefreshToken(newRefreshToken.Id);
         session.RecordActivity();

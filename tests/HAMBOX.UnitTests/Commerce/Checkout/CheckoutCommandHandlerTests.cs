@@ -81,9 +81,10 @@ public sealed class CheckoutCommandHandlerTests
         var cartResponseBuilder = new CartResponseBuilder(
             commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
+        var settingsProvider = new FakeCommerceSettingsProvider();
         var referralLifecycle = new ReferralLifecycleService(
             commerceDb,
-            new FakeCommerceSettingsProvider(),
+            settingsProvider,
             referralRewardService,
             new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
@@ -103,6 +104,7 @@ public sealed class CheckoutCommandHandlerTests
             new FakeMembershipAccessProvider(),
             referralLifecycle,
             jobQueue,
+            settingsProvider,
             NullLogger<CheckoutCommandHandler>.Instance);
     }
 
@@ -203,9 +205,10 @@ public sealed class CheckoutCommandHandlerTests
         var cartResponseBuilder = new CartResponseBuilder(
             commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
+        var settingsProvider = new FakeCommerceSettingsProvider();
         var referralLifecycle = new ReferralLifecycleService(
             commerceDb,
-            new FakePlatformSettingsProvider(),
+            settingsProvider,
             referralRewardService,
             new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
@@ -225,6 +228,7 @@ public sealed class CheckoutCommandHandlerTests
             new FakeMembershipAccessProvider(),
             referralLifecycle,
             new FakeOperationalJobQueue(),
+            settingsProvider,
             NullLogger<CheckoutCommandHandler>.Instance);
 
         var result = await handler.Handle(

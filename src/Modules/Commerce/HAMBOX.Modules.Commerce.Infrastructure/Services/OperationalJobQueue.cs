@@ -1,4 +1,6 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
+using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +15,11 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// class's <see cref="IBackgroundJobScheduler"/> registration only; no caller of either interface changes.
 /// </summary>
 internal sealed class OperationalJobQueue(
-    ICommerceDbContext db, IBackgroundJobSerializer serializer, IJobQueueNotifier notifier, ILogger<OperationalJobQueue> logger)
+    ICommerceDbContext db,
+    IBackgroundJobSerializer serializer,
+    IJobQueueNotifier notifier,
+    IPlatformSettingsProvider platformSettings,
+    ILogger<OperationalJobQueue> logger)
     : IOperationalJobQueue, IBackgroundJobScheduler
 {
     public async Task<OperationalJob> EnqueueAsync(
@@ -27,6 +33,13 @@ internal sealed class OperationalJobQueue(
         int? maxAttempts = null,
         CancellationToken cancellationToken = default)
     {
+        if (maxAttempts is null)
+        {
+            var retrySettings = await platformSettings.GetAsync<RetryPoliciesSettingsPayload>(
+                PlatformSettingsCategoryKeys.RetryPolicies, cancellationToken);
+            maxAttempts = retrySettings.RetryCount;
+        }
+
         var job = OperationalJob.Create(
             jobType,
             payloadJson,
@@ -35,7 +48,7 @@ internal sealed class OperationalJobQueue(
             correlationId,
             relatedEntityType,
             relatedEntityId,
-            maxAttempts ?? 3);
+            maxAttempts.Value);
 
         db.OperationalJobs.Add(job);
         await db.SaveChangesAsync(cancellationToken);
