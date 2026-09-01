@@ -138,6 +138,12 @@ public sealed record StorefrontTrustItemSettings(
     int SortOrder,
     bool Visible);
 
+public sealed record StorefrontNavLinkSettings(
+    string Id,
+    string LabelEn,
+    string LabelAr,
+    bool Visible);
+
 public sealed record StorefrontFooterSettings(
     string CompanyName,
     string Copyright,
@@ -170,7 +176,8 @@ public sealed record StorefrontContentSettingsPayload(
     StorefrontFeaturedProductSettings FeaturedProduct,
     IReadOnlyList<StorefrontTrustItemSettings> TrustBar,
     StorefrontFooterSettings Footer,
-    StorefrontSeoDefaultsSettings Seo);
+    StorefrontSeoDefaultsSettings Seo,
+    IReadOnlyList<StorefrontNavLinkSettings> NavigationLinks);
 
 public sealed record LocalizationSettingsPayload(
     string DefaultLanguage,

@@ -178,7 +178,14 @@ internal static class PlatformSettingsDefaultsFactory
                 DefaultMetaDescription: "Unlock thousands of titles with instant digital delivery.",
                 OpenGraphImageUrl: "/assets/images/hambox-hero-background.png",
                 TwitterCard: "summary_large_image",
-                CanonicalUrl: "http://localhost:4200"));
+                CanonicalUrl: "http://localhost:4200"),
+            NavigationLinks:
+            [
+                new StorefrontNavLinkSettings(Id: "games", LabelEn: "Games", LabelAr: "الألعاب", Visible: true),
+                new StorefrontNavLinkSettings(Id: "gift-cards", LabelEn: "Digital Products", LabelAr: "منتجات رقمية", Visible: true),
+                new StorefrontNavLinkSettings(Id: "subscriptions", LabelEn: "Subscriptions", LabelAr: "الاشتراكات", Visible: true),
+                new StorefrontNavLinkSettings(Id: "deals", LabelEn: "Deals", LabelAr: "العروض", Visible: true),
+            ]);
 
     private static LocalizationSettingsPayload CreateLocalization(IConfiguration configuration)
     {

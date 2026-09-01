@@ -12,7 +12,8 @@ public sealed record StorefrontContentDto(
     StorefrontFeaturedProductDto FeaturedProduct,
     IReadOnlyList<StorefrontTrustItemDto> TrustBar,
     StorefrontFooterDto Footer,
-    StorefrontSeoDto Seo);
+    StorefrontSeoDto Seo,
+    IReadOnlyList<StorefrontNavLinkDto> NavigationLinks);
 
 public sealed record StorefrontHeroDto(
     string Title,
@@ -91,6 +92,12 @@ public sealed record StorefrontFooterDto(
     string? YouTubeUrl,
     string? TikTokUrl,
     string? WhatsAppUrl);
+
+public sealed record StorefrontNavLinkDto(
+    string Id,
+    string LabelEn,
+    string LabelAr,
+    bool Visible);
 
 public sealed record StorefrontSeoDto(
     string DefaultMetaTitle,
