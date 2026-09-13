@@ -14,6 +14,9 @@ namespace HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 /// </summary>
 public static class CatalogImportLookupResolver
 {
+    /// <summary>Slug a blank product Category cell falls back to — auto-created as "Uncategorized" by <see cref="CatalogImportMatcher"/> the first time it's needed.</summary>
+    public const string DefaultCategorySlug = "uncategorized";
+
     public static async Task<ParsedCatalogPackage> ResolveAsync(
         ParsedCatalogPackage package, ICatalogDbContext db, CancellationToken cancellationToken)
     {
@@ -45,7 +48,7 @@ public static class CatalogImportLookupResolver
         var products = package.Products
             .Select(p => p with
             {
-                CategorySlug = Resolve(p.CategorySlug),
+                CategorySlug = string.IsNullOrWhiteSpace(p.CategorySlug) ? DefaultCategorySlug : Resolve(p.CategorySlug),
                 AdditionalCategorySlugs = p.AdditionalCategorySlugs.Select(Resolve).ToList(),
             })
             .ToList();

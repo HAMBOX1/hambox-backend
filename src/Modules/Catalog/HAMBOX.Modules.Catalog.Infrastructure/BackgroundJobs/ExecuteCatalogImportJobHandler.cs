@@ -294,7 +294,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                             ? (string.IsNullOrWhiteSpace(row.DescriptionEn) ? existing.DescriptionEn : row.DescriptionEn)
                             : row.DescriptionEn ?? existing.DescriptionEn;
                         existing.Update(row.NameAr ?? existing.NameAr, row.NameEn, row.DescriptionAr ?? existing.DescriptionAr, descriptionEn);
-                        existing.ChangePrice(row.Price);
+                        existing.ChangePrice(row.Price ?? existing.Price);
                         if (additionalCategoryIds.Count > 0)
                         {
                             existing.SetAdditionalCategories(additionalCategoryIds);
@@ -312,7 +312,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 {
                     var product = Product.Create(
                         row.NameAr ?? row.NameEn, row.NameEn, row.DescriptionAr ?? string.Empty, row.DescriptionEn ?? string.Empty,
-                        row.Price, categoryId);
+                        row.Price ?? 0m, categoryId);
                     product.SetInitialStock(row.StockQuantity);
                     if (additionalCategoryIds.Count > 0)
                     {

@@ -142,7 +142,8 @@ public sealed record StorefrontNavLinkSettings(
     string Id,
     string LabelEn,
     string LabelAr,
-    bool Visible);
+    bool Visible,
+    bool ShowInFooter = true);
 
 public sealed record StorefrontFooterSettings(
     string CompanyName,

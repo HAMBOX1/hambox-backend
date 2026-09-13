@@ -181,10 +181,10 @@ internal static class PlatformSettingsDefaultsFactory
                 CanonicalUrl: "http://localhost:4200"),
             NavigationLinks:
             [
-                new StorefrontNavLinkSettings(Id: "games", LabelEn: "Games", LabelAr: "الألعاب", Visible: true),
-                new StorefrontNavLinkSettings(Id: "gift-cards", LabelEn: "Digital Products", LabelAr: "منتجات رقمية", Visible: true),
-                new StorefrontNavLinkSettings(Id: "subscriptions", LabelEn: "Subscriptions", LabelAr: "الاشتراكات", Visible: true),
-                new StorefrontNavLinkSettings(Id: "deals", LabelEn: "Deals", LabelAr: "العروض", Visible: true),
+                new StorefrontNavLinkSettings(Id: "games", LabelEn: "Games", LabelAr: "الألعاب", Visible: true, ShowInFooter: true),
+                new StorefrontNavLinkSettings(Id: "gift-cards", LabelEn: "Digital Products", LabelAr: "منتجات رقمية", Visible: true, ShowInFooter: true),
+                new StorefrontNavLinkSettings(Id: "subscriptions", LabelEn: "Subscriptions", LabelAr: "الاشتراكات", Visible: true, ShowInFooter: true),
+                new StorefrontNavLinkSettings(Id: "deals", LabelEn: "Deals", LabelAr: "العروض", Visible: true, ShowInFooter: true),
             ]);
 
     private static LocalizationSettingsPayload CreateLocalization(IConfiguration configuration)

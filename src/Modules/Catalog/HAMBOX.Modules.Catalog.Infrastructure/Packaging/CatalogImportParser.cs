@@ -233,7 +233,7 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             NullIfEmpty(Get(row, "NameAr")),
             NullIfEmpty(Get(row, "DescriptionEn")),
             NullIfEmpty(Get(row, "DescriptionAr")),
-            ParseDecimal(Get(row, "Price")),
+            ParseNullableDecimal(Get(row, "Price")),
             Get(row, "CategorySlug"),
             NullIfEmpty(Get(row, "Status")),
             ParseInt(Get(row, "StockQuantity"), 100),

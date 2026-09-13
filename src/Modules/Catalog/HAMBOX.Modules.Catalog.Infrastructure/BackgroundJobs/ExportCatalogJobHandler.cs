@@ -352,7 +352,7 @@ internal sealed class ExportCatalogJobHandler(
             sheet.Cell(r + 2, 3).Value = p.NameAr ?? string.Empty;
             sheet.Cell(r + 2, 4).Value = p.DescriptionEn ?? string.Empty;
             sheet.Cell(r + 2, 5).Value = p.DescriptionAr ?? string.Empty;
-            sheet.Cell(r + 2, 6).Value = p.Price;
+            sheet.Cell(r + 2, 6).Value = p.Price ?? 0;
             sheet.Cell(r + 2, 7).Value = p.CategorySlug;
             sheet.Cell(r + 2, 8).Value = p.Status ?? string.Empty;
             sheet.Cell(r + 2, 9).Value = p.StockQuantity;
@@ -374,7 +374,7 @@ internal sealed class ExportCatalogJobHandler(
         {
             builder.AppendLine(string.Join(',',
                 Escape(p.ImportKey), Escape(p.NameEn), Escape(p.NameAr ?? ""), Escape(p.DescriptionEn ?? ""),
-                Escape(p.DescriptionAr ?? ""), p.Price, Escape(p.CategorySlug), Escape(p.Status ?? ""),
+                Escape(p.DescriptionAr ?? ""), p.Price ?? 0, Escape(p.CategorySlug), Escape(p.Status ?? ""),
                 p.StockQuantity, Escape(string.Join(';', p.AdditionalCategorySlugs)), Escape(string.Join(';', p.CollectionNames ?? []))));
         }
 

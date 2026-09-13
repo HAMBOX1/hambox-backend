@@ -94,7 +94,7 @@ internal sealed class GetStorefrontContentQueryHandler(IPlatformSettingsProvider
                 settings.Seo.TwitterCard,
                 settings.Seo.CanonicalUrl),
             settings.NavigationLinks
-                .Select(n => new StorefrontNavLinkDto(n.Id, n.LabelEn, n.LabelAr, n.Visible))
+                .Select(n => new StorefrontNavLinkDto(n.Id, n.LabelEn, n.LabelAr, n.Visible, n.ShowInFooter))
                 .ToList());
 
         return Result.Success(content);

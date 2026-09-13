@@ -49,9 +49,15 @@ public sealed record ParsedCategoryRow(
 public sealed record ParsedCollectionRow(
     int RowNumber, string Name, string? Description, string? Color, string? Icon, string? ParentName, int SortOrder);
 
+/// <summary>
+/// <see cref="Price"/> is nullable — a blank cell means "not provided" (defaults to 0 on create, or
+/// keeps the existing product's price on update) rather than the negative-sentinel error a missing
+/// value used to produce. <see cref="CategorySlug"/> may also be blank; it then falls back to the
+/// implicit "Uncategorized" category (auto-created on first use) instead of failing the row.
+/// </summary>
 public sealed record ParsedProductRow(
     int RowNumber, string ImportKey, string NameEn, string? NameAr, string? DescriptionEn, string? DescriptionAr,
-    decimal Price, string CategorySlug, string? Status, int StockQuantity,
+    decimal? Price, string CategorySlug, string? Status, int StockQuantity,
     IReadOnlyList<string> ImagePaths, IReadOnlyList<string> AdditionalCategorySlugs,
     IReadOnlyList<string>? CollectionNames = null);
 

@@ -27,12 +27,10 @@ internal sealed class ProductDraftConfiguration : IEntityTypeConfiguration<Produ
             .HasMaxLength(200);
 
         builder.Property(d => d.DescriptionAr)
-            .IsRequired()
-            .HasMaxLength(2000);
+            .IsRequired();
 
         builder.Property(d => d.DescriptionEn)
-            .IsRequired()
-            .HasMaxLength(2000);
+            .IsRequired();
 
         builder.Property(d => d.Price)
             .HasColumnType("decimal(18,2)");

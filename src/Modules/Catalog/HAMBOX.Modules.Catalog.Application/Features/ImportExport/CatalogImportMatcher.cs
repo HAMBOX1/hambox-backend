@@ -57,8 +57,49 @@ public static class CatalogImportMatcher
 
         bool CategoryExists(string slug) => existingCategoryBySlug.ContainsKey(slug) || packageCategorySlugs.Contains(slug);
 
+        // Auto-create any category a product references (primary or additional) that isn't already
+        // known by slug, package row, or friendly name — a bulk import should never fail a product
+        // just because nobody created its category first. A blank CategorySlug cell was already
+        // rewritten to the well-known "uncategorized" fallback by CatalogImportLookupResolver, so it
+        // flows through this same path and gets created (as "Uncategorized") the first time it's used.
+        var categoryValueToSlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var autoCreatedCategoryRows = new List<ParsedCategoryRow>();
+        foreach (var value in package.Products
+            .SelectMany(p => new[] { p.CategorySlug }.Concat(p.AdditionalCategorySlugs))
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (CategoryExists(value))
+            {
+                continue;
+            }
+
+            var slug = Slugify(value);
+            categoryValueToSlug[value] = slug;
+            if (CategoryExists(slug))
+            {
+                continue;
+            }
+
+            var isDefaultCategory = string.Equals(value, CatalogImportLookupResolver.DefaultCategorySlug, StringComparison.OrdinalIgnoreCase);
+            var nameEn = isDefaultCategory ? "Uncategorized" : value;
+            var nameAr = isDefaultCategory ? "غير مصنف" : null;
+            autoCreatedCategoryRows.Add(new ParsedCategoryRow(0, slug, nameEn, nameAr, null, true, 0));
+            packageCategorySlugs.Add(slug);
+        }
+
+        // Products carry the raw typed category value until here — rewrite it to the resolved/created
+        // slug so every later lookup (dedupe key, CategoryExists, Execute's slugToId) agrees.
+        var normalizedProducts = package.Products
+            .Select(p => p with
+            {
+                CategorySlug = categoryValueToSlug.GetValueOrDefault(p.CategorySlug, p.CategorySlug),
+                AdditionalCategorySlugs = p.AdditionalCategorySlugs.Select(s => categoryValueToSlug.GetValueOrDefault(s, s)).ToList(),
+            })
+            .ToList();
+
         var categoryRows = new List<CatalogImportPlanRow<ParsedCategoryRow>>();
-        foreach (var row in package.Categories)
+        foreach (var row in package.Categories.Concat(autoCreatedCategoryRows))
         {
             var errors = new List<string>();
             var fieldIssues = new List<CatalogImportFieldIssue>();
@@ -115,8 +156,22 @@ public static class CatalogImportMatcher
             existingCollectionByKey.Keys.Any(k => string.Equals(k.Name, name, StringComparison.OrdinalIgnoreCase))
             || packageCollectionNames.Contains(name);
 
+        // Auto-create any collection a product references that isn't already known — same rationale
+        // as the category auto-create above.
+        var autoCreatedCollectionRows = package.Products
+            .SelectMany(p => p.CollectionNames ?? [])
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(n => !CollectionExists(n))
+            .Select(n => new ParsedCollectionRow(0, n, null, null, null, null, 0))
+            .ToList();
+        foreach (var row in autoCreatedCollectionRows)
+        {
+            packageCollectionNames.Add(row.Name);
+        }
+
         var collectionRows = new List<CatalogImportPlanRow<ParsedCollectionRow>>();
-        foreach (var row in package.Collections)
+        foreach (var row in package.Collections.Concat(autoCreatedCollectionRows))
         {
             var errors = new List<string>();
             var fieldIssues = new List<CatalogImportFieldIssue>();
@@ -171,7 +226,7 @@ public static class CatalogImportMatcher
         var productRows = new List<CatalogImportPlanRow<ParsedProductRow>>();
         var productIdByImportKey = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var row in package.Products)
+        foreach (var row in normalizedProducts)
         {
             var errors = new List<string>();
             var fieldIssues = new List<CatalogImportFieldIssue>();
@@ -180,7 +235,7 @@ public static class CatalogImportMatcher
                 errors.Add("NameEn is required.");
             }
 
-            if (row.Price < 0)
+            if (row.Price is < 0)
             {
                 errors.Add("Price must not be negative.");
             }
@@ -227,7 +282,7 @@ public static class CatalogImportMatcher
                     productIdByImportKey[row.ImportKey] = existing.Id;
                 }
 
-                var changed = existing.Price != row.Price
+                var changed = (row.Price is not null && existing.Price != row.Price)
                     || existing.StockQuantity != row.StockQuantity
                     || !string.Equals(existing.DescriptionEn, row.DescriptionEn ?? existing.DescriptionEn, StringComparison.Ordinal)
                     || (row.Status is not null && existing.Status.ToString() != row.Status);
@@ -240,7 +295,7 @@ public static class CatalogImportMatcher
         }
 
         bool ProductResolvable(string importKey) =>
-            package.Products.Any(p => string.Equals(p.ImportKey, importKey, StringComparison.OrdinalIgnoreCase))
+            normalizedProducts.Any(p => string.Equals(p.ImportKey, importKey, StringComparison.OrdinalIgnoreCase))
             || existingProductByKey.Values.Any(p => p.Id.ToString().Equals(importKey, StringComparison.OrdinalIgnoreCase))
             || existingProducts.Any(p => string.Equals(p.NameEn, importKey, StringComparison.OrdinalIgnoreCase));
 
@@ -495,6 +550,12 @@ public static class CatalogImportMatcher
 
     private static string MaskCode(string code) =>
         code.Length <= 4 ? "****" : $"{code[..2]}****{code[^2..]}";
+
+    private static string Slugify(string value)
+    {
+        var slug = System.Text.RegularExpressions.Regex.Replace(value.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+        return slug.Length > 0 ? slug : Guid.NewGuid().ToString("N")[..8];
+    }
 
     private sealed class ProductKeyComparer : IEqualityComparer<(string Slug, string NameEn)>
     {

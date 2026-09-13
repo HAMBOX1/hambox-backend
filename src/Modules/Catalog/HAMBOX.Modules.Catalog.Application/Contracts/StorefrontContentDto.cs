@@ -97,7 +97,8 @@ public sealed record StorefrontNavLinkDto(
     string Id,
     string LabelEn,
     string LabelAr,
-    bool Visible);
+    bool Visible,
+    bool ShowInFooter);
 
 public sealed record StorefrontSeoDto(
     string DefaultMetaTitle,
