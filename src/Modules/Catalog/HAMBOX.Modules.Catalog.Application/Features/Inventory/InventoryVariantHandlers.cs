@@ -133,6 +133,17 @@ internal sealed class CreateProductVariantCommandHandler : IRequestHandler<Creat
 
         variant.SetOptions(request.OptionIds);
 
+        if (request.OptionIds.Count == 0)
+        {
+            // A variant with no option combination is the "simple product, no option groups
+            // needed" path (see the storefront-facing skip button) — the admin is adding this
+            // one SKU specifically to sell it now, not staging one of several combinations, so
+            // there's no draft review step to wait for. Variants tied to real option
+            // combinations (Platform/Region/...) still default to Draft so multi-combination
+            // setups can be reviewed before going live.
+            variant.Activate();
+        }
+
         var requestedOptionIds = request.OptionIds.Distinct().OrderBy(id => id).ToList();
         var existingVariants = await _db.ProductVariants
             .AsNoTracking()
