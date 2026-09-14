@@ -66,6 +66,28 @@ public static class CatalogErrors
         "Products.InvalidPriceAdjustment",
         "The price adjustment would result in a negative price.");
 
+    public static readonly Error ProductMergeRequiresAtLeastTwo = new(
+        "Products.MergeRequiresAtLeastTwo",
+        "Select at least two products to merge.");
+
+    /// <summary>
+    /// Gets the error for when a product picked as a merge *source* already has its own variants —
+    /// merging it away would silently orphan those variants under a product no longer visible in
+    /// the main catalog list, so the merge is blocked until the admin handles it separately.
+    /// </summary>
+    public static Error ProductMergeSourceHasVariants(Guid productId) => new(
+        "Products.MergeSourceHasVariants",
+        $"Product {productId} already has its own variants and cannot be merged as a source. Handle it separately first.");
+
+    /// <summary>
+    /// Gets the error for when merging would drop a source product's raw stock count — variant
+    /// stock is entirely driven by digital inventory codes, so a bare StockQuantity has no
+    /// migration path and needs an explicit confirmation before it's discarded.
+    /// </summary>
+    public static Error ProductMergeStockLossRequiresConfirmation(IReadOnlyList<Guid> productIds) => new(
+        "Products.MergeStockLossRequiresConfirmation",
+        $"These products have stock recorded that cannot be carried over automatically and will be lost: {string.Join(", ", productIds)}. Confirm to proceed anyway.");
+
     /// <summary>
     /// Gets the error for when a product is not active.
     /// </summary>

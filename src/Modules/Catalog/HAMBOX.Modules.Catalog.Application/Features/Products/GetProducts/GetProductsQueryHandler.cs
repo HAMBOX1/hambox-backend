@@ -51,9 +51,20 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         var totalCount = await query.CountAsync(cancellationToken);
 
+        // pageSize == -1 is the "show all" sentinel from the catalog UI's page-size control — resolve
+        // it here (rather than trusting a raw huge number from the client) to a real page size capped
+        // at MaxAllPageSize, mirroring how BulkProductSelectionResolver.MaxMatches caps "select all
+        // matching" elsewhere in this module. The capped value (not -1) flows into the PagedResult
+        // below so the frontend renders the true count it actually received.
+        const int MaxAllPageSize = 5000;
+        var effectivePageSize = request.PageSize == -1
+            ? Math.Max(1, Math.Min(totalCount, MaxAllPageSize))
+            : request.PageSize;
+        var effectivePageNumber = request.PageSize == -1 ? 1 : request.PageNumber;
+
         var rows = await query
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((effectivePageNumber - 1) * effectivePageSize)
+            .Take(effectivePageSize)
             .Select(p => new
             {
                 p.Id,
@@ -171,7 +182,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             await TryLogSearchAsync(request.SearchTerm.Trim(), totalCount, cancellationToken);
         }
 
-        return Result.Success(new PagedResult<ProductDto>(products, request.PageNumber, request.PageSize, totalCount));
+        return Result.Success(new PagedResult<ProductDto>(products, effectivePageNumber, effectivePageSize, totalCount));
     }
 
     private async Task TryLogSearchAsync(string searchTerm, int resultCount, CancellationToken cancellationToken)

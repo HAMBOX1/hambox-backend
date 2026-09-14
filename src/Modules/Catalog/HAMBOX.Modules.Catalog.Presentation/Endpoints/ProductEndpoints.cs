@@ -13,6 +13,8 @@ using HAMBOX.Modules.Catalog.Application.Features.Products.ExportProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductFacets;
 using HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.GetProductStatusCounts;
+using HAMBOX.Modules.Catalog.Application.Features.Products.MergeProducts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.UpdateProduct;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Identity.Application.Authorization;
@@ -52,7 +54,7 @@ internal static class ProductEndpoints
             ISender sender) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
-            pageSize = pageSize <= 0 ? 10 : pageSize;
+            pageSize = pageSize == -1 ? -1 : (pageSize <= 0 ? 10 : pageSize); // -1 is the "show all" sentinel, resolved server-side in GetProductsQueryHandler
             var query = new GetProductsQuery(
                 pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId);
             var result = await sender.Send(query);
@@ -279,6 +281,31 @@ internal static class ProductEndpoints
         })
         .WithName("ExportProducts")
         .RequirePermission(PermissionConstants.Catalog.Products.View);
+
+        // POST /api/v1/products/bulk-merge
+        group.MapPost("bulk-merge", async Task<Results<Ok<MergeProductsResultDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] MergeProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new MergeProductsCommand(
+                request.TargetProductId, request.SourceProductIds, request.ConfirmStockLoss));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("MergeProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // GET /api/v1/products/status-counts
+        group.MapGet("status-counts", async Task<Results<Ok<ProductStatusCountsDto>, BadRequest<ProblemDetails>>> (
+            [FromQuery] string? searchTerm,
+            [FromQuery] Guid? categoryId,
+            [FromQuery] Guid? collectionId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetProductStatusCountsQuery(searchTerm, categoryId, collectionId));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
+        })
+        .WithName("GetProductStatusCounts")
+        .AllowAnonymous();
     }
 
     private static async Task<Results<NoContent, BadRequest<ProblemDetails>>> SendEmptyResult(ISender sender, IRequest<Result> request)
@@ -324,3 +351,4 @@ internal sealed record CreateProductRequest(string NameAr, string NameEn, string
 internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null, DateTime? PublicReleaseOnUtc = null);
 internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);
+internal sealed record MergeProductsRequest(Guid TargetProductId, IReadOnlyList<Guid> SourceProductIds, bool ConfirmStockLoss);
