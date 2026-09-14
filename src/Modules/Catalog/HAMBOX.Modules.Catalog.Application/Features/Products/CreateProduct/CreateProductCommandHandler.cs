@@ -69,6 +69,11 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
         var newCollectionItems = product.SetCollections(collectionIds);
         product.ScheduleRelease(request.PublicReleaseOnUtc);
 
+        if (request.Status == HAMBOX.Modules.Catalog.Domain.Enums.ProductStatus.Active)
+        {
+            product.Activate();
+        }
+
         _dbContext.Products.Add(product);
         foreach (var newAdditionalCategory in newAdditionalCategories)
         {

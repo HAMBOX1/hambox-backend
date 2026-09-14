@@ -295,6 +295,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                             : row.DescriptionEn ?? existing.DescriptionEn;
                         existing.Update(row.NameAr ?? existing.NameAr, row.NameEn, row.DescriptionAr ?? existing.DescriptionAr, descriptionEn);
                         existing.ChangePrice(row.Price ?? existing.Price);
+                        ApplyRequestedStatus(existing, row.Status);
                         if (additionalCategoryIds.Count > 0)
                         {
                             existing.SetAdditionalCategories(additionalCategoryIds);
@@ -314,6 +315,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                         row.NameAr ?? row.NameEn, row.NameEn, row.DescriptionAr ?? string.Empty, row.DescriptionEn ?? string.Empty,
                         row.Price ?? 0m, categoryId);
                     product.SetInitialStock(row.StockQuantity);
+                    ApplyRequestedStatus(product, row.Status);
                     if (additionalCategoryIds.Count > 0)
                     {
                         product.SetAdditionalCategories(additionalCategoryIds);
@@ -671,6 +673,35 @@ internal sealed class ExecuteCatalogImportJobHandler(
             variant.SetOptions(combination);
             catalogDb.ProductVariants.Add(variant);
             summary.Created++;
+        }
+    }
+
+    /// <summary>
+    /// Applies the import file's Status column (Draft/Active/Inactive/Archived), if present and
+    /// recognized, via the product's own lifecycle methods so their transition guards still apply.
+    /// Previously parsed into <see cref="ParsedProductRow.Status"/> but never used here, so every
+    /// imported product silently stayed Draft regardless of what the file said.
+    /// </summary>
+    private static void ApplyRequestedStatus(Product product, string? statusText)
+    {
+        if (string.IsNullOrWhiteSpace(statusText)
+            || !Enum.TryParse<ProductStatus>(statusText, ignoreCase: true, out var desired)
+            || product.Status == desired)
+        {
+            return;
+        }
+
+        switch (desired)
+        {
+            case ProductStatus.Active when product.Status != ProductStatus.Archived:
+                product.Activate();
+                break;
+            case ProductStatus.Inactive when product.Status == ProductStatus.Active:
+                product.Deactivate();
+                break;
+            case ProductStatus.Archived:
+                product.Archive();
+                break;
         }
     }
 

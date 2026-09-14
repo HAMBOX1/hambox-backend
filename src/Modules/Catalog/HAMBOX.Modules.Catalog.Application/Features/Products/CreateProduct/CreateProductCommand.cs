@@ -1,4 +1,5 @@
 using System;
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 
@@ -13,4 +14,5 @@ public record CreateProductCommand(
     Guid CategoryId,
     IReadOnlyList<Guid>? AdditionalCategoryIds = null,
     IReadOnlyList<Guid>? CollectionIds = null,
-    DateTime? PublicReleaseOnUtc = null) : IRequest<Result<Guid>>;
+    DateTime? PublicReleaseOnUtc = null,
+    ProductStatus? Status = null) : IRequest<Result<Guid>>;
