@@ -45,8 +45,12 @@ internal sealed class ValidateCatalogImportQueryHandler(
                     ? CatalogErrors.PackagePasswordRequired
                     : CatalogErrors.InvalidPackagePassword);
         }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException)
+        catch (Exception) when (cancellationToken.IsCancellationRequested is false)
         {
+            // Any parse-time failure (malformed workbook, unexpected OpenXML/ClosedXML package
+            // shape — e.g. a macro-enabled .xlsm whose internal content types differ just enough
+            // to trip the reader, corrupt zip, wrong entity type) means "this file couldn't be
+            // read", never an application bug — surface the friendly message instead of a raw 500.
             return Result.Failure<CatalogImportValidationReport>(CatalogErrors.PackageParsingFailed);
         }
 
