@@ -12,7 +12,8 @@ public sealed record ProductOptionGroupDto(
     string DisplayName,
     int SortOrder,
     bool IsRequired,
-    IReadOnlyList<ProductOptionDto> Options);
+    IReadOnlyList<ProductOptionDto> Options,
+    string? DescriptionHtml = null);
 
 /// <summary>Lightweight autocomplete suggestion for the "reuse a saved option group" combobox.</summary>
 public sealed record OptionGroupTemplateSummaryDto(Guid Id, string Name, int OptionCount);

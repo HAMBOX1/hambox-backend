@@ -27,6 +27,12 @@ public sealed class ProductOptionGroup : Entity, IAuditable
     public string DisplayName { get; private set; } = string.Empty;
     public int SortOrder { get; private set; }
     public bool IsRequired { get; private set; }
+
+    /// <summary>Optional, already-sanitized rich-text instructions for this whole option group (e.g.
+    /// "pick the region matching your account's country"), shown to the customer regardless of which
+    /// value within the group they pick. Distinct from each <see cref="ProductOption.DescriptionHtml"/>,
+    /// which is specific to one value. Sanitization happens in the Application layer before this is set.</summary>
+    public string? DescriptionHtml { get; private set; }
     public IReadOnlyCollection<ProductOption> Options => _options.AsReadOnly();
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
@@ -38,11 +44,12 @@ public sealed class ProductOptionGroup : Entity, IAuditable
         return new ProductOptionGroup(Guid.NewGuid(), productId, parentOptionId, key.Trim().ToLowerInvariant(), displayName.Trim(), sortOrder, isRequired);
     }
 
-    public void Update(string displayName, int sortOrder, bool isRequired)
+    public void Update(string displayName, int sortOrder, bool isRequired, string? descriptionHtml = null)
     {
         DisplayName = displayName.Trim();
         SortOrder = sortOrder;
         IsRequired = isRequired;
+        DescriptionHtml = descriptionHtml;
     }
 
     public ProductOption AddOption(string value, string label, int sortOrder = 0)

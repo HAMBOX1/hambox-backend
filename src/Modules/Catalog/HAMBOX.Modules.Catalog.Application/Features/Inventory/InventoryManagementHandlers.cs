@@ -49,7 +49,8 @@ public sealed record UpdateProductOptionGroupCommand(
     Guid GroupId,
     string DisplayName,
     int SortOrder,
-    bool IsRequired) : IRequest<Result>;
+    bool IsRequired,
+    string? DescriptionHtml = null) : IRequest<Result>;
 
 public sealed record DeleteProductOptionGroupCommand(Guid GroupId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionGroupsCommand(Guid ProductId, IReadOnlyList<Guid> OrderedGroupIds) : IRequest<Result>;
@@ -422,7 +423,8 @@ internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<U
             return Result.Failure(CatalogErrors.OptionGroupNotFound);
         }
 
-        group.Update(request.DisplayName, request.SortOrder, request.IsRequired);
+        var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);
+        group.Update(request.DisplayName, request.SortOrder, request.IsRequired, descriptionHtml);
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -555,7 +557,7 @@ internal sealed class ReorderProductOptionGroupsCommandHandler : IRequestHandler
                 return Result.Failure(CatalogErrors.OptionGroupNotFound);
             }
 
-            group.Update(group.DisplayName, index, group.IsRequired);
+            group.Update(group.DisplayName, index, group.IsRequired, group.DescriptionHtml);
         }
 
         await _db.SaveChangesAsync(cancellationToken);

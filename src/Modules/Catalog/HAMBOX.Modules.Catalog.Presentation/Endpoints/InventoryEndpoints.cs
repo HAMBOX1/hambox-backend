@@ -185,7 +185,7 @@ internal static class InventoryEndpoints
         group.MapPut("/option-groups/{groupId:guid}", async (
             Guid groupId,
             [FromBody] UpdateOptionGroupRequest body,
-            ISender sender) => await SendEmpty(sender, new UpdateProductOptionGroupCommand(groupId, body.DisplayName, body.SortOrder, body.IsRequired)))
+            ISender sender) => await SendEmpty(sender, new UpdateProductOptionGroupCommand(groupId, body.DisplayName, body.SortOrder, body.IsRequired, body.DescriptionHtml)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapDelete("/option-groups/{groupId:guid}", async (Guid groupId, [FromQuery] bool force, ISender sender) =>
@@ -454,7 +454,7 @@ internal sealed record BulkUpdateVariantsRequest(
     IReadOnlyList<Guid> VariantIds,
     decimal? PriceOverride,
     ProductVariantStatus? Status);
-internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrder, bool IsRequired);
+internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrder, bool IsRequired, string? DescriptionHtml = null);
 internal sealed record UpdateOptionRequest(string Label, int SortOrder, string? DescriptionHtml = null);
 internal sealed record ReorderIdsRequest(IReadOnlyList<Guid> OrderedIds);
 internal sealed record BulkCodeIdsRequest(IReadOnlyList<Guid> CodeIds);

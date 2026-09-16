@@ -233,7 +233,8 @@ internal sealed class GetProductOptionGroupsQueryHandler : IRequestHandler<GetPr
 
         var dtos = groups.Select(g => new ProductOptionGroupDto(
             g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
-            g.Options.OrderBy(o => o.SortOrder).Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml)).ToList()
+            g.Options.OrderBy(o => o.SortOrder).Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml)).ToList(),
+            g.DescriptionHtml
         )).ToList();
 
         return Result.Success<IReadOnlyList<ProductOptionGroupDto>>(dtos);
