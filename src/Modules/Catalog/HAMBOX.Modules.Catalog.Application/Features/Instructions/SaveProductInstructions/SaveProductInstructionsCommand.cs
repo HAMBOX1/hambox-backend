@@ -6,5 +6,6 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Instructions.SaveProductIn
 
 public sealed record SaveProductInstructionsCommand(
     Guid ProductId,
+    Guid? VariantId,
     string Title,
     string ContentHtml) : IRequest<Result<ProductInstructionsDto>>;

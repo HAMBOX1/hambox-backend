@@ -16,6 +16,8 @@ internal sealed class ProductInstructionsConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(i => i.Id);
 
+        builder.Property(i => i.VariantId);
+
         builder.Property(i => i.Title)
             .IsRequired()
             .HasMaxLength(200);
@@ -47,10 +49,19 @@ internal sealed class ProductInstructionsConfiguration : IEntityTypeConfiguratio
         builder.Property<byte[]>("RowVersion")
             .IsRowVersion();
 
-        // One row per product
+        // One general row per product (VariantId IS NULL). A plain composite unique index on
+        // (ProductId, VariantId) would NOT enforce this on its own — SQL Server treats every NULL as
+        // distinct in a unique index — hence the two filtered indexes below instead.
         builder.HasIndex(i => i.ProductId)
             .IsUnique()
-            .HasDatabaseName("IX_ProductInstructions_ProductId");
+            .HasFilter("[VariantId] IS NULL")
+            .HasDatabaseName("IX_ProductInstructions_ProductId_NullVariant");
+
+        // At most one row per (product, variant) once a variant is specified.
+        builder.HasIndex(i => new { i.ProductId, i.VariantId })
+            .IsUnique()
+            .HasFilter("[VariantId] IS NOT NULL")
+            .HasDatabaseName("IX_ProductInstructions_ProductId_VariantId");
 
         builder.Ignore(i => i.DomainEvents);
     }

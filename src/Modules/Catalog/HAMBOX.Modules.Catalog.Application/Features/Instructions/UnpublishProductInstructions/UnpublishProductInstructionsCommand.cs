@@ -4,4 +4,4 @@ using MediatR;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Instructions.UnpublishProductInstructions;
 
-public sealed record UnpublishProductInstructionsCommand(Guid ProductId) : IRequest<Result<ProductInstructionsDto>>;
+public sealed record UnpublishProductInstructionsCommand(Guid ProductId, Guid? VariantId = null) : IRequest<Result<ProductInstructionsDto>>;

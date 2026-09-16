@@ -25,17 +25,18 @@ internal sealed class GetProductInstructionsQueryHandler(ICatalogDbContext dbCon
 
         var instructions = await dbContext.ProductInstructions
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId, cancellationToken);
+            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId && i.VariantId == request.VariantId, cancellationToken);
 
-        // A product with no authored instructions yet is a normal state, not an error —
+        // A product (or variant) with no authored instructions yet is a normal state, not an error —
         // the admin editor starts from a blank document.
         if (instructions is null)
         {
-            return Result.Success(new ProductInstructionsDto(request.ProductId, string.Empty, string.Empty, 0, false, null));
+            return Result.Success(new ProductInstructionsDto(request.ProductId, request.VariantId, string.Empty, string.Empty, 0, false, null));
         }
 
         return Result.Success(new ProductInstructionsDto(
             instructions.ProductId,
+            instructions.VariantId,
             instructions.Title,
             instructions.ContentHtml,
             instructions.Version,

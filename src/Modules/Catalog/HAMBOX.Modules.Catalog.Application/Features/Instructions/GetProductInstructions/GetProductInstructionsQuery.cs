@@ -4,4 +4,4 @@ using MediatR;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Instructions.GetProductInstructions;
 
-public sealed record GetProductInstructionsQuery(Guid ProductId) : IRequest<Result<ProductInstructionsDto>>;
+public sealed record GetProductInstructionsQuery(Guid ProductId, Guid? VariantId = null) : IRequest<Result<ProductInstructionsDto>>;

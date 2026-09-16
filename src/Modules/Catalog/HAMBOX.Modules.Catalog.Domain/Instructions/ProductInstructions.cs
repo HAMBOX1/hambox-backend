@@ -6,10 +6,12 @@ namespace HAMBOX.Modules.Catalog.Domain.Instructions;
 /// Represents the private, post-purchase setup/usage documentation for a product.
 /// </summary>
 /// <remarks>
-/// One <see cref="ProductInstructions"/> row per <see cref="Products.Product"/> (enforced by a unique
-/// index on <see cref="ProductId"/>). Content is only ever surfaced to customers who have completed a
-/// purchase of the product, and only while <see cref="IsPublished"/> is <c>true</c> — see the
-/// customer-facing library endpoints for the access check.
+/// One general (<see cref="VariantId"/> is <c>null</c>) <see cref="ProductInstructions"/> row per
+/// <see cref="Products.Product"/>, plus at most one additional row per specific
+/// <see cref="Products.ProductVariant"/> (enforced by two filtered unique indexes — see
+/// <c>ProductInstructionsConfiguration</c>). Content is only ever surfaced to customers who have
+/// completed a purchase of the product, and only while <see cref="IsPublished"/> is <c>true</c> — see
+/// the customer-facing library endpoints for the access check and variant-first fallback logic.
 /// </remarks>
 public sealed class ProductInstructions : AggregateRoot, IAuditable
 {
@@ -21,10 +23,11 @@ public sealed class ProductInstructions : AggregateRoot, IAuditable
     {
     }
 
-    private ProductInstructions(Guid id, Guid productId, string title, string contentHtml)
+    private ProductInstructions(Guid id, Guid productId, Guid? variantId, string title, string contentHtml)
         : base(id)
     {
         ProductId = productId;
+        VariantId = variantId;
         Title = title;
         ContentHtml = contentHtml;
         Version = 0;
@@ -35,6 +38,13 @@ public sealed class ProductInstructions : AggregateRoot, IAuditable
     /// Gets the identifier of the product this documentation belongs to.
     /// </summary>
     public Guid ProductId { get; private set; }
+
+    /// <summary>
+    /// Gets the identifier of the specific variant this documentation applies to, or <c>null</c> when
+    /// this is the product's general documentation shown to any customer whose purchased variant has
+    /// no documentation of its own.
+    /// </summary>
+    public Guid? VariantId { get; private set; }
 
     /// <summary>
     /// Gets the documentation title.
@@ -64,10 +74,11 @@ public sealed class ProductInstructions : AggregateRoot, IAuditable
     public string? ModifiedBy { get; private set; }
 
     /// <summary>
-    /// Creates a new, unpublished documentation draft for a product.
+    /// Creates a new, unpublished documentation draft for a product, or for one specific variant of it
+    /// when <paramref name="variantId"/> is provided.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown when the product identifier is empty or the title is blank.</exception>
-    public static ProductInstructions CreateDraft(Guid productId, string title, string contentHtml)
+    public static ProductInstructions CreateDraft(Guid productId, Guid? variantId, string title, string contentHtml)
     {
         if (productId == Guid.Empty)
         {
@@ -76,7 +87,7 @@ public sealed class ProductInstructions : AggregateRoot, IAuditable
 
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
-        return new ProductInstructions(Guid.NewGuid(), productId, title, contentHtml ?? string.Empty);
+        return new ProductInstructions(Guid.NewGuid(), productId, variantId, title, contentHtml ?? string.Empty);
     }
 
     /// <summary>

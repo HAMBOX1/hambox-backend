@@ -24,12 +24,24 @@ internal sealed class SaveProductInstructionsCommandHandler(ICatalogDbContext db
             return Result.Failure<ProductInstructionsDto>(CatalogErrors.ProductNotFound);
         }
 
+        if (request.VariantId is not null)
+        {
+            var variantExists = await dbContext.ProductVariants
+                .AsNoTracking()
+                .AnyAsync(v => v.Id == request.VariantId && v.ProductId == request.ProductId, cancellationToken);
+
+            if (!variantExists)
+            {
+                return Result.Failure<ProductInstructionsDto>(CatalogErrors.VariantNotFound);
+            }
+        }
+
         var instructions = await dbContext.ProductInstructions
-            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId, cancellationToken);
+            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId && i.VariantId == request.VariantId, cancellationToken);
 
         if (instructions is null)
         {
-            instructions = ProductInstructions.CreateDraft(request.ProductId, request.Title, request.ContentHtml);
+            instructions = ProductInstructions.CreateDraft(request.ProductId, request.VariantId, request.Title, request.ContentHtml);
             dbContext.ProductInstructions.Add(instructions);
         }
         else
@@ -41,6 +53,7 @@ internal sealed class SaveProductInstructionsCommandHandler(ICatalogDbContext db
 
         return Result.Success(new ProductInstructionsDto(
             instructions.ProductId,
+            instructions.VariantId,
             instructions.Title,
             instructions.ContentHtml,
             instructions.Version,

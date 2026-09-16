@@ -34,7 +34,7 @@ internal sealed class GetLibraryItemInstructionsQueryHandler(
             where item.Id == request.OrderItemId
                 && order.UserId == currentUserService.UserId
                 && order.Status == OrderStatus.Completed
-            select new { item.ProductId })
+            select new { item.ProductId, item.ProductVariantId })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (orderItem?.ProductId is null)
@@ -42,9 +42,21 @@ internal sealed class GetLibraryItemInstructionsQueryHandler(
             return Result.Failure<LibraryItemInstructionsDto>(CommerceErrors.InstructionsNotAccessible);
         }
 
-        var instructions = await catalogDbContext.ProductInstructions
+        // Prefer instructions authored for the specific variant purchased; fall back to the
+        // product's general instructions when the variant has none of its own.
+        var instructions = orderItem.ProductVariantId is not null
+            ? await catalogDbContext.ProductInstructions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    i => i.ProductId == orderItem.ProductId && i.VariantId == orderItem.ProductVariantId && i.IsPublished,
+                    cancellationToken)
+            : null;
+
+        instructions ??= await catalogDbContext.ProductInstructions
             .AsNoTracking()
-            .FirstOrDefaultAsync(i => i.ProductId == orderItem.ProductId && i.IsPublished, cancellationToken);
+            .FirstOrDefaultAsync(
+                i => i.ProductId == orderItem.ProductId && i.VariantId == null && i.IsPublished,
+                cancellationToken);
 
         if (instructions is null)
         {

@@ -15,7 +15,7 @@ internal sealed class UnpublishProductInstructionsCommandHandler(ICatalogDbConte
         CancellationToken cancellationToken)
     {
         var instructions = await dbContext.ProductInstructions
-            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId, cancellationToken);
+            .FirstOrDefaultAsync(i => i.ProductId == request.ProductId && i.VariantId == request.VariantId, cancellationToken);
 
         if (instructions is null)
         {
@@ -27,6 +27,7 @@ internal sealed class UnpublishProductInstructionsCommandHandler(ICatalogDbConte
 
         return Result.Success(new ProductInstructionsDto(
             instructions.ProductId,
+            instructions.VariantId,
             instructions.Title,
             instructions.ContentHtml,
             instructions.Version,

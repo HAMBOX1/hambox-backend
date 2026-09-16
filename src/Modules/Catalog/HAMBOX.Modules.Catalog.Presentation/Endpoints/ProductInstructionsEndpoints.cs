@@ -32,9 +32,10 @@ internal static class ProductInstructionsEndpoints
 
         group.MapGet("", async Task<Results<Ok<ProductInstructionsDto>, NotFound<ProblemDetails>>> (
             Guid productId,
+            Guid? variantId,
             ISender sender) =>
         {
-            var result = await sender.Send(new GetProductInstructionsQuery(productId));
+            var result = await sender.Send(new GetProductInstructionsQuery(productId, variantId));
 
             if (result.IsSuccess)
             {
@@ -54,10 +55,11 @@ internal static class ProductInstructionsEndpoints
 
         group.MapPut("", async Task<Results<Ok<ProductInstructionsDto>, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
             Guid productId,
+            Guid? variantId,
             [FromBody] SaveProductInstructionsRequest request,
             ISender sender) =>
         {
-            var result = await sender.Send(new SaveProductInstructionsCommand(productId, request.Title, request.ContentHtml));
+            var result = await sender.Send(new SaveProductInstructionsCommand(productId, variantId, request.Title, request.ContentHtml));
 
             if (result.IsSuccess)
             {
@@ -88,13 +90,15 @@ internal static class ProductInstructionsEndpoints
 
         group.MapPost("publish", async Task<Results<Ok<ProductInstructionsDto>, BadRequest<ProblemDetails>>> (
             Guid productId,
-            ISender sender) => await PublishOrUnpublish(sender, new PublishProductInstructionsCommand(productId)))
+            Guid? variantId,
+            ISender sender) => await PublishOrUnpublish(sender, new PublishProductInstructionsCommand(productId, variantId)))
         .WithName("PublishProductInstructions")
         .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
         group.MapPost("unpublish", async Task<Results<Ok<ProductInstructionsDto>, BadRequest<ProblemDetails>>> (
             Guid productId,
-            ISender sender) => await PublishOrUnpublish(sender, new UnpublishProductInstructionsCommand(productId)))
+            Guid? variantId,
+            ISender sender) => await PublishOrUnpublish(sender, new UnpublishProductInstructionsCommand(productId, variantId)))
         .WithName("UnpublishProductInstructions")
         .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 

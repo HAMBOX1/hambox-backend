@@ -5,6 +5,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// </summary>
 public sealed record ProductInstructionsDto(
     Guid ProductId,
+    Guid? VariantId,
     string Title,
     string ContentHtml,
     int Version,
