@@ -103,6 +103,23 @@ public sealed class DotPaymentVerificationService(
 
         var status = statusResult.Value;
 
+        if (status.IsStillProcessing)
+        {
+            // DOT hasn't reached a terminal answer yet (confirmed live: resultCode 1000, "the
+            // request is being processed") — this is not a decline, it's "ask again shortly".
+            // Release back to Pending exactly like a transient network failure above, so the next
+            // callback/webhook/reconciliation-sweep pass gets a fresh, authoritative answer instead
+            // of the order being failed out from under a payment that may still complete.
+            attempt.ReleaseForRetry();
+            await commerceDbContext.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "DOT transaction still processing for payment attempt {PaymentAttemptId}; will retry.",
+                paymentAttemptId);
+
+            return new DotVerificationResult(DotVerificationOutcome.StillPending, order.Id, "Payment is still being processed.");
+        }
+
         if (!status.IsSuccessfulTransaction)
         {
             attempt.MarkFailed(status.ResultCode.ToString(), status.ResultDesc);

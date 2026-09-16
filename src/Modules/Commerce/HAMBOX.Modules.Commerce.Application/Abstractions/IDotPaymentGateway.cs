@@ -59,8 +59,10 @@ public sealed record DotAccessTokenResult(int ResultCode, string ResultDesc, str
 }
 
 /// <summary>
-/// resultCode: 0 successful transaction, 1015 not found among successful transactions, 1008
-/// invalid request, 1009 internal error — per the Check Transaction Status API spec.
+/// resultCode: 0 successful transaction, 1000 the request is still being processed (not yet
+/// finalized — confirmed live against DOT's sandbox, not in the documented spec below), 1015 not
+/// found among successful transactions, 1008 invalid request, 1009 internal error — per the Check
+/// Transaction Status API spec.
 /// </summary>
 public sealed record DotTransactionStatusResult(
     int ResultCode,
@@ -70,4 +72,7 @@ public sealed record DotTransactionStatusResult(
     string? Currency)
 {
     public bool IsSuccessfulTransaction => ResultCode == 0;
+
+    /// <summary>DOT hasn't reached a terminal answer yet — never a failure, just "ask again shortly".</summary>
+    public bool IsStillProcessing => ResultCode == 1000;
 }

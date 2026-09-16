@@ -239,7 +239,10 @@ public sealed class PaymentAttempt : Entity
         CompletedOnUtc = DateTimeOffset.UtcNow;
     }
 
-    /// <summary>Releases a claimed attempt back to Pending after a transient provider failure (network/timeout/5xx) — never after a real answer from DOT.</summary>
+    /// <summary>Releases a claimed attempt back to Pending when there is no terminal answer yet —
+    /// either a transient provider failure (network/timeout/5xx) or DOT itself reporting the
+    /// transaction is still being processed. Never call this after a real terminal answer (success
+    /// or a genuine decline) from DOT.</summary>
     public void ReleaseForRetry()
     {
         if (Status != PaymentAttemptStatus.Verifying)
