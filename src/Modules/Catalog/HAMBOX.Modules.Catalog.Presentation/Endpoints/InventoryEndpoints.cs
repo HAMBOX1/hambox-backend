@@ -127,6 +127,14 @@ internal static class InventoryEndpoints
             await Send(sender, new GetOptionGroupTemplateQuery(templateId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.View);
 
+        // Product-independent authoring: creates an empty template so an admin can build a master
+        // list (e.g. every country) from scratch, then populate it via the PUT below — no need to
+        // first add every value to some real product's option group.
+        group.MapPost("/option-group-templates", async (
+            [FromBody] CreateOptionGroupTemplateRequest body,
+            ISender sender) => await SendCreated(sender, new CreateOptionGroupTemplateCommand(body.Name, body.IsRequiredDefault)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
         group.MapPost("/option-groups/{groupId:guid}/save-as-template", async (
             Guid groupId,
             [FromBody] SaveOptionGroupAsTemplateRequest body,
@@ -170,7 +178,8 @@ internal static class InventoryEndpoints
         group.MapPost("/products/{productId:guid}/option-groups/import-template", async (
             Guid productId,
             [FromBody] ImportOptionGroupTemplateRequest body,
-            ISender sender) => await SendCreated(sender, new ImportOptionGroupTemplateCommand(productId, body.TemplateId, body.Resolution)))
+            ISender sender) => await SendCreated(sender, new ImportOptionGroupTemplateCommand(
+                productId, body.TemplateId, body.Resolution, body.SelectedOptionIds)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
         group.MapPut("/option-groups/{groupId:guid}", async (
@@ -401,9 +410,10 @@ internal sealed record CreateVariantRequest(
 
 internal sealed record CreateOptionGroupRequest(string Key, string DisplayName, int SortOrder, bool IsRequired, Guid? ParentOptionId = null);
 internal sealed record CreateOptionRequest(string Value, string Label, int SortOrder, string? DescriptionHtml = null);
+internal sealed record CreateOptionGroupTemplateRequest(string Name, bool IsRequiredDefault);
 internal sealed record SaveOptionGroupAsTemplateRequest(string Name);
 internal sealed record UpdateOptionGroupTemplateRequest(string Name, bool IsRequiredDefault, IReadOnlyList<OptionGroupTemplateOptionInput> Options);
-internal sealed record ImportOptionGroupTemplateRequest(Guid TemplateId, ImportConflictResolution Resolution);
+internal sealed record ImportOptionGroupTemplateRequest(Guid TemplateId, ImportConflictResolution Resolution, IReadOnlyList<Guid>? SelectedOptionIds = null);
 internal sealed record CreateOptionDescriptionTemplateRequest(string Name, string DescriptionHtml);
 internal sealed record UpdateOptionDescriptionTemplateRequest(string Name, string DescriptionHtml);
 internal sealed record CreateSupplierRequest(

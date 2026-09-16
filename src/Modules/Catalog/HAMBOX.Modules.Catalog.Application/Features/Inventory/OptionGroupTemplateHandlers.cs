@@ -88,6 +88,33 @@ internal sealed class GetOptionGroupTemplateQueryHandler : IRequestHandler<GetOp
     }
 }
 
+/// <summary>Creates an empty, product-independent template — lets an admin author a master list
+/// (e.g. every country for "Region") from scratch via <see cref="UpdateOptionGroupTemplateCommand"/>,
+/// without first having to build the full list on some real product's option group.</summary>
+public sealed record CreateOptionGroupTemplateCommand(string Name, bool IsRequiredDefault) : IRequest<Result<Guid>>;
+
+internal sealed class CreateOptionGroupTemplateCommandHandler : IRequestHandler<CreateOptionGroupTemplateCommand, Result<Guid>>
+{
+    private readonly ICatalogDbContext _db;
+
+    public CreateOptionGroupTemplateCommandHandler(ICatalogDbContext db) => _db = db;
+
+    public async Task<Result<Guid>> Handle(CreateOptionGroupTemplateCommand request, CancellationToken cancellationToken)
+    {
+        var name = request.Name.Trim();
+        var nameTaken = await _db.OptionGroupTemplates.AnyAsync(t => t.Name == name, cancellationToken);
+        if (nameTaken)
+        {
+            return Result.Failure<Guid>(CatalogErrors.DuplicateOptionGroupTemplateName);
+        }
+
+        var template = OptionGroupTemplate.Create(name, request.IsRequiredDefault);
+        _db.OptionGroupTemplates.Add(template);
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success(template.Id);
+    }
+}
+
 public sealed record SaveOptionGroupAsTemplateCommand(Guid OptionGroupId, string Name) : IRequest<Result<Guid>>;
 
 internal sealed class SaveOptionGroupAsTemplateCommandHandler : IRequestHandler<SaveOptionGroupAsTemplateCommand, Result<Guid>>
@@ -201,10 +228,15 @@ internal sealed class DeleteOptionGroupTemplateCommandHandler : IRequestHandler<
     }
 }
 
+/// <param name="SelectedOptionIds">When provided (non-null, non-empty), only these template
+/// options are attached to the product — lets an admin import a subset of a large master list
+/// (e.g. 5 of 190 countries) instead of getting everything and deleting the rest afterward. Null
+/// or empty imports every option in the template, unchanged from the original behavior.</param>
 public sealed record ImportOptionGroupTemplateCommand(
     Guid ProductId,
     Guid TemplateId,
-    ImportConflictResolution Resolution) : IRequest<Result<Guid>>;
+    ImportConflictResolution Resolution,
+    IReadOnlyList<Guid>? SelectedOptionIds = null) : IRequest<Result<Guid>>;
 
 internal sealed class ImportOptionGroupTemplateCommandHandler : IRequestHandler<ImportOptionGroupTemplateCommand, Result<Guid>>
 {
@@ -264,7 +296,12 @@ internal sealed class ImportOptionGroupTemplateCommandHandler : IRequestHandler<
         var group = ProductOptionGroup.Create(request.ProductId, key, template.Name, sortOrder: 0, isRequired: template.IsRequiredDefault);
         _db.ProductOptionGroups.Add(group);
 
-        foreach (var templateOption in template.Options.OrderBy(o => o.SortOrder))
+        var selectedIds = request.SelectedOptionIds;
+        var optionsToImport = selectedIds is { Count: > 0 }
+            ? template.Options.Where(o => selectedIds.Contains(o.Id))
+            : template.Options.AsEnumerable();
+
+        foreach (var templateOption in optionsToImport.OrderBy(o => o.SortOrder))
         {
             var option = ProductOption.Create(group.Id, templateOption.Value, templateOption.Label, templateOption.SortOrder, templateOption.DescriptionHtml);
             _db.ProductOptions.Add(option);
