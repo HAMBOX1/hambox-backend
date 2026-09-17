@@ -11,7 +11,7 @@ namespace HAMBOX.Modules.Support.Application.Services;
 /// self-service and WhatsApp-bot entry points already use — no category/priority override, so it
 /// gets whichever defaults <c>CreateTicketCommandHandler</c> resolves for an uncategorized ticket.
 /// </summary>
-internal sealed class DeliveryTicketService(ISender sender, ILogger<DeliveryTicketService> logger)
+public sealed class DeliveryTicketService(ISender sender, ILogger<DeliveryTicketService> logger)
     : IDeliveryTicketService
 {
     public async Task<Guid> CreateDeliveryTicketAsync(DeliveryTicketRequest request, CancellationToken cancellationToken = default)
