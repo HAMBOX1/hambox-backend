@@ -1,4 +1,5 @@
 using FluentValidation;
+using HAMBOX.Application.Support;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Features.Tickets.CreateTicket;
@@ -28,6 +29,7 @@ public static class SupportInfrastructureExtensions
         services.AddScoped<ISupportAiAssistant, NullSupportAiAssistant>();
         services.AddScoped<IAttachmentScanner, NullAttachmentScanner>();
         services.AddScoped<TicketContextBuilder>();
+        services.AddScoped<IDeliveryTicketService, DeliveryTicketService>();
 
         services.AddValidatorsFromAssembly(typeof(CreateTicketCommandValidator).Assembly);
 

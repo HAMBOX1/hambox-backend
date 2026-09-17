@@ -51,7 +51,7 @@ internal sealed class InventoryEngine : IInventoryEngine
         var variants = await _db.ProductVariants
             .AsNoTracking()
             .Where(v => ids.Contains(v.Id))
-            .Select(v => new { v.Id, v.LowStockThreshold })
+            .Select(v => new { v.Id, v.LowStockThreshold, v.FulfillmentMode, v.ManualDeliveryCapacity })
             .ToDictionaryAsync(v => v.Id, cancellationToken);
 
         var counts = await _db.DigitalInventoryCodes
@@ -67,6 +67,18 @@ internal sealed class InventoryEngine : IInventoryEngine
             var threshold = variants.TryGetValue(id, out var v) && v.LowStockThreshold > 0
                 ? v.LowStockThreshold
                 : inventorySettings.LowStockThreshold;
+
+            // ChatDelivery has no digital codes at all — its "available" count is the admin-set
+            // remaining capacity instead of a code tally, so every caller of this snapshot (checkout,
+            // storefront display, admin catalog list) sees the right number with no changes of their
+            // own. Reserved/sold/expired/disabled stay 0: there are no code rows to have those statuses.
+            if (v?.FulfillmentMode == FulfillmentMode.ChatDelivery)
+            {
+                var capacityAvailable = v.ManualDeliveryCapacity ?? 0;
+                result[id] = new VariantStockSnapshot(id, capacityAvailable, 0, 0, 0, 0, capacityAvailable > 0 && capacityAvailable <= threshold, capacityAvailable <= 0);
+                continue;
+            }
+
             var available = counts.Where(c => c.VariantId == id && c.Status == InventoryCodeStatus.Available).Sum(c => c.Count);
             var reserved = counts.Where(c => c.VariantId == id && c.Status == InventoryCodeStatus.Reserved).Sum(c => c.Count);
             var sold = counts.Where(c => c.VariantId == id && c.Status == InventoryCodeStatus.Sold).Sum(c => c.Count);
@@ -94,6 +106,23 @@ internal sealed class InventoryEngine : IInventoryEngine
                 && v.Status == ProductVariantStatus.Active
                 && v.IsVisible,
             cancellationToken);
+
+    public async Task<bool> TryConsumeManualDeliveryCapacityAsync(
+        Guid variantId,
+        int quantity,
+        CancellationToken cancellationToken = default)
+    {
+        // Same condition-guarded UPDATE pattern as PromotionRedemptionService's usage-limit checks —
+        // the WHERE clause re-evaluates against whatever the last committed value is, so a concurrent
+        // order that would take capacity below zero simply affects 0 rows instead of over-selling.
+        var affected = await _db.ProductVariants
+            .Where(v => v.Id == variantId && v.ManualDeliveryCapacity != null && v.ManualDeliveryCapacity >= quantity)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(v => v.ManualDeliveryCapacity, v => v.ManualDeliveryCapacity!.Value - quantity),
+                cancellationToken);
+
+        return affected > 0;
+    }
 
     public Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveCodesAsync(
         Guid variantId,

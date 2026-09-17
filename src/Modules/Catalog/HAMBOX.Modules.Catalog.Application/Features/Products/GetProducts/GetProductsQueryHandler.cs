@@ -144,8 +144,38 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             .Select(g => new { ProductId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ProductId, x => x.Count, cancellationToken);
 
+        // ChatDelivery variants have no digital codes at all — their "stock" is the admin-set
+        // remaining ManualDeliveryCapacity instead, summed in separately here since this handler
+        // computes AvailableStock via its own bulk join rather than InventoryEngine's per-variant
+        // snapshot (which already folds capacity in for other callers — see its own doc comment).
+        var chatDeliveryVariantRows = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v => productIds.Contains(v.ProductId) && v.FulfillmentMode == FulfillmentMode.ChatDelivery && !v.IsDeleted)
+            .Select(v => new { v.ProductId, v.ManualDeliveryCapacity })
+            .ToListAsync(cancellationToken);
+
+        var chatDeliveryCapacityByProduct = chatDeliveryVariantRows
+            .GroupBy(v => v.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(v => v.ManualDeliveryCapacity ?? 0));
+
+        var hasChatDeliveryVariantByProduct = chatDeliveryVariantRows
+            .Select(v => v.ProductId)
+            .ToHashSet();
+
+        var variantCountByProduct = await _dbContext.ProductVariants
+            .AsNoTracking()
+            .Where(v => productIds.Contains(v.ProductId) && !v.IsDeleted)
+            .GroupBy(v => v.ProductId)
+            .Select(g => new { ProductId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Count, cancellationToken);
+
         products = products
-            .Select(p => p with { AvailableStock = stockByProduct.GetValueOrDefault(p.Id, 0) })
+            .Select(p => p with
+            {
+                AvailableStock = stockByProduct.GetValueOrDefault(p.Id, 0) + chatDeliveryCapacityByProduct.GetValueOrDefault(p.Id, 0),
+                HasChatDeliveryVariant = hasChatDeliveryVariantByProduct.Contains(p.Id),
+                VariantCount = variantCountByProduct.GetValueOrDefault(p.Id, 0),
+            })
             .ToList();
 
         // "Starting from" price for products fulfilled (fully or partly) by automated suppliers — the

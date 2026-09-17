@@ -28,4 +28,11 @@ public enum FulfillmentMode
 
     /// <summary>Automated supplier only. Manual inventory is never reserved, assigned, or used as a fallback.</summary>
     SupplierOnly = 3,
+
+    /// <summary>
+    /// No digital inventory codes and no automated supplier — a human delivers this manually over a
+    /// support conversation opened automatically once the order is paid. Purchasability is governed by
+    /// <see cref="Inventory.ProductVariant.ManualDeliveryCapacity"/> instead of code count.
+    /// </summary>
+    ChatDelivery = 4,
 }

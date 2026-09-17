@@ -89,6 +89,15 @@ public static class CatalogErrors
         $"These products have stock recorded that cannot be carried over automatically and will be lost: {string.Join(", ", productIds)}. Confirm to proceed anyway.");
 
     /// <summary>
+    /// Gets the error for when the quick "set as On-Delivery" catalog action is used on a product
+    /// that already has more than one variant — which one to reconfigure is ambiguous, so the admin
+    /// must use the per-variant controls in the variant manager instead.
+    /// </summary>
+    public static readonly Error ProductHasMultipleVariantsForQuickAction = new(
+        "Products.HasMultipleVariantsForQuickAction",
+        "This product has more than one variant — set On-Delivery from the variant manager instead.");
+
+    /// <summary>
     /// Gets the error for when a product is not active.
     /// </summary>
     public static readonly Error ProductNotActive = new(

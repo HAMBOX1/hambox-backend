@@ -100,6 +100,7 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         // Enum.Parse would throw on) — the safe, non-spending default this column must never be blank for.
         builder.Property(x => x.FulfillmentMode).HasConversion<string>().HasMaxLength(20)
             .HasDefaultValue(FulfillmentMode.ManualOnly);
+        builder.Property(x => x.ManualDeliveryCapacity);
         // Filtered so a permanently-deleted (soft-deleted) variant's SKU frees up for reuse —
         // SoftDelete() deliberately leaves Sku untouched (see its doc comment), so without this
         // filter a regenerated variant with the same option combination collides with the

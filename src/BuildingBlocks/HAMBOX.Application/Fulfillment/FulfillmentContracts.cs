@@ -69,6 +69,7 @@ public static class FulfillmentAvailability
         FulfillmentMode.ManualOnly => manualSufficient,
         FulfillmentMode.ManualFirst => manualSufficient || supplierReady,
         FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly => supplierReady,
+        FulfillmentMode.ChatDelivery => manualSufficient,
         _ => false,
     };
 }

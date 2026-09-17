@@ -49,6 +49,19 @@ internal sealed class ExecuteOrderFulfillmentJobHandler(
 
         var wasAlreadyCompleted = order.Status == OrderStatus.Completed;
 
+        // Checkout deliberately skips ChatDelivery inline (see CheckoutCommandHandler's reservation
+        // loop) for the same reason automated-supplier fulfillment is deferred here rather than run
+        // inline: opening a Support ticket writes to a separate DbContext/connection the checkout
+        // payment transaction doesn't span. This job handler is the safe, outside-any-transaction place
+        // to do both — capacity consumption first, then its ticket, then the automated-supplier step.
+        var result = await fulfillmentService.FulfillMissingAsync(order, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (result.PendingChatDeliveryTickets.Count > 0)
+        {
+            await fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order, result.PendingChatDeliveryTickets, cancellationToken);
+        }
+
         // Unmodified — every guarantee (idempotent purchase, ambiguous-outcome-stays-Unknown, cheapest
         // eligible supplier, never touching manual inventory) lives entirely inside this call and the
         // SupplierFulfillmentService/state machine it delegates to. See that method's own remarks for

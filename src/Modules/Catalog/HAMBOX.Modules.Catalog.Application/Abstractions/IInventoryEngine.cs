@@ -45,6 +45,21 @@ public interface IInventoryEngine
     Task<int> ExpireStaleReservationsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically decrements a <see cref="HAMBOX.Modules.Catalog.Domain.Enums.FulfillmentMode.ChatDelivery"/> variant's
+    /// remaining <c>ManualDeliveryCapacity</c> by <paramref name="quantity"/> — the capacity-based
+    /// counterpart to reserving/committing digital codes for this mode, which has none. A single
+    /// condition-guarded UPDATE (same pattern as <c>PromotionRedemptionService</c>'s usage-limit
+    /// checks), so two concurrent orders can never both succeed past the last unit of capacity.
+    /// Returns <c>false</c> (no row touched) when capacity is null or insufficient; the caller must
+    /// treat that as "nothing delivered" rather than throwing, matching
+    /// <see cref="ReservePartialCodesAsync"/>'s partial/never-throwing contract.
+    /// </summary>
+    Task<bool> TryConsumeManualDeliveryCapacityAsync(
+        Guid variantId,
+        int quantity,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns every sold code tied to <paramref name="orderId"/> back to the available pool, e.g. when
     /// the order is cancelled or refunded. Codes not currently <c>Sold</c> (already released, disabled, etc.)
     /// are left untouched, so this is safe to call more than once for the same order.

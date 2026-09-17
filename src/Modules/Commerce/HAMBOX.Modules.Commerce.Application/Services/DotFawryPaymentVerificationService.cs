@@ -184,6 +184,7 @@ public sealed class DotFawryPaymentVerificationService(
             return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, status.BillingTransactionResultDesc);
         }
 
+        OrderFulfillmentResult? fulfillmentResult = null;
         await transactionService.ExecuteAsync(async ct =>
         {
             var providerTransactionId = attempt.ProviderTransactionId ?? status.DotTransId ?? attempt.PartnerTxId;
@@ -220,7 +221,7 @@ public sealed class DotFawryPaymentVerificationService(
             // paying at Fawry.
             try
             {
-                await fulfillmentService.FulfillMissingAsync(order, ct);
+                fulfillmentResult = await fulfillmentService.FulfillMissingAsync(order, ct);
             }
             catch (InvalidOperationException ex)
             {
@@ -234,6 +235,13 @@ public sealed class DotFawryPaymentVerificationService(
             await commerceDbContext.SaveChangesAsync(ct);
             await catalogDbContext.SaveChangesAsync(ct);
         }, cancellationToken);
+
+        if (fulfillmentResult?.PendingChatDeliveryTickets.Count > 0)
+        {
+            // Strictly after the transaction above has committed — see ChatDeliveryPendingTicket's doc
+            // comment for why a Support-schema ticket write must never share that transaction.
+            await fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order, fulfillmentResult.PendingChatDeliveryTickets, cancellationToken);
+        }
 
         if (order.Status != OrderStatus.Completed)
         {

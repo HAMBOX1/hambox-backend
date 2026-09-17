@@ -32,6 +32,8 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="RequiredPlanNames">When <see cref="IsMembersOnly"/> is true, the plan(s) that grant access — used for the upgrade CTA.</param>
 /// <param name="LastEditedByName">The display name (email) of the admin who last edited this product's own fields, if ever edited since creation.</param>
 /// <param name="LastEditedOnUtc">When the product was last edited by an admin, if ever edited since creation.</param>
+/// <param name="HasChatDeliveryVariant">True if at least one of this product's variants is <see cref="Domain.Enums.FulfillmentMode.ChatDelivery"/> — delivered manually over a support chat rather than an instant digital code. Populated on list reads.</param>
+/// <param name="VariantCount">Number of non-deleted variants this product has. Populated on list reads — drives whether the catalog list's one-click "set as On-Delivery" action is offered (only for 0 or 1 variant; more than that is configured per-variant instead).</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -56,4 +58,6 @@ public sealed record ProductDto(
     bool CanPurchase = true,
     IReadOnlyList<string>? RequiredPlanNames = null,
     string? LastEditedByName = null,
-    DateTimeOffset? LastEditedOnUtc = null);
+    DateTimeOffset? LastEditedOnUtc = null,
+    bool HasChatDeliveryVariant = false,
+    int VariantCount = 0);

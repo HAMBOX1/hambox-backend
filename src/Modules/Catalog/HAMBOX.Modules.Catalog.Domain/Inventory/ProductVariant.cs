@@ -50,6 +50,14 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
     /// for every variant, existing or new — see <see cref="FulfillmentMode"/> for the full contract.
     /// </summary>
     public FulfillmentMode FulfillmentMode { get; private set; }
+
+    /// <summary>
+    /// Remaining capacity for <see cref="FulfillmentMode.ChatDelivery"/> — how many more units of this
+    /// variant can be sold before a customer is blocked, exactly like running out of digital codes
+    /// would for a manual variant. Decremented at order fulfillment time. Meaningless for any other
+    /// <see cref="FulfillmentMode"/>.
+    /// </summary>
+    public int? ManualDeliveryCapacity { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTimeOffset? DeletedOnUtc { get; private set; }
     public string? CreatedBy { get; set; }
@@ -109,6 +117,12 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         var previous = FulfillmentMode;
         FulfillmentMode = mode;
         return previous;
+    }
+
+    public void SetManualDeliveryCapacity(int capacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
+        ManualDeliveryCapacity = capacity;
     }
 
     public void SetOptions(IEnumerable<Guid> optionIds)

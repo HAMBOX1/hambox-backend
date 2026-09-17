@@ -148,6 +148,7 @@ public sealed class DotPaymentVerificationService(
             return new DotVerificationResult(DotVerificationOutcome.Failed, order.Id, "Payment verification failed.");
         }
 
+        OrderFulfillmentResult? fulfillmentResult = null;
         await transactionService.ExecuteAsync(async ct =>
         {
             var providerTransactionId = attempt.ProviderTransactionId ?? attempt.PartnerTxId;
@@ -180,7 +181,7 @@ public sealed class DotPaymentVerificationService(
             // customer was off completing OTP with DOT.
             try
             {
-                await fulfillmentService.FulfillMissingAsync(order, ct);
+                fulfillmentResult = await fulfillmentService.FulfillMissingAsync(order, ct);
             }
             catch (InvalidOperationException ex)
             {
@@ -194,6 +195,13 @@ public sealed class DotPaymentVerificationService(
             await commerceDbContext.SaveChangesAsync(ct);
             await catalogDbContext.SaveChangesAsync(ct);
         }, cancellationToken);
+
+        if (fulfillmentResult?.PendingChatDeliveryTickets.Count > 0)
+        {
+            // Strictly after the transaction above has committed — see ChatDeliveryPendingTicket's doc
+            // comment for why a Support-schema ticket write must never share that transaction.
+            await fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order, fulfillmentResult.PendingChatDeliveryTickets, cancellationToken);
+        }
 
         if (order.Status != OrderStatus.Completed)
         {

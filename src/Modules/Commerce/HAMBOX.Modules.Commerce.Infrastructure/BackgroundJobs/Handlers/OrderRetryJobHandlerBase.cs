@@ -39,6 +39,14 @@ internal abstract class OrderRetryJobHandlerBase(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        if (result.PendingChatDeliveryTickets.Count > 0)
+        {
+            // Strictly after the SaveChangesAsync above — see ChatDeliveryPendingTicket's doc comment
+            // for why a Support-schema ticket write must never share a transaction with the capacity
+            // consumption that produced it.
+            await fulfillment.CreatePendingChatDeliveryTicketsAsync(order, result.PendingChatDeliveryTickets, cancellationToken);
+        }
+
         if (result.OrderCompleted)
         {
             // Deferred fulfillment completing an order (e.g. a backorder finally getting stock) is a

@@ -60,14 +60,20 @@ internal sealed class FulfillmentRouter(
         // No variant found is not this method's concern to fail on — callers already validate variant
         // existence themselves. Fail closed to the safest possible answer (manual only, no supplier)
         // rather than guessing; simply absent from the returned dictionary.
-        var manualOnlyIds = variantRows.Where(v => v.FulfillmentMode == FulfillmentMode.ManualOnly).Select(v => v.Id).ToHashSet();
-        var routedVariants = variantRows.Where(v => v.FulfillmentMode != FulfillmentMode.ManualOnly).ToList();
+        // ChatDelivery joins ManualOnly in this short-circuit for the same reason: neither mode ever
+        // routes to an automated supplier, so there is nothing to resolve from the Suppliers schema —
+        // whether the sale can actually proceed is left entirely to the caller's own manualSufficient
+        // check (code count for ManualOnly, remaining ManualDeliveryCapacity for ChatDelivery).
+        var manualModeVariants = variantRows
+            .Where(v => v.FulfillmentMode is FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)
+            .ToList();
+        var routedVariants = variantRows.Where(v => v.FulfillmentMode is not (FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)).ToList();
 
-        foreach (var id in manualOnlyIds)
+        foreach (var variant in manualModeVariants)
         {
-            // Never even queries supplier mappings for a ManualOnly variant — nothing to resolve, and
-            // this keeps the READY check for ManualOnly products free of any Suppliers-schema query.
-            result[id] = new FulfillmentReadiness(FulfillmentMode.ManualOnly, true, null);
+            // Never even queries supplier mappings for these modes — nothing to resolve, and this
+            // keeps the READY check free of any Suppliers-schema query.
+            result[variant.Id] = new FulfillmentReadiness(variant.FulfillmentMode, true, null);
         }
 
         if (routedVariants.Count == 0)

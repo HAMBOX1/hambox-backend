@@ -1,4 +1,5 @@
 using HAMBOX.Application.Fulfillment;
+using HAMBOX.Application.Support;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
@@ -13,7 +14,23 @@ using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Commerce.Application.Services;
 
-public sealed record OrderFulfillmentResult(int CodesDelivered, bool OrderCompleted);
+/// <param name="PendingChatDeliveryTickets">
+/// <c>ChatDelivery</c> items whose capacity was just consumed by this call and still need their
+/// delivery ticket opened. Deliberately not created inside <see cref="OrderFulfillmentService.FulfillMissingAsync"/>
+/// itself — every caller of that method runs it inside (or may run it inside) a Commerce+Catalog
+/// transaction, and a Support-schema ticket write must never share that transaction (same rule
+/// <see cref="OrderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync"/>'s remarks describe for
+/// automated-supplier calls). Callers must invoke
+/// <see cref="OrderFulfillmentService.CreatePendingChatDeliveryTicketsAsync"/> with this list strictly
+/// after their transaction has committed.
+/// </param>
+public sealed record OrderFulfillmentResult(
+    int CodesDelivered,
+    bool OrderCompleted,
+    IReadOnlyList<ChatDeliveryPendingTicket> PendingChatDeliveryTickets);
+
+/// <summary>One <c>ChatDelivery</c> unit-quantity fulfilled without its ticket created yet.</summary>
+public sealed record ChatDeliveryPendingTicket(Guid OrderItemId, Guid ProductId, int Quantity);
 
 /// <summary>
 /// Outcome of <see cref="OrderFulfillmentService.QueueAutomatedSupplierFulfillmentAsync"/> — counts
@@ -29,6 +46,7 @@ public sealed class OrderFulfillmentService
     private readonly IFulfillmentRouter _router;
     private readonly ISupplierPricingEngine _pricingEngine;
     private readonly ISuppliersDbContext _suppliersDb;
+    private readonly IDeliveryTicketService _deliveryTicketService;
     private readonly ILogger<OrderFulfillmentService> _logger;
 
     public OrderFulfillmentService(
@@ -38,6 +56,7 @@ public sealed class OrderFulfillmentService
         IFulfillmentRouter router,
         ISupplierPricingEngine pricingEngine,
         ISuppliersDbContext suppliersDb,
+        IDeliveryTicketService deliveryTicketService,
         ILogger<OrderFulfillmentService> logger)
     {
         _commerceDb = commerceDb;
@@ -46,6 +65,7 @@ public sealed class OrderFulfillmentService
         _router = router;
         _pricingEngine = pricingEngine;
         _suppliersDb = suppliersDb;
+        _deliveryTicketService = deliveryTicketService;
         _logger = logger;
     }
 
@@ -53,7 +73,7 @@ public sealed class OrderFulfillmentService
     {
         if (order.Kind == OrderKind.Membership)
         {
-            return new OrderFulfillmentResult(0, false);
+            return new OrderFulfillmentResult(0, false, []);
         }
 
         if (order.PaymentStatus != PaymentStatus.Paid)
@@ -72,6 +92,7 @@ public sealed class OrderFulfillmentService
 
         var keysByItem = existingKeys.GroupBy(k => k.OrderItemId).ToDictionary(g => g.Key, g => g.Count());
         var delivered = 0;
+        var pendingChatDeliveryTickets = new List<ChatDeliveryPendingTicket>();
 
         await _inventoryEngine.ExpireStaleReservationsAsync(cancellationToken);
 
@@ -87,6 +108,19 @@ public sealed class OrderFulfillmentService
             if (item.ProductVariantId is Guid variantId)
             {
                 var readiness = await _router.GetReadinessAsync(variantId, cancellationToken);
+
+                if (readiness.Mode == FulfillmentMode.ChatDelivery)
+                {
+                    var chatDelivered = await FulfillViaChatDeliveryAsync(order, item, variantId, missing, cancellationToken);
+                    delivered += chatDelivered;
+                    if (chatDelivered > 0)
+                    {
+                        pendingChatDeliveryTickets.Add(new ChatDeliveryPendingTicket(item.Id, item.ProductId!.Value, chatDelivered));
+                    }
+
+                    continue;
+                }
+
                 if (!readiness.ManualAllowed)
                 {
                     // SupplierOnly/SupplierFirst — manual inventory must never be touched here, even if
@@ -174,7 +208,85 @@ public sealed class OrderFulfillmentService
             }
         }
 
-        return new OrderFulfillmentResult(delivered, orderCompleted);
+        return new OrderFulfillmentResult(delivered, orderCompleted, pendingChatDeliveryTickets);
+    }
+
+    /// <summary>
+    /// Fulfills a <see cref="FulfillmentMode.ChatDelivery"/> item: consumes the variant's remaining
+    /// <c>ManualDeliveryCapacity</c> (all-or-nothing for the whole shortfall — checkout already
+    /// verified enough capacity existed for the full cart line, so a partial consume here would only
+    /// mean a race with another order, in which case leaving this item untouched for a later retry is
+    /// correct) and stages the sentinel license-key row so completion counts it. Deliberately does NOT
+    /// create the delivery ticket here — see <see cref="ChatDeliveryPendingTicket"/>'s doc comment for
+    /// why that must happen strictly after the caller's transaction commits. Never throws; capacity
+    /// exhaustion just leaves the item undelivered for the existing retry-job path to pick up later,
+    /// exactly like a manual variant that ran out of codes.
+    /// </summary>
+    private async Task<int> FulfillViaChatDeliveryAsync(
+        Order order,
+        OrderItem item,
+        Guid variantId,
+        int quantity,
+        CancellationToken cancellationToken)
+    {
+        var consumed = await _inventoryEngine.TryConsumeManualDeliveryCapacityAsync(variantId, quantity, cancellationToken);
+        if (!consumed)
+        {
+            _logger.LogInformation(
+                "FulfillmentRouting: order {OrderId} item {OrderItemId} mode ChatDelivery — insufficient ManualDeliveryCapacity for {Quantity} unit(s).",
+                order.Id, item.Id, quantity);
+            return 0;
+        }
+
+        _logger.LogInformation(
+            "FulfillmentRouting: order {OrderId} item {OrderItemId} mode ChatDelivery — consumed {Quantity} unit(s) of capacity, ticket pending.",
+            order.Id, item.Id, quantity);
+
+        for (var i = 0; i < quantity; i++)
+        {
+            // No real digital code exists for this mode — this sentinel row exists purely so the
+            // order-completion count below (which counts OrderLicenseKey rows) treats this unit as
+            // delivered exactly like a code-backed one, without duplicating that logic for a second
+            // fulfillment kind. The string itself is customer-safe in case it's ever surfaced the same
+            // way a real revealed code would be.
+            _commerceDb.OrderLicenseKeys.Add(OrderLicenseKey.Create(
+                order.Id,
+                item.Id,
+                item.ProductId!.Value,
+                "Delivered via support chat — see your ticket for details.",
+                item.ProductVariantId));
+        }
+
+        return quantity;
+    }
+
+    /// <summary>
+    /// Opens the delivery ticket for each pending <c>ChatDelivery</c> item returned by
+    /// <see cref="FulfillMissingAsync"/> — call this only after the caller's own transaction (if any)
+    /// around that call has committed. Best-effort per item: a failed ticket creation is logged and
+    /// skipped rather than throwing, since the order is already paid and its capacity already spent;
+    /// an admin can open one manually from the order if this never catches up on retry.
+    /// </summary>
+    public async Task CreatePendingChatDeliveryTicketsAsync(
+        Order order,
+        IReadOnlyList<ChatDeliveryPendingTicket> pending,
+        CancellationToken cancellationToken)
+    {
+        foreach (var ticket in pending)
+        {
+            var ticketId = await _deliveryTicketService.CreateDeliveryTicketAsync(
+                new DeliveryTicketRequest(
+                    order.UserId,
+                    order.Id,
+                    ticket.ProductId,
+                    Subject: $"Order {order.OrderNumber} — delivery",
+                    Body: $"Thanks for your order! Our team will deliver order {order.OrderNumber} to you right here — reply with any details we need to get started."),
+                cancellationToken);
+
+            _logger.LogInformation(
+                "FulfillmentRouting: order {OrderId} item {OrderItemId} mode ChatDelivery — ticket {TicketId} created for {Quantity} unit(s).",
+                order.Id, ticket.OrderItemId, ticketId, ticket.Quantity);
+        }
     }
 
     public async Task<OrderLicenseKey> AssignManualCodeAsync(
@@ -272,10 +384,12 @@ public sealed class OrderFulfillmentService
             }
 
             var readiness = await _router.GetReadinessAsync(variantId, cancellationToken);
-            if (readiness.Mode == FulfillmentMode.ManualOnly)
+            if (readiness.Mode is FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)
             {
-                // Never even resolves a supplier candidate for a ManualOnly variant — this shortfall
-                // is expected to stay uncovered by automation; an admin resolves it manually.
+                // Never even resolves a supplier candidate for these modes — a ManualOnly shortfall is
+                // expected to stay uncovered by automation until an admin resolves it manually, and a
+                // ChatDelivery shortfall (capacity exhausted) is covered by topping up capacity and
+                // retrying, never by an automated supplier.
                 continue;
             }
 

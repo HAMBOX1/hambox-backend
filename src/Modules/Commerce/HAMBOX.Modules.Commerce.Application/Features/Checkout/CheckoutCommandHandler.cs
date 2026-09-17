@@ -180,11 +180,16 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                         ? variantForMode.FulfillmentMode
                         : FulfillmentMode.ManualOnly;
 
-                    if (mode is FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly)
+                    if (mode is FulfillmentMode.SupplierFirst or FulfillmentMode.SupplierOnly or FulfillmentMode.ChatDelivery)
                     {
-                        // Never reserve manual inventory inline for these modes — CartLineValidator
+                        // Never reserve manual inventory inline for the supplier modes — CartLineValidator
                         // already confirmed a READY supplier route exists; the automated-supplier step,
                         // run strictly after this transaction commits, covers the full quantity.
+                        // ChatDelivery joins them here for a different reason: fulfilling it means
+                        // creating a Support ticket, which writes to a separate DbContext/connection this
+                        // transaction doesn't span (same rule QueueAutomatedSupplierFulfillmentAsync's own
+                        // remarks describe) — ExecuteOrderFulfillmentJobHandler's post-commit
+                        // FulfillMissingAsync call covers it instead.
                         continue;
                     }
 

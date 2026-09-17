@@ -120,6 +120,13 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
                 CommerceErrors.OrderFulfillmentFailed);
         }
 
+        if (result!.PendingChatDeliveryTickets.Count > 0)
+        {
+            // Strictly after the transaction above has committed — see ChatDeliveryPendingTicket's doc
+            // comment for why a Support-schema ticket write must never share that transaction.
+            await _fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order!, result.PendingChatDeliveryTickets, cancellationToken);
+        }
+
         // Manual retry delivered something but possibly not everything (e.g. one product line still
         // short) — top up via an automated supplier for whatever remains, strictly after the
         // transaction above has committed. See QueueAutomatedSupplierFulfillmentAsync's remarks.
