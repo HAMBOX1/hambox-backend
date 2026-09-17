@@ -85,7 +85,18 @@ public sealed class DotPaymentVerificationService(
             return new DotVerificationResult(DotVerificationOutcome.Failed, attempt.OrderId, "Order not found.");
         }
 
-        var statusResult = await dotGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, attempt.OperatorId, cancellationToken);
+        // DOT's Check Transaction Status spec states the partnerTransId lookup is "available only
+        // for limited cases" — DotFawryPaymentVerificationService already found the Fawry
+        // operator/service combo (opId 141) rejects it outright (resultCode 1005/1008). Live
+        // production evidence now confirms Orange Cash (117) and Vodafone Cash (114) hit the same
+        // limitation: every recent redirect-callback verification came back resultCode 1015 ("the
+        // transaction cannot be found among the transactions") even though the customer had just
+        // completed a real DOT charge — dotTransId lookup has no such caveat and is always available
+        // by this point, since the callback handler records it via RecordProviderContext before
+        // calling this method. Same fallback pattern as the Fawry service.
+        var statusResult = string.IsNullOrWhiteSpace(attempt.ProviderTransactionId)
+            ? await dotGateway.CheckTransactionStatusByPartnerTxIdAsync(attempt.PartnerTxId, attempt.OperatorId, cancellationToken)
+            : await dotGateway.CheckTransactionStatusByDotTxIdAsync(attempt.ProviderTransactionId, attempt.OperatorId, cancellationToken);
 
         if (statusResult.IsFailure)
         {
