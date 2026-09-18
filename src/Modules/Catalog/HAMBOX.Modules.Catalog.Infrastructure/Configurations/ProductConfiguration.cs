@@ -109,10 +109,14 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(pc => pc.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // ClientSetNull (not SetNull): SQL Server refuses a self-referencing FK's ON DELETE SET
+        // NULL here ("may cause cycles or multiple cascade paths") because of the other
+        // Products-referencing FKs below — the DB constraint is NO ACTION and EF nulls this out
+        // in memory instead when a target product is deleted.
         builder.HasOne<Product>()
             .WithMany()
             .HasForeignKey(p => p.PendingMergeIntoProductId)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.ClientSetNull);
 
         // Metadata for encapsulated collections
         builder.Metadata.FindNavigation(nameof(Product.Images))!

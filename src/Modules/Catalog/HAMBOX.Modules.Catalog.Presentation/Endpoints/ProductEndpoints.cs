@@ -51,8 +51,8 @@ internal static class ProductEndpoints
             [FromQuery] ProductSortBy? sortBy,
             [FromQuery] string? attributes,
             [FromQuery] Guid? collectionId,
-            [FromQuery] bool pendingMergeOnly,
-            ISender sender) =>
+            ISender sender,
+            [FromQuery] bool pendingMergeOnly = false) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize == -1 ? -1 : (pageSize <= 0 ? 10 : pageSize); // -1 is the "show all" sentinel, resolved server-side in GetProductsQueryHandler
