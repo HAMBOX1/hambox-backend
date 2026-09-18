@@ -95,6 +95,8 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         builder.Property(x => x.Sku).IsRequired().HasMaxLength(100);
         builder.Property(x => x.PriceOverride).HasColumnType("decimal(18,2)");
         builder.Property(x => x.ComparePrice).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.CostPrice).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.MemberPrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
         // Explicit DB-level default so every existing row gets ManualOnly (never an empty string that
         // Enum.Parse would throw on) — the safe, non-spending default this column must never be blank for.

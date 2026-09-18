@@ -182,7 +182,9 @@ internal sealed class BulkUpdateProductVariantsCommandHandler
                 status,
                 isVisible,
                 variant.MembershipPlanId,
-                variant.LowStockThreshold);
+                variant.LowStockThreshold,
+                variant.CostPrice,
+                variant.MemberPrice);
         }
 
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(

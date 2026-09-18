@@ -39,6 +39,14 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
     public string Sku { get; private set; } = string.Empty;
     public decimal? PriceOverride { get; private set; }
     public decimal? ComparePrice { get; private set; }
+    /// <summary>What this variant costs to acquire — the basis for computing <see cref="PriceOverride"/>
+    /// or <see cref="MemberPrice"/> as a percentage markup in the admin pricing UI. Purely informational
+    /// at checkout time; never itself charged to a customer.</summary>
+    public decimal? CostPrice { get; private set; }
+    /// <summary>A discounted sale price for members of an eligible plan — set alongside
+    /// <see cref="PriceOverride"/> but not yet consumed by <see cref="Services.EffectivePriceResolver"/>
+    /// or checkout; wiring it to an actual membership-plan discount is a separate, later change.</summary>
+    public decimal? MemberPrice { get; private set; }
     public int SortOrder { get; private set; }
     public ProductVariantStatus Status { get; private set; }
     public bool IsVisible { get; private set; }
@@ -94,7 +102,9 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         ProductVariantStatus status,
         bool isVisible,
         Guid? membershipPlanId,
-        int lowStockThreshold)
+        int lowStockThreshold,
+        decimal? costPrice = null,
+        decimal? memberPrice = null)
     {
         Sku = sku.Trim().ToUpperInvariant();
         PlanId = planId;
@@ -105,6 +115,8 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         IsVisible = isVisible;
         MembershipPlanId = membershipPlanId;
         LowStockThreshold = lowStockThreshold;
+        CostPrice = costPrice;
+        MemberPrice = memberPrice;
     }
 
     /// <summary>

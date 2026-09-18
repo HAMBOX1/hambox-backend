@@ -48,7 +48,9 @@ public sealed record ProductVariantDto(
     bool IsLowStock,
     bool IsOutOfStock,
     IReadOnlyList<Guid> OptionIds,
-    string FulfillmentMode);
+    string FulfillmentMode,
+    decimal? CostPrice = null,
+    decimal? MemberPrice = null);
 
 public sealed record GenerateProductVariantsResultDto(
     int CreatedCount,

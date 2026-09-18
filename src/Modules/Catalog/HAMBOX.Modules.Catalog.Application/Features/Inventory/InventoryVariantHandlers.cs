@@ -72,7 +72,8 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 v.SortOrder, v.Status.ToString(), v.IsVisible, v.MembershipPlanId, v.LowStockThreshold,
                 s?.Available ?? 0, s?.Reserved ?? 0, s?.Sold ?? 0, totalCodes,
                 s?.IsLowStock ?? false, s?.IsOutOfStock ?? true,
-                v.SelectedOptions.Select(o => o.OptionId).ToList(), v.FulfillmentMode.ToString());
+                v.SelectedOptions.Select(o => o.OptionId).ToList(), v.FulfillmentMode.ToString(),
+                v.CostPrice, v.MemberPrice);
         }).ToList();
 
         return Result.Success<IReadOnlyList<ProductVariantDto>>(dtos);

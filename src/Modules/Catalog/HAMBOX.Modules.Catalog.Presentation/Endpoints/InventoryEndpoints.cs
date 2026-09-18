@@ -69,7 +69,7 @@ internal static class InventoryEndpoints
             ISender sender) => await SendEmpty(sender, new UpdateProductVariantCommand(
                 variantId, body.Sku, body.PlanId, body.PriceOverride, body.ComparePrice,
                 body.SortOrder, body.Status, body.IsVisible, body.MembershipPlanId,
-                body.LowStockThreshold, body.OptionIds)))
+                body.LowStockThreshold, body.OptionIds, body.CostPrice, body.MemberPrice)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapPut("/variants/{variantId:guid}/fulfillment-mode", async (
@@ -456,7 +456,9 @@ internal sealed record UpdateVariantRequest(
     bool IsVisible,
     Guid? MembershipPlanId,
     int LowStockThreshold,
-    IReadOnlyList<Guid> OptionIds);
+    IReadOnlyList<Guid> OptionIds,
+    decimal? CostPrice = null,
+    decimal? MemberPrice = null);
 
 internal sealed record DuplicateVariantRequest(string? SkuSuffix);
 internal sealed record BulkUpdateVariantsRequest(

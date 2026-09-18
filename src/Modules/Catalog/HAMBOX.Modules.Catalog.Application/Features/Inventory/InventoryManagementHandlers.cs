@@ -24,7 +24,9 @@ public sealed record UpdateProductVariantCommand(
     bool IsVisible,
     Guid? MembershipPlanId,
     int LowStockThreshold,
-    IReadOnlyList<Guid> OptionIds) : IRequest<Result>;
+    IReadOnlyList<Guid> OptionIds,
+    decimal? CostPrice = null,
+    decimal? MemberPrice = null) : IRequest<Result>;
 
 /// <summary>
 /// Kept deliberately separate from <see cref="UpdateProductVariantCommand"/> — changing fulfillment
@@ -145,7 +147,9 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
             request.Status,
             request.IsVisible,
             request.MembershipPlanId,
-            request.LowStockThreshold);
+            request.LowStockThreshold,
+            request.CostPrice,
+            request.MemberPrice);
 
         variant.SetOptions(requestedOptionIds);
 
@@ -284,7 +288,9 @@ internal sealed class DuplicateProductVariantCommandHandler : IRequestHandler<Du
             ProductVariantStatus.Draft,
             false,
             source.MembershipPlanId,
-            source.LowStockThreshold);
+            source.LowStockThreshold,
+            source.CostPrice,
+            source.MemberPrice);
 
         duplicate.SetOptions(optionIds);
         _db.ProductVariants.Add(duplicate);
