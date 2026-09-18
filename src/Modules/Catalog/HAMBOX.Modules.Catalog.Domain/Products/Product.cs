@@ -169,6 +169,13 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public DateTimeOffset? DeletedOnUtc { get; private set; }
 
     /// <summary>
+    /// Gets the identifier of another product this one is parked as a duplicate of, pending an
+    /// admin decision to promote it into a variant (see the Merge Products feature). Null means
+    /// this product is not parked. See <see cref="SetPendingMerge"/> / <see cref="ClearPendingMerge"/>.
+    /// </summary>
+    public Guid? PendingMergeIntoProductId { get; private set; }
+
+    /// <summary>
     /// Restores a soft-deleted product.
     /// </summary>
     public void Restore()
@@ -403,6 +410,37 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         Status = ProductStatus.Archived;
 
         RaiseDomainEvent(new ProductArchivedDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Parks this product as a duplicate pending merge into <paramref name="targetProductId"/>,
+    /// without touching stock or converting it into a variant yet. If currently
+    /// <see cref="ProductStatus.Active"/>, also deactivates it so it's hidden from the storefront
+    /// independent of any query-level filtering on <see cref="PendingMergeIntoProductId"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="targetProductId"/> is this product's own id.</exception>
+    public void SetPendingMerge(Guid targetProductId)
+    {
+        if (targetProductId == Id)
+        {
+            throw new ArgumentException("A product cannot be a pending merge into itself.", nameof(targetProductId));
+        }
+
+        PendingMergeIntoProductId = targetProductId;
+
+        if (Status == ProductStatus.Active)
+        {
+            Deactivate();
+        }
+    }
+
+    /// <summary>
+    /// Clears a pending merge previously set via <see cref="SetPendingMerge"/>. Does not change
+    /// <see cref="Status"/> — the admin re-activates the product explicitly if they want it live again.
+    /// </summary>
+    public void ClearPendingMerge()
+    {
+        PendingMergeIntoProductId = null;
     }
 
     /// <summary>

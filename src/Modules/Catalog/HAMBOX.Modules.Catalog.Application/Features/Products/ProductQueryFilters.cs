@@ -17,8 +17,18 @@ internal static class ProductQueryFilters
         string? searchTerm,
         Guid? categoryId,
         ProductStatus? status,
-        Guid? collectionId = null)
+        Guid? collectionId = null,
+        bool includePendingMerge = false)
     {
+        // Products parked as a pending merge (see the Merge Products feature) are duplicates
+        // awaiting an admin decision — hide them from both the storefront and the default admin
+        // catalog list the same way, at this single shared choke point, so neither ever needs its
+        // own copy of this rule.
+        if (!includePendingMerge)
+        {
+            query = query.Where(p => p.PendingMergeIntoProductId == null);
+        }
+
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             query = query.Where(p => p.NameAr.Contains(searchTerm) ||

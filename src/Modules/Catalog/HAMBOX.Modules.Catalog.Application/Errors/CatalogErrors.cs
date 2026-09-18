@@ -89,6 +89,36 @@ public static class CatalogErrors
         $"These products have stock recorded that cannot be carried over automatically and will be lost: {string.Join(", ", productIds)}. Confirm to proceed anyway.");
 
     /// <summary>
+    /// Gets the error for when a product is asked to be parked as a pending merge into itself.
+    /// </summary>
+    public static readonly Error ProductPendingMergeSelfReference = new(
+        "Products.PendingMergeSelfReference",
+        "A product cannot be marked as a pending merge into itself.");
+
+    /// <summary>
+    /// Gets the error for when the chosen pending-merge target is itself already parked as a
+    /// pending merge into another product — chains are blocked so "promote" is always single-hop.
+    /// </summary>
+    public static readonly Error ProductPendingMergeTargetAlsoPending = new(
+        "Products.PendingMergeTargetAlsoPending",
+        "The target product is itself pending merge into another product. Resolve that first.");
+
+    /// <summary>
+    /// Gets the error for when a product picked to park as a pending-merge source already has its
+    /// own variants — same rationale as <see cref="ProductMergeSourceHasVariants"/>.
+    /// </summary>
+    public static Error ProductPendingMergeSourceHasVariants(Guid productId) => new(
+        "Products.PendingMergeSourceHasVariants",
+        $"Product {productId} already has its own variants and cannot be marked as a pending merge source. Handle it separately first.");
+
+    /// <summary>
+    /// Gets the error for when clearing a pending merge on a product that doesn't have one set.
+    /// </summary>
+    public static readonly Error ProductNotPendingMerge = new(
+        "Products.NotPendingMerge",
+        "This product is not currently marked as a pending merge.");
+
+    /// <summary>
     /// Gets the error for when the quick "set as On-Delivery" catalog action is used on a product
     /// that already has more than one variant — which one to reconfigure is ambiguous, so the admin
     /// must use the per-variant controls in the variant manager instead.

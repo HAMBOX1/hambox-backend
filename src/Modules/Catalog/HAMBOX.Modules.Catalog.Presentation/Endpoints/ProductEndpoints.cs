@@ -51,12 +51,13 @@ internal static class ProductEndpoints
             [FromQuery] ProductSortBy? sortBy,
             [FromQuery] string? attributes,
             [FromQuery] Guid? collectionId,
+            [FromQuery] bool pendingMergeOnly,
             ISender sender) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize == -1 ? -1 : (pageSize <= 0 ? 10 : pageSize); // -1 is the "show all" sentinel, resolved server-side in GetProductsQueryHandler
             var query = new GetProductsQuery(
-                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId);
+                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId, pendingMergeOnly);
             var result = await sender.Send(query);
 
             if (result.IsSuccess)
@@ -203,6 +204,20 @@ internal static class ProductEndpoints
 
         group.MapPost("{id:guid}/restore", async (Guid id, ISender sender) =>
             await SendEmptyResult(sender, new RestoreProductCommand(id)))
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // POST /api/v1/products/{id}/pending-merge — park this product as a duplicate of another,
+        // pending a later "promote to variant" (the real merge, via bulk-merge) once the admin is
+        // ready to deal with any stock it carries.
+        group.MapPost("{id:guid}/pending-merge", async (Guid id, [FromBody] SetPendingMergeRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new SetPendingMergeCommand(id, request.TargetProductId)))
+            .WithName("SetPendingMerge")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
+        // DELETE /api/v1/products/{id}/pending-merge — unlink a previously parked duplicate.
+        group.MapDelete("{id:guid}/pending-merge", async (Guid id, ISender sender) =>
+            await SendEmptyResult(sender, new ClearPendingMergeCommand(id)))
+            .WithName("ClearPendingMerge")
             .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
         group.MapPost("{id:guid}/duplicate", async Task<Results<Ok<Guid>, BadRequest<ProblemDetails>>> (
@@ -352,3 +367,4 @@ internal sealed record UpdateProductRequest(string NameAr, string NameEn, string
 internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);
 internal sealed record MergeProductsRequest(Guid TargetProductId, IReadOnlyList<Guid> SourceProductIds, bool ConfirmStockLoss);
+internal sealed record SetPendingMergeRequest(Guid TargetProductId);

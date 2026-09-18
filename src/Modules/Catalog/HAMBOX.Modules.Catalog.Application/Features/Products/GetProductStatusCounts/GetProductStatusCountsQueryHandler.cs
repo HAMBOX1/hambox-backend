@@ -29,11 +29,16 @@ internal sealed class GetProductStatusCountsQueryHandler
 
         int Get(ProductStatus status) => counts.GetValueOrDefault(status, 0);
 
+        var pendingMergeCount = await ProductQueryFilters.ApplyBaseFilters(
+                _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId, includePendingMerge: true)
+            .CountAsync(p => p.PendingMergeIntoProductId != null, cancellationToken);
+
         return Result.Success(new ProductStatusCountsDto(
             All: counts.Values.Sum(),
             Draft: Get(ProductStatus.Draft),
             Active: Get(ProductStatus.Active),
             Inactive: Get(ProductStatus.Inactive),
-            Archived: Get(ProductStatus.Archived)));
+            Archived: Get(ProductStatus.Archived),
+            PendingMerge: pendingMergeCount));
     }
 }

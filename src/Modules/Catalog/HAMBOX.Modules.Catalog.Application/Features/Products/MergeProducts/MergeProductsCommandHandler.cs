@@ -47,11 +47,8 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
         // A source that already has its own variants would be silently orphaned (its variants stay
         // put, but the product they belong to disappears from the main catalog list) — block this
         // rather than guess what the admin wants; they can handle that product on its own first.
-        var sourceIdsWithVariants = await _db.ProductVariants
-            .Where(v => !v.IsDeleted && request.SourceProductIds.Contains(v.ProductId))
-            .Select(v => v.ProductId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+        var sourceIdsWithVariants = await ProductMergeGuard.GetProductIdsWithVariantsAsync(
+            _db, request.SourceProductIds, cancellationToken);
 
         if (sourceIdsWithVariants.Count > 0)
         {

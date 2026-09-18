@@ -15,6 +15,8 @@ public sealed record DeactivateProductCommand(Guid ProductId) : IRequest<Result>
 public sealed record ArchiveProductCommand(Guid ProductId) : IRequest<Result>;
 public sealed record RestoreProductCommand(Guid ProductId) : IRequest<Result>;
 public sealed record DuplicateProductCommand(Guid ProductId, string? NameSuffix) : IRequest<Result<Guid>>;
+public sealed record SetPendingMergeCommand(Guid ProductId, Guid TargetProductId) : IRequest<Result>;
+public sealed record ClearPendingMergeCommand(Guid ProductId) : IRequest<Result>;
 
 internal sealed class PublishProductCommandHandler : IRequestHandler<PublishProductCommand, Result>
 {
@@ -264,5 +266,96 @@ internal sealed class DuplicateProductCommandHandler : IRequestHandler<Duplicate
         var token = Guid.NewGuid().ToString("N")[..8];
         var candidate = $"{sourceSku}{suffix}-{token}";
         return candidate.Length <= 100 ? candidate : candidate[..100];
+    }
+}
+
+internal sealed class SetPendingMergeCommandHandler : IRequestHandler<SetPendingMergeCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public SetPendingMergeCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result> Handle(SetPendingMergeCommand request, CancellationToken cancellationToken)
+    {
+        if (request.ProductId == request.TargetProductId)
+        {
+            return Result.Failure(CatalogErrors.ProductPendingMergeSelfReference);
+        }
+
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        var target = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.TargetProductId, cancellationToken);
+        if (target is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        if (target.PendingMergeIntoProductId is not null)
+        {
+            return Result.Failure(CatalogErrors.ProductPendingMergeTargetAlsoPending);
+        }
+
+        var sourceIdsWithVariants = await ProductMergeGuard.GetProductIdsWithVariantsAsync(
+            _db, [request.ProductId], cancellationToken);
+        if (sourceIdsWithVariants.Count > 0)
+        {
+            return Result.Failure(CatalogErrors.ProductPendingMergeSourceHasVariants(request.ProductId));
+        }
+
+        product.SetPendingMerge(request.TargetProductId);
+
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.PendingMergeSet,
+            productId: product.Id,
+            performedByUserId: _currentUser.UserId,
+            details: $"Marked as pending merge into product '{target.NameEn}' ({target.Id})"));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+internal sealed class ClearPendingMergeCommandHandler : IRequestHandler<ClearPendingMergeCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public ClearPendingMergeCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result> Handle(ClearPendingMergeCommand request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        if (product.PendingMergeIntoProductId is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotPendingMerge);
+        }
+
+        product.ClearPendingMerge();
+
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.PendingMergeCleared,
+            productId: product.Id,
+            performedByUserId: _currentUser.UserId));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

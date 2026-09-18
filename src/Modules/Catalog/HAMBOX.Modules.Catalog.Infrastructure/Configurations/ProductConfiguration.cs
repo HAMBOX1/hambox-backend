@@ -76,6 +76,8 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.DeletedOnUtc);
 
+        builder.Property(p => p.PendingMergeIntoProductId);
+
         // Base entity properties
         builder.Property(p => p.CreatedOnUtc)
             .IsRequired();
@@ -107,6 +109,11 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(pc => pc.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne<Product>()
+            .WithMany()
+            .HasForeignKey(p => p.PendingMergeIntoProductId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Metadata for encapsulated collections
         builder.Metadata.FindNavigation(nameof(Product.Images))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
@@ -127,6 +134,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.IsDeleted)
             .HasFilter("[IsDeleted] = 0")
             .HasDatabaseName("IX_Products_IsDeleted");
+
+        builder.HasIndex(p => p.PendingMergeIntoProductId)
+            .HasDatabaseName("IX_Products_PendingMergeIntoProductId");
 
         // Ignore domain events collection
         builder.Ignore(p => p.DomainEvents);

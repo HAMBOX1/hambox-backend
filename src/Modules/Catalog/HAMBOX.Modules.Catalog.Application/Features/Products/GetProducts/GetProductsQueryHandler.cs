@@ -42,8 +42,22 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
     public async Task<Result<PagedResult<ProductDto>>> Handle(GetProductsQuery request, CancellationToken cancellationToken)
     {
+        // The list endpoint is AllowAnonymous for the storefront, so an anonymous caller must never
+        // be able to see parked duplicates via this flag — only honor it in an admin context.
+        var pendingMergeOnly = request.PendingMergeOnly && _currentUser.IsAdminContext;
+
         var query = ProductQueryFilters.ApplyBaseFilters(
-            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, request.Status, request.CollectionId);
+            _dbContext.Products.AsNoTracking(),
+            request.SearchTerm,
+            request.CategoryId,
+            request.Status,
+            request.CollectionId,
+            includePendingMerge: pendingMergeOnly);
+
+        if (pendingMergeOnly)
+        {
+            query = query.Where(p => p.PendingMergeIntoProductId != null);
+        }
 
         query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 
@@ -87,6 +101,10 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 CollectionIds = p.Collections.Select(pc => pc.CollectionId).ToList(),
                 p.LastEditedByName,
                 p.LastEditedOnUtc,
+                p.PendingMergeIntoProductId,
+                PendingMergeIntoProductName = p.PendingMergeIntoProductId == null
+                    ? null
+                    : _dbContext.Products.FirstOrDefault(t => t.Id == p.PendingMergeIntoProductId)!.NameEn,
             })
             .ToListAsync(cancellationToken);
 
@@ -127,7 +145,9 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     canPurchase,
                     access.RequiredPlanNames,
                     LastEditedByName: _currentUser.IsAdminContext ? r.LastEditedByName : null,
-                    LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null);
+                    LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null,
+                    PendingMergeIntoProductId: r.PendingMergeIntoProductId,
+                    PendingMergeIntoProductName: r.PendingMergeIntoProductName);
             })
             .ToList();
 

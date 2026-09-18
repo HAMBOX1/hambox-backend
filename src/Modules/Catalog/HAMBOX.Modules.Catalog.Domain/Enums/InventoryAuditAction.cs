@@ -22,5 +22,7 @@ public enum InventoryAuditAction
     CodeRevealed = 16,
     CodeReturned = 17,
     VariantArchived = 18,
-    VariantCleanedUp = 19
+    VariantCleanedUp = 19,
+    PendingMergeSet = 20,
+    PendingMergeCleared = 21
 }

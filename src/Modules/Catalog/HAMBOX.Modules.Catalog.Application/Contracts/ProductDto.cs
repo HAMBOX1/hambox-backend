@@ -34,6 +34,8 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="LastEditedOnUtc">When the product was last edited by an admin, if ever edited since creation.</param>
 /// <param name="HasChatDeliveryVariant">True if at least one of this product's variants is <see cref="Domain.Enums.FulfillmentMode.ChatDelivery"/> — delivered manually over a support chat rather than an instant digital code. Populated on list reads.</param>
 /// <param name="VariantCount">Number of non-deleted variants this product has. Populated on list reads — drives whether the catalog list's one-click "set as On-Delivery" action is offered (only for 0 or 1 variant; more than that is configured per-variant instead).</param>
+/// <param name="PendingMergeIntoProductId">The identifier of the product this one is parked as a duplicate of, pending promotion to a variant, if any. See the Merge Products feature.</param>
+/// <param name="PendingMergeIntoProductName">The English name of <see cref="PendingMergeIntoProductId"/>'s product, for display, if any.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -60,4 +62,6 @@ public sealed record ProductDto(
     string? LastEditedByName = null,
     DateTimeOffset? LastEditedOnUtc = null,
     bool HasChatDeliveryVariant = false,
-    int VariantCount = 0);
+    int VariantCount = 0,
+    Guid? PendingMergeIntoProductId = null,
+    string? PendingMergeIntoProductName = null);
