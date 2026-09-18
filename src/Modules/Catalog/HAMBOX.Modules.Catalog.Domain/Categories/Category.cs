@@ -79,6 +79,13 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public string? ImageStorageKey { get; private set; }
 
     /// <summary>
+    /// Gets the optional, already-sanitized rich-text instructions shown to customers browsing this
+    /// category (e.g. "these codes only work on US-region accounts"). Sanitization happens in the
+    /// Application layer before this is set — see <c>ProductOptionDescriptionSanitizer</c>.
+    /// </summary>
+    public string? DescriptionHtml { get; private set; }
+
+    /// <summary>
     /// Gets the resolved "nearest self-or-ancestor" image URL: this category's own
     /// <see cref="ImageUrl"/> when set, otherwise the value inherited from the closest
     /// ancestor that has one, otherwise <see langword="null"/>.
@@ -164,6 +171,16 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
         NameEn = nameEn;
         Slug = slug;
         SetParent(parentId);
+    }
+
+    /// <summary>
+    /// Sets (or clears, with <see langword="null"/>) this category's customer-facing instructions.
+    /// Deliberately separate from <see cref="Update"/> so the bulk catalog import job — which has no
+    /// description column — can keep calling <see cref="Update"/> without ever touching this field.
+    /// </summary>
+    public void SetDescription(string? descriptionHtml)
+    {
+        DescriptionHtml = descriptionHtml;
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="NameEn">The category name in English.</param>
 /// <param name="Slug">The URL-friendly slug.</param>
 /// <param name="IsActive">Whether the category is active.</param>
+/// <param name="DescriptionHtml">Optional, already-sanitized rich-text instructions shown to customers browsing this category.</param>
 public sealed record CategoryDto(
     Guid Id,
     string NameAr,
@@ -15,4 +16,5 @@ public sealed record CategoryDto(
     string Slug,
     bool IsActive,
     Guid? ParentId,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    string? DescriptionHtml = null);

@@ -46,6 +46,7 @@ internal sealed class UpdateCategoryCommandHandler : IRequestHandler<UpdateCateg
         var parentChanged = category.ParentId != request.ParentId;
 
         category.Update(request.NameAr, request.NameEn, request.Slug, request.ParentId);
+        category.SetDescription(ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml));
 
         if (parentChanged)
         {

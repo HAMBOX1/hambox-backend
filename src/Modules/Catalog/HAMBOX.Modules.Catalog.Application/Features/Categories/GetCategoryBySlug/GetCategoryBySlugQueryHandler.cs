@@ -15,7 +15,7 @@ internal sealed class GetCategoryBySlugQueryHandler(ICatalogDbContext dbContext)
         var category = await dbContext.Categories
             .AsNoTracking()
             .Where(c => c.Slug == request.Slug)
-            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId, c.ImageUrl))
+            .Select(c => new CategoryDto(c.Id, c.NameAr, c.NameEn, c.Slug, c.IsActive, c.ParentId, c.ImageUrl, c.DescriptionHtml))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (category is null)

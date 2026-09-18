@@ -39,6 +39,9 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(c => c.DescriptionHtml)
+            .HasColumnType("nvarchar(max)");
+
         builder.Property(c => c.ImageUrl)
             .HasMaxLength(500);
 

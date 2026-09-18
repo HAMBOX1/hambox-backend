@@ -130,7 +130,7 @@ internal static class CategoryEndpoints
         // POST /api/v1/categories
         group.MapPost("", async Task<Results<Created<Guid>, BadRequest<ProblemDetails>>> ([FromBody] CreateCategoryRequest request, ISender sender) =>
         {
-            var command = new CreateCategoryCommand(request.NameAr, request.NameEn, request.Slug, request.ParentId);
+            var command = new CreateCategoryCommand(request.NameAr, request.NameEn, request.Slug, request.ParentId, request.DescriptionHtml);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -152,7 +152,7 @@ internal static class CategoryEndpoints
         // PUT /api/v1/categories/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateCategoryRequest request, ISender sender) =>
         {
-            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive, request.ParentId);
+            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive, request.ParentId, request.DescriptionHtml);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -239,7 +239,7 @@ internal static class CategoryEndpoints
     }
 }
 
-internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug, Guid? ParentId);
-internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId);
+internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug, Guid? ParentId, string? DescriptionHtml = null);
+internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId, string? DescriptionHtml = null);
 internal sealed record ReorderCategoriesRequest(IReadOnlyList<CategoryReorderEntryRequest> Entries);
 internal sealed record CategoryReorderEntryRequest(Guid Id, Guid? ParentId, int SortOrder);
