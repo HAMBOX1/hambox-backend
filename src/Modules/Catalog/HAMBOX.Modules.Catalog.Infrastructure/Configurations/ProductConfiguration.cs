@@ -78,6 +78,10 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.PendingMergeIntoProductId);
 
+        builder.Property(p => p.IsFavorite)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         // Base entity properties
         builder.Property(p => p.CreatedOnUtc)
             .IsRequired();

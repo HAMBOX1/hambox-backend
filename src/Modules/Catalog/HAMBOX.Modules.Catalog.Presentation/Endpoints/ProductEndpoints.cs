@@ -52,12 +52,13 @@ internal static class ProductEndpoints
             [FromQuery] string? attributes,
             [FromQuery] Guid? collectionId,
             ISender sender,
-            [FromQuery] bool pendingMergeOnly = false) =>
+            [FromQuery] bool pendingMergeOnly = false,
+            [FromQuery] bool favoritesOnly = false) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize == -1 ? -1 : (pageSize <= 0 ? 10 : pageSize); // -1 is the "show all" sentinel, resolved server-side in GetProductsQueryHandler
             var query = new GetProductsQuery(
-                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId, pendingMergeOnly);
+                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId, pendingMergeOnly, favoritesOnly);
             var result = await sender.Send(query);
 
             if (result.IsSuccess)
@@ -220,6 +221,12 @@ internal static class ProductEndpoints
             .WithName("ClearPendingMerge")
             .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
+        // PUT /api/v1/products/{id}/favorite — toggle the admin's personal catalog bookmark.
+        group.MapPut("{id:guid}/favorite", async (Guid id, [FromBody] SetProductFavoriteRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new SetProductFavoriteCommand(id, request.IsFavorite)))
+            .WithName("SetProductFavorite")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         group.MapPost("{id:guid}/duplicate", async Task<Results<Ok<Guid>, BadRequest<ProblemDetails>>> (
             Guid id,
             [FromBody] DuplicateProductRequest? request,
@@ -368,3 +375,4 @@ internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);
 internal sealed record MergeProductsRequest(Guid TargetProductId, IReadOnlyList<Guid> SourceProductIds, bool ConfirmStockLoss);
 internal sealed record SetPendingMergeRequest(Guid TargetProductId);
+internal sealed record SetProductFavoriteRequest(bool IsFavorite);

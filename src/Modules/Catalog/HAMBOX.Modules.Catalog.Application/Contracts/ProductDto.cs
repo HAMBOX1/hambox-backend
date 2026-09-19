@@ -36,6 +36,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="VariantCount">Number of non-deleted variants this product has. Populated on list reads — drives whether the catalog list's one-click "set as On-Delivery" action is offered (only for 0 or 1 variant; more than that is configured per-variant instead).</param>
 /// <param name="PendingMergeIntoProductId">The identifier of the product this one is parked as a duplicate of, pending promotion to a variant, if any. See the Merge Products feature.</param>
 /// <param name="PendingMergeIntoProductName">The English name of <see cref="PendingMergeIntoProductId"/>'s product, for display, if any.</param>
+/// <param name="IsFavorite">Admin-only bookmark for quickly finding this product again — always false for anonymous/storefront callers, never shown to customers.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -64,4 +65,5 @@ public sealed record ProductDto(
     bool HasChatDeliveryVariant = false,
     int VariantCount = 0,
     Guid? PendingMergeIntoProductId = null,
-    string? PendingMergeIntoProductName = null);
+    string? PendingMergeIntoProductName = null,
+    bool IsFavorite = false);

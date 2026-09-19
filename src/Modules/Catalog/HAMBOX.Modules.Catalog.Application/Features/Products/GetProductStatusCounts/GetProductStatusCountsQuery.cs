@@ -14,4 +14,4 @@ public sealed record GetProductStatusCountsQuery(
     Guid? CategoryId,
     Guid? CollectionId) : IRequest<Result<ProductStatusCountsDto>>;
 
-public sealed record ProductStatusCountsDto(int All, int Draft, int Active, int Inactive, int Archived, int PendingMerge = 0);
+public sealed record ProductStatusCountsDto(int All, int Draft, int Active, int Inactive, int Archived, int PendingMerge = 0, int Favorites = 0);

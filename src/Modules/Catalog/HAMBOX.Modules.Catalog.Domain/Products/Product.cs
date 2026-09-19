@@ -176,6 +176,21 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public Guid? PendingMergeIntoProductId { get; private set; }
 
     /// <summary>
+    /// Admin-only bookmark for quickly finding this product again from the catalog list, unrelated
+    /// to anything shown on the storefront. See <see cref="SetFavorite"/>.
+    /// </summary>
+    public bool IsFavorite { get; private set; }
+
+    /// <summary>
+    /// Toggles the admin bookmark. Not tracked as an edit for <see cref="LastEditedOnUtc"/> purposes
+    /// — it's personal catalog-navigation state, not a change to the product itself.
+    /// </summary>
+    public void SetFavorite(bool isFavorite)
+    {
+        IsFavorite = isFavorite;
+    }
+
+    /// <summary>
     /// Restores a soft-deleted product.
     /// </summary>
     public void Restore()

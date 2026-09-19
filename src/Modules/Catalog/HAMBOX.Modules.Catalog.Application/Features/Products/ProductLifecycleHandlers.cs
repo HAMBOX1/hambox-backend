@@ -17,6 +17,7 @@ public sealed record RestoreProductCommand(Guid ProductId) : IRequest<Result>;
 public sealed record DuplicateProductCommand(Guid ProductId, string? NameSuffix) : IRequest<Result<Guid>>;
 public sealed record SetPendingMergeCommand(Guid ProductId, Guid TargetProductId) : IRequest<Result>;
 public sealed record ClearPendingMergeCommand(Guid ProductId) : IRequest<Result>;
+public sealed record SetProductFavoriteCommand(Guid ProductId, bool IsFavorite) : IRequest<Result>;
 
 internal sealed class PublishProductCommandHandler : IRequestHandler<PublishProductCommand, Result>
 {
@@ -354,6 +355,27 @@ internal sealed class ClearPendingMergeCommandHandler : IRequestHandler<ClearPen
             InventoryAuditAction.PendingMergeCleared,
             productId: product.Id,
             performedByUserId: _currentUser.UserId));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+internal sealed class SetProductFavoriteCommandHandler : IRequestHandler<SetProductFavoriteCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+
+    public SetProductFavoriteCommandHandler(ICatalogDbContext db) => _db = db;
+
+    public async Task<Result> Handle(SetProductFavoriteCommand request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        product.SetFavorite(request.IsFavorite);
 
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();

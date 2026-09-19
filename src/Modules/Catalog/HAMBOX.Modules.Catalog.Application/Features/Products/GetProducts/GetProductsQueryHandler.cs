@@ -59,6 +59,14 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             query = query.Where(p => p.PendingMergeIntoProductId != null);
         }
 
+        // Same admin-only gating as PendingMergeOnly above — favorites are a personal admin
+        // bookmark, never a storefront concept.
+        var favoritesOnly = request.FavoritesOnly && _currentUser.IsAdminContext;
+        if (favoritesOnly)
+        {
+            query = query.Where(p => p.IsFavorite);
+        }
+
         query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 
         query = ApplySort(query, request.SortBy);
@@ -105,6 +113,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 PendingMergeIntoProductName = p.PendingMergeIntoProductId == null
                     ? null
                     : _dbContext.Products.FirstOrDefault(t => t.Id == p.PendingMergeIntoProductId)!.NameEn,
+                p.IsFavorite,
             })
             .ToListAsync(cancellationToken);
 
@@ -147,7 +156,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     LastEditedByName: _currentUser.IsAdminContext ? r.LastEditedByName : null,
                     LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null,
                     PendingMergeIntoProductId: r.PendingMergeIntoProductId,
-                    PendingMergeIntoProductName: r.PendingMergeIntoProductName);
+                    PendingMergeIntoProductName: r.PendingMergeIntoProductName,
+                    IsFavorite: _currentUser.IsAdminContext && r.IsFavorite);
             })
             .ToList();
 

@@ -33,12 +33,15 @@ internal sealed class GetProductStatusCountsQueryHandler
                 _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId, includePendingMerge: true)
             .CountAsync(p => p.PendingMergeIntoProductId != null, cancellationToken);
 
+        var favoritesCount = await query.CountAsync(p => p.IsFavorite, cancellationToken);
+
         return Result.Success(new ProductStatusCountsDto(
             All: counts.Values.Sum(),
             Draft: Get(ProductStatus.Draft),
             Active: Get(ProductStatus.Active),
             Inactive: Get(ProductStatus.Inactive),
             Archived: Get(ProductStatus.Archived),
-            PendingMerge: pendingMergeCount));
+            PendingMerge: pendingMergeCount,
+            Favorites: favoritesCount));
     }
 }
