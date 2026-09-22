@@ -127,7 +127,10 @@ public sealed record GetSupplierMappingsQuery(Guid SupplierId) : IRequest<Result
 /// than failing the whole list.
 /// </summary>
 internal sealed class GetSupplierMappingsQueryHandler(
-    ISuppliersDbContext dbContext, ICatalogDbContext catalogDbContext, IPlatformSettingsProvider platformSettings)
+    ISuppliersDbContext dbContext,
+    ICatalogDbContext catalogDbContext,
+    IPlatformSettingsProvider platformSettings,
+    ICurrencyExchangeRateProvider exchangeRateProvider)
     : IRequestHandler<GetSupplierMappingsQuery, Result<IReadOnlyList<SupplierMappingDto>>>
 {
     public async Task<Result<IReadOnlyList<SupplierMappingDto>>> Handle(GetSupplierMappingsQuery request, CancellationToken cancellationToken)
@@ -165,6 +168,28 @@ internal sealed class GetSupplierMappingsQueryHandler(
         var commerceSettings = await platformSettings.GetAsync<CommerceSettingsPayload>(
             PlatformSettingsCategoryKeys.Commerce, cancellationToken);
 
+        // Mirrors CurrencyExchangeRateService's own rate normalization (fetched rate, else the
+        // configured static fallback, else — for the base currency only — 1:1) so a mapping's
+        // BuyingPrice in the supplier's own currency (e.g. INR) converts to the platform base
+        // currency (e.g. USD) the same way checkout-time cost comparison already does in
+        // SupplierRoutingEngine, instead of the raw supplier-currency amount leaking into SellingPrice.
+        var currencySettings = await platformSettings.GetCurrencyAsync(cancellationToken);
+        var fetchedRates = await exchangeRateProvider.GetRatesAsync(cancellationToken);
+        var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        foreach (var code in currencySettings.SupportedCurrencies)
+        {
+            if (fetchedRates.TryGetValue(code, out var rate) && rate > 0)
+            {
+                rates[code] = rate;
+            }
+            else if (currencySettings.StaticRates.TryGetValue(code, out var fallbackRate) && fallbackRate > 0)
+            {
+                rates[code] = fallbackRate;
+            }
+        }
+        rates.TryAdd(currencySettings.BaseCurrency, 1m);
+        var currencyConversion = new CurrencyConversion(currencySettings.BaseCurrency, rates);
+
         // Keyed by variant id (or the product id itself for a product-wide-only variant) so each
         // mapping can tell whether it's the one currently driving that variant's storefront price —
         // read directly from the persisted cache, never recomputed here.
@@ -183,7 +208,8 @@ internal sealed class GetSupplierMappingsQueryHandler(
                 m.InternalProductVariantId.HasValue ? variantSkus.GetValueOrDefault(m.InternalProductVariantId.Value) : null,
                 availabilityByMapping.GetValueOrDefault(m.Id),
                 commerceSettings.DefaultSupplierMarginPercent,
-                m.InternalProductVariantId.HasValue ? selectedMappingByVariant.GetValueOrDefault(m.InternalProductVariantId.Value) : null))
+                m.InternalProductVariantId.HasValue ? selectedMappingByVariant.GetValueOrDefault(m.InternalProductVariantId.Value) : null,
+                currencyConversion))
             .ToList();
 
         return Result.Success<IReadOnlyList<SupplierMappingDto>>(result);

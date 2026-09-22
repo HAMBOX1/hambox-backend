@@ -116,17 +116,18 @@ public sealed class DotPaymentVerificationService(
 
         if (status.IsStillProcessing)
         {
-            // DOT hasn't reached a terminal answer yet (confirmed live: resultCode 1000, "the
-            // request is being processed") — this is not a decline, it's "ask again shortly".
-            // Release back to Pending exactly like a transient network failure above, so the next
-            // callback/webhook/reconciliation-sweep pass gets a fresh, authoritative answer instead
-            // of the order being failed out from under a payment that may still complete.
+            // DOT hasn't reached a terminal answer yet:
+            // - resultCode 1000: "the request is being processed"
+            // - resultCode 1015: transaction recorded on provider side, awaiting customer wallet confirmation (PIN / app approval)
+            // This is not a decline, it's "still pending, ask again shortly".
+            // Release back to Pending so the next callback/webhook/status poll gets a fresh,
+            // authoritative answer instead of the order being failed out from under a payment that may still complete.
             attempt.ReleaseForRetry();
             await commerceDbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
-                "DOT transaction still processing for payment attempt {PaymentAttemptId}; will retry.",
-                paymentAttemptId);
+                "DOT transaction still processing for payment attempt {PaymentAttemptId} (resultCode: {ResultCode}, desc: {ResultDesc}); will retry.",
+                paymentAttemptId, status.ResultCode, status.ResultDesc);
 
             return new DotVerificationResult(DotVerificationOutcome.StillPending, order.Id, "Payment is still being processed.");
         }

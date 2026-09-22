@@ -63,12 +63,15 @@ public static class SupplierMapper
         string? internalVariantSku = null,
         SupplierProductAvailability? availability = null,
         decimal? defaultMarginPercent = null,
-        Guid? selectedMappingIdForPricing = null)
+        Guid? selectedMappingIdForPricing = null,
+        CurrencyConversion? currencyConversion = null)
     {
         var effectiveMarginPercent = mapping.MarginPercentOverride ?? defaultMarginPercent;
-        var sellingPrice = effectiveMarginPercent is decimal margin
-            ? mapping.BuyingPrice * (1 + margin / 100m)
+        var costInBaseCurrency = currencyConversion?.NormalizeToBaseCurrency(mapping.BuyingPrice, mapping.Currency);
+        var sellingPrice = effectiveMarginPercent is decimal margin && costInBaseCurrency is decimal cost
+            ? cost * (1 + margin / 100m)
             : (decimal?)null;
+        var sellingPriceCurrency = sellingPrice is not null ? currencyConversion!.BaseCurrency : null;
 
         return new(
             mapping.Id,
@@ -91,6 +94,7 @@ public static class SupplierMapper
             mapping.MarginPercentOverride,
             effectiveMarginPercent,
             sellingPrice,
+            sellingPriceCurrency,
             selectedMappingIdForPricing == mapping.Id);
     }
 
@@ -102,4 +106,27 @@ public static class SupplierMapper
         item.MinFaceValue,
         item.MaxFaceValue,
         item.Available);
+}
+
+/// <summary>
+/// A snapshot of exchange rates for converting a mapping's <c>BuyingPrice</c> (in the supplier's own
+/// currency, e.g. INR) into the platform base currency (e.g. USD) for admin display — the same
+/// amount-divided-by-rate convention <c>SupplierRoutingEngine.NormalizeToBaseCurrency</c> uses for
+/// checkout-time cost comparison, applied here so the mapping list's "Selling Price" isn't shown as if
+/// it were still in the supplier's currency.
+/// </summary>
+/// <param name="Rates">Units of that currency per one <see cref="BaseCurrency"/> unit.</param>
+public sealed record CurrencyConversion(string BaseCurrency, IReadOnlyDictionary<string, decimal> Rates)
+{
+    public decimal? NormalizeToBaseCurrency(decimal amount, string currency)
+    {
+        if (string.Equals(currency, BaseCurrency, StringComparison.OrdinalIgnoreCase))
+        {
+            return amount;
+        }
+
+        return Rates.TryGetValue(currency, out var rate) && rate > 0
+            ? amount / rate
+            : null;
+    }
 }

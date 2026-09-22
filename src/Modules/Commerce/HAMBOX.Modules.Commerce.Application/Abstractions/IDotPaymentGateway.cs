@@ -73,6 +73,11 @@ public sealed record DotTransactionStatusResult(
 {
     public bool IsSuccessfulTransaction => ResultCode == 0;
 
-    /// <summary>DOT hasn't reached a terminal answer yet — never a failure, just "ask again shortly".</summary>
-    public bool IsStillProcessing => ResultCode == 1000;
+    /// <summary>
+    /// DOT hasn't reached a terminal answer yet — never a failure, just "ask again shortly".
+    /// Per DOT engineering guidance:
+    /// - 1000: transaction is pending / under processing.
+    /// - 1015: transaction recorded on provider side, awaiting customer wallet confirmation (PIN / app approval).
+    /// </summary>
+    public bool IsStillProcessing => ResultCode is 1000 or 1015;
 }

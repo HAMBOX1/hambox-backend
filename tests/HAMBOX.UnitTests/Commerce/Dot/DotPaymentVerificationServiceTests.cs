@@ -60,7 +60,6 @@ public sealed class DotPaymentVerificationServiceTests
     [InlineData(1002, "OTP session timed out")]
     [InlineData(1004, "Insufficient balance")]
     [InlineData(1011, "Invalid MSISDN")]
-    [InlineData(1015, "transaction not found")]
     public async Task VerifyAndFinalizeAsync_UnsuccessfulTransaction_MarksOrderFailedAndDeliversNothing(
         int resultCode, string resultDesc)
     {
@@ -77,6 +76,29 @@ public sealed class DotPaymentVerificationServiceTests
         Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
         Assert.Empty(harness.Communication.SentRequests);
     }
+
+    [Theory]
+    [InlineData(1000, "the request is being processed")]
+    [InlineData(1015, "the transaction cannot be found among the transactions")]
+    public async Task VerifyAndFinalizeAsync_StillProcessingResultCodes_LeavesAttemptPendingAndReleasesClaim(
+        int resultCode, string resultDesc)
+    {
+        var (harness, attemptId, orderId) = await InitiateAsync();
+        harness.Gateway.StatusResult = new(resultCode, resultDesc, null, null, null);
+
+        var result = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
+
+        Assert.Equal(DotVerificationOutcome.StillPending, result.Outcome);
+
+        var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == attemptId);
+        Assert.Equal(PaymentAttemptStatus.Pending, attempt.Status);
+
+        var order = await harness.CommerceDb.Orders.FirstAsync(o => o.Id == orderId);
+        Assert.Equal(OrderStatus.Pending, order.Status);
+        Assert.Equal(PaymentStatus.Pending, order.PaymentStatus);
+        Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
+    }
+
 
     [Fact]
     public async Task VerifyAndFinalizeAsync_AmountMismatch_NeverCompletesOrder()
