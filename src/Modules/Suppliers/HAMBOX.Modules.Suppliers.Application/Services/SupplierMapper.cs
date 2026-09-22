@@ -71,8 +71,6 @@ public static class SupplierMapper
         var sellingPrice = effectiveMarginPercent is decimal margin && costInBaseCurrency is decimal cost
             ? cost * (1 + margin / 100m)
             : (decimal?)null;
-        var sellingPriceCurrency = sellingPrice is not null ? currencyConversion!.BaseCurrency : null;
-
         return new(
             mapping.Id,
             mapping.SupplierId,
@@ -94,7 +92,6 @@ public static class SupplierMapper
             mapping.MarginPercentOverride,
             effectiveMarginPercent,
             sellingPrice,
-            sellingPriceCurrency,
             selectedMappingIdForPricing == mapping.Id);
     }
 
