@@ -118,12 +118,18 @@ internal sealed class ZohoCpaasEmailService(
                 ? configuredName
                 : settings.FromName;
 
+            // Customers' replies to a notification land here instead of the (mailbox-less) sender address.
+            var replyTo = configuration["ZohoCpaas:ReplyTo"] is { Length: > 0 } configuredReplyTo
+                ? new[] { new ZohoAddress(configuredReplyTo, fromName) }
+                : null;
+
             var payload = new ZohoEmailRequest(
                 new ZohoAddress(fromAddress, fromName),
                 [new ZohoRecipient(new ZohoAddress(email, email))],
                 message.Subject,
                 message.HtmlBody,
-                message.TextBody);
+                message.TextBody,
+                replyTo);
 
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
             {
@@ -198,5 +204,6 @@ internal sealed class ZohoCpaasEmailService(
         [property: JsonPropertyName("to")] IReadOnlyList<ZohoRecipient> To,
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("htmlbody")] string? HtmlBody,
-        [property: JsonPropertyName("textbody")] string? TextBody);
+        [property: JsonPropertyName("textbody")] string? TextBody,
+        [property: JsonPropertyName("reply_to")] IReadOnlyList<ZohoAddress>? ReplyTo);
 }
