@@ -1,11 +1,14 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using Microsoft.Extensions.Configuration;
 
 namespace HAMBOX.Modules.Identity.Infrastructure.Services;
 
 internal sealed class PlatformRoutingEmailService(
     IPlatformSettingsService platformSettings,
     SmtpEmailService smtpEmailService,
-    LoggingEmailService loggingEmailService) : IEmailService
+    ZohoCpaasEmailService zohoCpaasEmailService,
+    LoggingEmailService loggingEmailService,
+    IConfiguration configuration) : IEmailService
 {
     public async Task<bool> SendEmailVerificationAsync(
         Guid userId,
@@ -54,6 +57,12 @@ internal sealed class PlatformRoutingEmailService(
     private async Task<IEmailService> ResolveAsync(CancellationToken cancellationToken)
     {
         var email = await platformSettings.GetEmailAsync(cancellationToken);
-        return email.Enabled ? smtpEmailService : loggingEmailService;
+        if (!email.Enabled)
+        {
+            return loggingEmailService;
+        }
+
+        // Zoho CPaaS (REST) takes over from SMTP whenever an API key is configured.
+        return string.IsNullOrWhiteSpace(configuration["ZohoCpaas:ApiKey"]) ? smtpEmailService : zohoCpaasEmailService;
     }
 }

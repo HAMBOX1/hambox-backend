@@ -44,6 +44,7 @@ public static class CommunicationChannels
 {
     public const string InApp = "InApp";
     public const string Email = "Email";
+    public const string WhatsApp = "WhatsApp";
 }
 
 public enum CommunicationAuditAction

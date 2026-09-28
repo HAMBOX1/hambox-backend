@@ -31,6 +31,7 @@ public static class CommunicationInfrastructureExtensions
         // means adding one more line like this — no other file in the module needs to change.
         services.AddScoped<ICommunicationProvider, DatabaseNotificationProvider>();
         services.AddScoped<ICommunicationProvider, EmailCommunicationProvider>();
+        services.AddScoped<ICommunicationProvider, ZohoWhatsAppCommunicationProvider>();
         services.AddScoped<ICommunicationProviderRegistry, CommunicationProviderRegistry>();
 
         services.AddScoped<IBackgroundJobHandler, DeliverCommunicationJobHandler>();

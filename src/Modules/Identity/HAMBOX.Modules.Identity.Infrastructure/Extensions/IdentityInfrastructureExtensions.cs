@@ -261,6 +261,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IPasswordHasher, PasswordHasherService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<SmtpEmailService>();
+        services.AddScoped<ZohoCpaasEmailService>();
         services.AddScoped<LoggingEmailService>();
         services.AddScoped<PlatformRoutingEmailService>();
         services.AddScoped<IEmailService>(sp => sp.GetRequiredService<PlatformRoutingEmailService>());
