@@ -10,7 +10,8 @@ internal sealed class CheckoutConfigurationProvider(
     IOptions<DotSettings> dotOptions,
     IDotPricePointResolver dotPricePointResolver,
     IOptions<DotFawrySettings> dotFawryOptions,
-    IDotFawryChargeAmountResolver dotFawryChargeAmountResolver) : ICheckoutConfigurationProvider
+    IDotFawryChargeAmountResolver dotFawryChargeAmountResolver,
+    IOptions<CryptomusSettings> cryptomusOptions) : ICheckoutConfigurationProvider
 {
     public bool IsDevelopmentCheckoutEnabled => environment.IsDevelopment();
 
@@ -35,4 +36,11 @@ internal sealed class CheckoutConfigurationProvider(
         dotFawryChargeAmountResolver is not NotConfiguredDotFawryChargeAmountResolver
         && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.PartnerId)
         && !string.IsNullOrWhiteSpace(dotFawryOptions.Value.ServiceId);
+
+    // No price-point-resolver analog needed (Cryptomus invoices directly in USD — see
+    // CryptomusPaymentGateway), so settings presence alone is the gate.
+    public bool IsCryptomusCheckoutEnabled =>
+        !string.IsNullOrWhiteSpace(cryptomusOptions.Value.MerchantId)
+        && !string.IsNullOrWhiteSpace(cryptomusOptions.Value.ApiKey)
+        && !string.IsNullOrWhiteSpace(cryptomusOptions.Value.PublicWebhookUrl);
 }

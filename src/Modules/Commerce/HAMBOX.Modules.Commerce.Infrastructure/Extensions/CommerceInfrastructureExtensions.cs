@@ -69,6 +69,21 @@ public static class CommerceInfrastructureExtensions
         services.AddSingleton<IValidateOptions<DotFawrySettings>, DotFawrySettingsValidator>();
         services.AddScoped<IDotFawryChargeAmountResolver, DotFawryChargeAmountResolver>();
 
+        services.Configure<CryptomusSettings>(configuration.GetSection(CryptomusSettings.SectionName));
+        services.AddSingleton<IValidateOptions<CryptomusSettings>, CryptomusSettingsValidator>();
+        services.AddHttpClient<ICryptomusPaymentGateway, CryptomusPaymentGateway>((sp, client) =>
+            {
+                var cryptomusSettings = sp.GetRequiredService<IOptions<CryptomusSettings>>().Value;
+                if (!string.IsNullOrWhiteSpace(cryptomusSettings.BaseUrl))
+                {
+                    client.BaseAddress = new Uri(cryptomusSettings.BaseUrl);
+                }
+
+                client.Timeout = TimeSpan.FromSeconds(cryptomusSettings.RequestTimeoutSeconds > 0 ? cryptomusSettings.RequestTimeoutSeconds : 15);
+                client.MaxResponseContentBufferSize = 1024 * 1024;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
         // Cost-based automated-supplier selection — reuses the same CurrencyExchangeRateService
         // DotFawryChargeAmountResolver already relies on (registered by AddSharedInfrastructure).
         services.AddScoped<ISupplierRoutingEngine, SupplierRoutingEngine>();

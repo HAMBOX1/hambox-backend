@@ -9,4 +9,7 @@ public interface ICheckoutConfigurationProvider
 
     /// <summary>Whether DOT Fawry checkout has its required non-secret/secret settings populated. Does not guarantee <see cref="IDotFawryChargeAmountResolver"/> is configured — see that interface for why the charge currency is a separate, still-unresolved question. A distinct DOT product from <see cref="IsDotCheckoutEnabled"/>.</summary>
     bool IsDotFawryCheckoutEnabled { get; }
+
+    /// <summary>Whether Cryptomus checkout has its required non-secret/secret settings populated.</summary>
+    bool IsCryptomusCheckoutEnabled { get; }
 }
