@@ -41,6 +41,7 @@ public static class CommerceApplicationExtensions
         services.AddScoped<PromotionRedemptionService>();
         services.AddScoped<DotPaymentVerificationService>();
         services.AddScoped<DotFawryPaymentVerificationService>();
+        services.AddScoped<CryptomusPaymentVerificationService>();
         services.AddScoped<ISupplierFulfillmentDeliverySink, CommerceOrderLicenseKeyDeliverySink>();
         services.AddScoped<IFulfillmentRouter, FulfillmentRouter>();
 

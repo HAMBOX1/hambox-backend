@@ -277,6 +277,29 @@ public static class CommerceErrors
         "DotFawry.PricingNotConfigured",
         "This payment method is not yet available.");
 
+    public static readonly Error CryptomusGatewayMisconfigured = new(
+        "Cryptomus.GatewayMisconfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error CryptomusPaymentAttemptNotFound = new(
+        "Cryptomus.PaymentAttemptNotFound",
+        "The payment attempt was not found.");
+
+    /// <summary>Single, non-specific error for a Cryptomus webhook that fails signature
+    /// verification or does not correspond to a known, still-open payment attempt — same
+    /// information-hiding rationale as <see cref="DotCallbackInvalid"/>.</summary>
+    public static readonly Error CryptomusWebhookInvalid = new(
+        "Cryptomus.WebhookInvalid",
+        "The payment callback could not be processed.");
+
+    public static readonly Error CryptomusVerificationFailed = new(
+        "Cryptomus.VerificationFailed",
+        "The payment could not be verified.");
+
+    public static readonly Error CryptomusProviderUnavailable = new(
+        "Cryptomus.ProviderUnavailable",
+        "The payment provider is temporarily unavailable. Please try again shortly.");
+
     public static readonly Error DotFawryGatewayMisconfigured = new(
         "DotFawry.GatewayMisconfigured",
         "This payment method is not yet available.");

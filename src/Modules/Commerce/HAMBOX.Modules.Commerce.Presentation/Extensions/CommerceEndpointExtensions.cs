@@ -25,6 +25,7 @@ public static class CommerceEndpointExtensions
         app.MapCartEndpoints(apiVersionSet);
         app.MapDotPaymentEndpoints(apiVersionSet);
         app.MapDotFawryPaymentEndpoints(apiVersionSet);
+        app.MapCryptomusPaymentEndpoints(apiVersionSet);
         app.MapAccountEndpoints(apiVersionSet);
         app.MapCustomerAlertEndpoints(apiVersionSet);
         app.MapPromotionEndpoints(apiVersionSet);
