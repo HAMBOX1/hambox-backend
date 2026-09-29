@@ -24,9 +24,10 @@ public interface IDotPaymentGateway
     /// <summary>
     /// Builds the URL to redirect the customer's browser to (DOT's OTP landing page), per the
     /// documented <c>token</c>/<c>rurl</c>/<c>partner_tx_timestamp</c>/<c>amount</c> query
-    /// parameters. Pure string composition — no network call.
+    /// parameters. No network call — async only because it reads <c>BaseUrl</c> from the (cached)
+    /// settings provider.
     /// </summary>
-    string BuildOtpLandingPageUrl(string token, DotAccessTokenRequest originalRequest);
+    Task<string> BuildOtpLandingPageUrlAsync(string token, DotAccessTokenRequest originalRequest, CancellationToken cancellationToken = default);
 
     /// <summary>Calls Check Transaction Status using DOT's <c>partner_txid</c> lookup. Authoritative — the only source of truth for whether a charge actually succeeded.</summary>
     Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(

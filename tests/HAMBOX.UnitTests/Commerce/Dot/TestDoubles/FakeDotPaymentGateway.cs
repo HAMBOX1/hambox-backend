@@ -37,9 +37,11 @@ internal sealed class FakeDotPaymentGateway : IDotPaymentGateway
             : Result.Success(AccessTokenResult));
     }
 
-    public string BuildOtpLandingPageUrl(string token, DotAccessTokenRequest originalRequest) =>
-        $"https://dot-jo.biz/otp-lp?token={token}&rurl={Uri.EscapeDataString(originalRequest.RedirectUrl)}" +
-        $"&partner_tx_timestamp={originalRequest.PartnerTxTimestampUnix}&amount={originalRequest.Amount}";
+    public Task<string> BuildOtpLandingPageUrlAsync(
+        string token, DotAccessTokenRequest originalRequest, CancellationToken cancellationToken = default) =>
+        Task.FromResult(
+            $"https://dot-jo.biz/otp-lp?token={token}&rurl={Uri.EscapeDataString(originalRequest.RedirectUrl)}" +
+            $"&partner_tx_timestamp={originalRequest.PartnerTxTimestampUnix}&amount={originalRequest.Amount}");
 
     public Task<Result<DotTransactionStatusResult>> CheckTransactionStatusByPartnerTxIdAsync(
         string partnerTxId, string operatorId, CancellationToken cancellationToken = default)

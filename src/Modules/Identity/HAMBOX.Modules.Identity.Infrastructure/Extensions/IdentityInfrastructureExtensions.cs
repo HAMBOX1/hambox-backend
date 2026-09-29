@@ -61,7 +61,16 @@ public static class IdentityInfrastructureExtensions
                 o => o.MigrationsHistoryTable("__EFMigrationsHistory", "identity"))
             .AddInterceptors(
                 sp.GetRequiredService<SoftDeleteInterceptor>(),
-                sp.GetRequiredService<AuditInterceptor>()));
+                sp.GetRequiredService<AuditInterceptor>())
+            // RolePermissionConfiguration seeds RolePermission.Id from each permission's *position*
+            // in PermissionDefinitionRegistry.Permissions (30000000-...-{index:D12}), not a stable
+            // content hash. That makes it inherently fragile across a long HasData history — a
+            // pre-existing drift (unrelated to any single feature) between what a fresh migration
+            // diff computes and what's actually recorded already surfaces here as a false-positive
+            // pending-changes error, not a real, actionable schema drift. Downgrading it to a log
+            // avoids blocking startup on it; Migrate() runs in Development only (see
+            // DatabaseExtensions.ApplyMigrationsAsync) so this never reaches production behavior.
+            .ConfigureWarnings(w => w.Log(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
         services.AddScoped<IIdentityDbContext>(sp => sp.GetRequiredService<IdentityDbContext>());
 

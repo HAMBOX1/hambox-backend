@@ -281,6 +281,10 @@ public static class CommerceErrors
         "Cryptomus.GatewayMisconfigured",
         "This payment method is not yet available.");
 
+    public static readonly Error PaymentGatewayNotFound = new(
+        "PaymentGateway.NotFound",
+        "The payment gateway was not found.");
+
     public static readonly Error CryptomusPaymentAttemptNotFound = new(
         "Cryptomus.PaymentAttemptNotFound",
         "The payment attempt was not found.");

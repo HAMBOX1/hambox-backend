@@ -49,6 +49,11 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<ICheckoutConfigurationProvider, CheckoutConfigurationProvider>();
         services.AddScoped<IIdempotencyService, IdempotencyService>();
 
+        // Admin-managed (DB-backed, cached) settings source for all three gateways below — falls back
+        // field-by-field to the IOptions<T> values configured here whenever the admin hasn't filled in
+        // a DB row yet, so registering IOptions<T>/the validators stays necessary as the legacy floor.
+        services.AddScoped<IPaymentGatewayConfigurationProvider, PaymentGatewayConfigurationProvider>();
+
         services.Configure<DotSettings>(configuration.GetSection(DotSettings.SectionName));
         services.AddSingleton<IValidateOptions<DotSettings>, DotSettingsValidator>();
         services.AddScoped<IDotPricePointResolver, DotPricePointResolver>();
@@ -64,6 +69,7 @@ public static class CommerceInfrastructureExtensions
                 client.MaxResponseContentBufferSize = 1024 * 1024;
             })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<IDotPaymentGateway>());
 
         services.Configure<DotFawrySettings>(configuration.GetSection(DotFawrySettings.SectionName));
         services.AddSingleton<IValidateOptions<DotFawrySettings>, DotFawrySettingsValidator>();
@@ -83,6 +89,7 @@ public static class CommerceInfrastructureExtensions
                 client.MaxResponseContentBufferSize = 1024 * 1024;
             })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<ICryptomusPaymentGateway>());
 
         // Cost-based automated-supplier selection — reuses the same CurrencyExchangeRateService
         // DotFawryChargeAmountResolver already relies on (registered by AddSharedInfrastructure).
@@ -95,6 +102,7 @@ public static class CommerceInfrastructureExtensions
                 client.MaxResponseContentBufferSize = 1024 * 1024;
             })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<IDotFawryPaymentGateway>());
 
         services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly);
 

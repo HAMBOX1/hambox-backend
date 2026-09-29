@@ -236,7 +236,7 @@ internal sealed class InitiateDotCheckoutCommandHandler(
                 tokenResult.IsFailure ? tokenResult.Error : CommerceErrors.DotProviderUnavailable);
         }
 
-        var landingPageUrl = dotGateway.BuildOtpLandingPageUrl(tokenResult.Value.Token!, tokenRequest);
+        var landingPageUrl = await dotGateway.BuildOtpLandingPageUrlAsync(tokenResult.Value.Token!, tokenRequest, cancellationToken);
 
         return Result.Success(new DotCheckoutInitiationDto(paymentAttempt.Id, order.Id, landingPageUrl, expiresOnUtc));
     }

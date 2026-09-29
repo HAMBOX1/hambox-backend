@@ -4,6 +4,7 @@ using HAMBOX.Modules.Commerce.Domain.Idempotency;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Commerce.Domain.PaymentGateways;
 using HAMBOX.Modules.Commerce.Domain.Promotions;
 using HAMBOX.Modules.Commerce.Domain.Reports;
 using Microsoft.EntityFrameworkCore;
@@ -117,6 +118,8 @@ public interface ICommerceDbContext
     DbSet<OrderPaymentCallback> OrderPaymentCallbacks { get; }
 
     DbSet<PaymentAttempt> PaymentAttempts { get; }
+
+    DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations { get; }
 
     DbSet<MembershipPlan> MembershipPlans { get; }
     DbSet<MembershipBenefit> MembershipBenefits { get; }

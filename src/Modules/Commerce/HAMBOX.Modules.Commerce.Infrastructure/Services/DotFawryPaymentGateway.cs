@@ -8,7 +8,6 @@ using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.SharedKernel.Errors;
 using HAMBOX.SharedKernel.Results;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
@@ -19,17 +18,37 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// different auth headers (this API requires a <c>PartnerId</c> header on every call, including the
 /// charge call, unlike the OTP product's GET Access Token), and a string-typed <c>resultCode</c>
 /// rather than an integer. Never logs the Authorization header, MSISDN, or raw response bodies —
-/// only result codes and correlation identifiers.
+/// only result codes and correlation identifiers. Settings come from
+/// <see cref="IPaymentGatewayConfigurationProvider"/> rather than
+/// <c>IOptions&lt;DotFawrySettings&gt;</c> directly.
 /// </summary>
 internal sealed class DotFawryPaymentGateway(
     HttpClient httpClient,
-    IOptions<DotFawrySettings> optionsAccessor,
-    ILogger<DotFawryPaymentGateway> logger) : IDotFawryPaymentGateway
+    IPaymentGatewayConfigurationProvider settingsProvider,
+    ILogger<DotFawryPaymentGateway> logger) : IDotFawryPaymentGateway, IPaymentGateway
 {
+    public string GatewayKey => "dotfawry";
+
+    /// <summary>
+    /// DOT Fawry has no dedicated no-op ping endpoint either — same caveat as
+    /// <c>DotPaymentGateway.TestConnectionAsync</c>: this confirms reachability, not precisely
+    /// "credentials valid" vs. "transaction not found", since both collapse to the same generic
+    /// provider-unavailable error today.
+    /// </summary>
+    public async Task<PaymentGatewayTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await CheckTransactionStatusByPartnerTxIdAsync(
+            $"test-{Guid.NewGuid():N}", "117", cancellationToken);
+
+        return result.IsSuccess
+            ? PaymentGatewayTestResult.Success("DOT Fawry responded to a Check Transaction Status call — credentials appear valid.")
+            : PaymentGatewayTestResult.Failure(result.Error.Description);
+    }
+
     public async Task<Result<DotFawryChargeResult>> ChargeAsync(
         DotFawryChargeRequest request, CancellationToken cancellationToken = default)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetDotFawrySettingsAsync(cancellationToken);
         var body = new ChargeRequestBody
         {
             PartnerTransId = request.PartnerTxId,
@@ -76,7 +95,7 @@ internal sealed class DotFawryPaymentGateway(
     private async Task<Result<DotFawryTransactionStatusResult>> CheckTransactionStatusAsync(
         string lookupSegment, string transactionIdentifier, string operatorId, CancellationToken cancellationToken)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetDotFawrySettingsAsync(cancellationToken);
         var basePath = BuildUrl(settings.BaseUrl, settings.CheckTransactionStatusPath);
         var path = $"{basePath.TrimEnd('/')}/{lookupSegment}/" +
             $"{Uri.EscapeDataString(operatorId)}/{Uri.EscapeDataString(settings.ServiceId)}/{Uri.EscapeDataString(transactionIdentifier)}";

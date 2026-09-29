@@ -166,6 +166,12 @@ public static class PermissionConstants
         public const string ManageMappings = "Suppliers.ManageMappings";
     }
 
+    public static class PaymentGateways
+    {
+        public const string View = "PaymentGateways.View";
+        public const string Edit = "PaymentGateways.Edit";
+    }
+
     public static class Reviews
     {
         public const string View = "Reviews.View";

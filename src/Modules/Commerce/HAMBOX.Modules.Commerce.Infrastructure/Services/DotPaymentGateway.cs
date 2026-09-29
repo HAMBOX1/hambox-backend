@@ -7,7 +7,6 @@ using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.SharedKernel.Results;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
@@ -17,22 +16,43 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// encrypted token contents, or raw response bodies — only result codes and correlation
 /// identifiers. A single attempt per call; the caller decides whether/when to retry (see
 /// <c>DotPaymentVerificationService</c> — Check Transaction Status is safe to repeat, GET Access
-/// Token is not retried automatically by this class).
+/// Token is not retried automatically by this class). Settings come from
+/// <see cref="IPaymentGatewayConfigurationProvider"/> rather than <c>IOptions&lt;DotSettings&gt;</c>
+/// directly — see that interface for the appsettings fallback rule.
 /// </summary>
 internal sealed class DotPaymentGateway(
     HttpClient httpClient,
-    IOptions<DotSettings> optionsAccessor,
-    ILogger<DotPaymentGateway> logger) : IDotPaymentGateway
+    IPaymentGatewayConfigurationProvider settingsProvider,
+    ILogger<DotPaymentGateway> logger) : IDotPaymentGateway, IPaymentGateway
 {
     private const string AccessTokenPath = "/lb2/get-access-token";
     private const string OtpLandingPagePath = "/otp-lp";
     private const string StatusByPartnerTxIdPathTemplate = "/lb2/otplp-transaction-status/get-by-partnertxid/{0}/{1}/{2}";
     private const string StatusByDotTxIdPathTemplate = "/lb2/otplp-transaction-status/get-by-dottxid/{0}/{1}/{2}";
 
+    public string GatewayKey => "dot";
+
+    /// <summary>
+    /// DOT has no dedicated no-op ping endpoint, so this calls Check Transaction Status with a
+    /// throwaway id — a real authenticated round trip against DOT's servers. Note this only confirms
+    /// DOT is reachable and answered; it can't yet distinguish "bad credentials" from "transaction not
+    /// found" since <see cref="SendAsync{TBody}"/> collapses every non-2xx response into the same
+    /// generic provider-unavailable error.
+    /// </summary>
+    public async Task<PaymentGatewayTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await CheckTransactionStatusByPartnerTxIdAsync(
+            $"test-{Guid.NewGuid():N}", "117", cancellationToken);
+
+        return result.IsSuccess
+            ? PaymentGatewayTestResult.Success("DOT responded to a Check Transaction Status call — credentials appear valid.")
+            : PaymentGatewayTestResult.Failure(result.Error.Description);
+    }
+
     public async Task<Result<DotAccessTokenResult>> GetAccessTokenAsync(
         DotAccessTokenRequest request, CancellationToken cancellationToken = default)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetDotSettingsAsync(cancellationToken);
         var query = string.Join('&',
             $"partner_id={Uri.EscapeDataString(settings.PartnerId)}",
             $"service_id={Uri.EscapeDataString(settings.ServiceId)}",
@@ -55,9 +75,10 @@ internal sealed class DotPaymentGateway(
         return Result.Success(new DotAccessTokenResult(body.ResultCode, body.ResultDesc ?? string.Empty, body.Token));
     }
 
-    public string BuildOtpLandingPageUrl(string token, DotAccessTokenRequest originalRequest)
+    public async Task<string> BuildOtpLandingPageUrlAsync(
+        string token, DotAccessTokenRequest originalRequest, CancellationToken cancellationToken = default)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetDotSettingsAsync(cancellationToken);
         var query = string.Join('&',
             $"token={Uri.EscapeDataString(token)}",
             $"rurl={Uri.EscapeDataString(originalRequest.RedirectUrl)}",
@@ -78,7 +99,7 @@ internal sealed class DotPaymentGateway(
     private async Task<Result<DotTransactionStatusResult>> CheckTransactionStatusAsync(
         string pathTemplate, string transactionIdentifier, string operatorId, CancellationToken cancellationToken)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetDotSettingsAsync(cancellationToken);
         var path = string.Format(
             CultureInfo.InvariantCulture,
             pathTemplate,

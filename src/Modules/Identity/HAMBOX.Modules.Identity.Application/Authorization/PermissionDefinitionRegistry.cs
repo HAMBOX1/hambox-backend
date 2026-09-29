@@ -58,6 +58,7 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Campaigns = new("15000000-0000-0000-0000-000000000033");
         public static readonly Guid Faq = new("15000000-0000-0000-0000-000000000034");
         public static readonly Guid WhatsAppBot = new("15000000-0000-0000-0000-000000000035");
+        public static readonly Guid PaymentGateways = new("923cabe7-aade-4b79-94d8-a784f8617884");
     }
 
     public static readonly IReadOnlyList<GroupDefinition> Groups =
@@ -97,6 +98,7 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Campaigns, "Campaigns", "Theme Campaigns", "Platform", 141, "Time-boxed, storefront-wide marketing theme overrides (Black Friday, Ramadan, ...)"),
         new(GroupIds.Faq, "Faq", "FAQ", "Platform", 150, "Global, product, and category scoped frequently-asked-question entries"),
         new(GroupIds.WhatsAppBot, "WhatsAppBot", "WhatsApp Bot", "Platform", 151, "WhatsApp menu-bot presentation: welcome/fallback text and menu item labels/order"),
+        new(GroupIds.PaymentGateways, "PaymentGateways", "Payment Gateways", "Operations", 152, "Enable/disable payment gateways and manage their credentials and webhook settings"),
     ];
 
     public static readonly IReadOnlyList<PermissionDefinition> Permissions =
@@ -317,6 +319,13 @@ public static class PermissionDefinitionRegistry
         // WhatsApp Bot (281-282) appended to preserve RolePermission seed indices
         new(new Guid("20000000-0000-0000-0000-000000000281"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.View, 1),
         new(new Guid("20000000-0000-0000-0000-000000000282"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.Edit, 2),
+
+        // Payment Gateways appended to preserve RolePermission seed indices. Random (not
+        // sequential-looking) GUIDs here deliberately — the sequential "next number" convention used
+        // above collided with an out-of-order permission (Orders.RevealLicenseKeys) added directly by
+        // its own migration rather than appended to this list; random GUIDs sidestep that entirely.
+        new(new Guid("aa39f338-f48a-4067-bdbd-7df86928f2e9"), GroupIds.PaymentGateways, PermissionConstants.PaymentGateways.View, 1),
+        new(new Guid("b7607a7a-bb4e-4784-b81a-09e29614e0a9"), GroupIds.PaymentGateways, PermissionConstants.PaymentGateways.Edit, 2),
     ];
 
     public static IReadOnlyCollection<string> AllPermissionNames =>

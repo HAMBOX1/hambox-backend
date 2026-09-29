@@ -8,7 +8,6 @@ using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Options;
 using HAMBOX.SharedKernel.Results;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 
@@ -16,16 +15,18 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// Server-to-server HTTP client for the Cryptomus Merchant API. Never logs the API key, the
 /// computed <c>sign</c> header, or raw response bodies — only status/order identifiers. Mirrors
 /// <c>DotPaymentGateway</c>'s shape (shared <see cref="SendAsync{TBody}"/> helper, never lets a raw
-/// exception escape).
+/// exception escape). Settings come from <see cref="IPaymentGatewayConfigurationProvider"/> (admin
+/// dashboard, DB-backed) rather than <c>IOptions&lt;CryptomusSettings&gt;</c> directly — see that
+/// interface for the appsettings fallback rule.
 /// <para>
-/// NOTE: this integration has not been exercised against a live Cryptomus invoice end-to-end yet.
-/// Run one supervised real test (small amount) before relying on it in production.
+/// Verified end-to-end against the live Cryptomus API (real invoice creation, full authenticated
+/// checkout flow) — see commit history around the Cryptomus rollout for the verification notes.
 /// </para>
 /// </summary>
 internal sealed class CryptomusPaymentGateway(
     HttpClient httpClient,
-    IOptions<CryptomusSettings> optionsAccessor,
-    ILogger<CryptomusPaymentGateway> logger) : ICryptomusPaymentGateway
+    IPaymentGatewayConfigurationProvider settingsProvider,
+    ILogger<CryptomusPaymentGateway> logger) : ICryptomusPaymentGateway, IPaymentGateway
 {
     private const string CreatePaymentPath = "/v1/payment";
     private const string PaymentInfoPath = "/v1/payment/info";
@@ -36,10 +37,12 @@ internal sealed class CryptomusPaymentGateway(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    public string GatewayKey => "cryptomus";
+
     public async Task<Result<CryptomusInvoiceResult>> CreateInvoiceAsync(
         CryptomusCreateInvoiceRequest request, CancellationToken cancellationToken = default)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetCryptomusSettingsAsync(cancellationToken);
         var body = new CreatePaymentRequestBody
         {
             Amount = request.AmountUsd.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
@@ -71,7 +74,7 @@ internal sealed class CryptomusPaymentGateway(
     public async Task<Result<CryptomusInvoiceResult>> GetPaymentInfoByOrderIdAsync(
         string orderId, CancellationToken cancellationToken = default)
     {
-        var settings = optionsAccessor.Value;
+        var settings = await settingsProvider.GetCryptomusSettingsAsync(cancellationToken);
         var body = new PaymentInfoRequestBody { OrderId = orderId };
         var json = JsonSerializer.Serialize(body, SerializerOptions);
 
@@ -88,6 +91,24 @@ internal sealed class CryptomusPaymentGateway(
         }
 
         return MapResult(result.Value);
+    }
+
+    /// <summary>
+    /// Cryptomus has no dedicated no-op "verify credentials" endpoint, so the lightest real check is
+    /// creating a minimal ($1, immediately-expiring) test invoice — the same call this class already
+    /// makes for a real checkout, just with a throwaway order id. Never charges anyone; the invoice is
+    /// simply left unpaid and expires on its own.
+    /// </summary>
+    public async Task<PaymentGatewayTestResult> TestConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsProvider.GetCryptomusSettingsAsync(cancellationToken);
+        var testOrderId = $"test-{Guid.NewGuid():N}"[..16];
+        var result = await CreateInvoiceAsync(
+            new CryptomusCreateInvoiceRequest(testOrderId, 1.00m, settings.FrontendResultUrl), cancellationToken);
+
+        return result.IsSuccess
+            ? PaymentGatewayTestResult.Success("Cryptomus accepted a test invoice request — credentials are valid.")
+            : PaymentGatewayTestResult.Failure(result.Error.Description);
     }
 
     private static Result<CryptomusInvoiceResult> MapResult(CryptomusResponse response)

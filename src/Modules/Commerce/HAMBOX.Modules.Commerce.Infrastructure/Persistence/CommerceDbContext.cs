@@ -8,9 +8,11 @@ using HAMBOX.Modules.Commerce.Domain.Idempotency;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
+using HAMBOX.Modules.Commerce.Domain.PaymentGateways;
 using HAMBOX.Modules.Commerce.Domain.Promotions;
 using HAMBOX.Modules.Commerce.Domain.Reports;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace HAMBOX.Modules.Commerce.Infrastructure.Persistence;
 
@@ -83,6 +85,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
 
+    public DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations => Set<PaymentGatewayConfiguration>();
+
     public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
     public DbSet<MembershipBenefit> MembershipBenefits => Set<MembershipBenefit>();
     public DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess => Set<MembershipPlanProductAccess>();
@@ -124,14 +128,20 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     }
 
     /// <summary>
-    /// Encrypts delivered license keys/codes at rest. Storage is ciphertext only; the application
-    /// layer keeps reading/writing plaintext, since EF applies the conversion transparently.
+    /// Encrypts delivered license keys/codes, and payment gateway credentials, at rest. Storage is
+    /// ciphertext only; the application layer keeps reading/writing plaintext, since EF applies the
+    /// conversion transparently.
     /// </summary>
     private void ApplyCodeEncryption(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OrderLicenseKey>().Property(k => k.LicenseKey)
             .HasConversion(new EncryptedStringConverter(codeProtector))
             .HasMaxLength(2000);
+
+        ValueConverter secretConverter = new EncryptedStringConverter(codeProtector);
+        var gatewayConfiguration = modelBuilder.Entity<PaymentGatewayConfiguration>();
+        gatewayConfiguration.Property(g => g.ApiKey).HasConversion(secretConverter).HasMaxLength(2000);
+        gatewayConfiguration.Property(g => g.ApiSecret).HasConversion(secretConverter).HasMaxLength(2000);
     }
 
     private static void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
