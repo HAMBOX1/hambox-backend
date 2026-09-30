@@ -304,6 +304,29 @@ public static class CommerceErrors
         "Cryptomus.ProviderUnavailable",
         "The payment provider is temporarily unavailable. Please try again shortly.");
 
+    public static readonly Error OxaPayGatewayMisconfigured = new(
+        "OxaPay.GatewayMisconfigured",
+        "This payment method is not yet available.");
+
+    public static readonly Error OxaPayPaymentAttemptNotFound = new(
+        "OxaPay.PaymentAttemptNotFound",
+        "The payment attempt was not found.");
+
+    /// <summary>Single, non-specific error for an OxaPay webhook that fails signature verification
+    /// or does not correspond to a known, still-open payment attempt — same information-hiding
+    /// rationale as <see cref="CryptomusWebhookInvalid"/>.</summary>
+    public static readonly Error OxaPayWebhookInvalid = new(
+        "OxaPay.WebhookInvalid",
+        "The payment callback could not be processed.");
+
+    public static readonly Error OxaPayVerificationFailed = new(
+        "OxaPay.VerificationFailed",
+        "The payment could not be verified.");
+
+    public static readonly Error OxaPayProviderUnavailable = new(
+        "OxaPay.ProviderUnavailable",
+        "The payment provider is temporarily unavailable. Please try again shortly.");
+
     public static readonly Error DotFawryGatewayMisconfigured = new(
         "DotFawry.GatewayMisconfigured",
         "This payment method is not yet available.");

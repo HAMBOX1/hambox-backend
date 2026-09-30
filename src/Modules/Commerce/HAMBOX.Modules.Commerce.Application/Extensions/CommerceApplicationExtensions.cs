@@ -42,6 +42,7 @@ public static class CommerceApplicationExtensions
         services.AddScoped<DotPaymentVerificationService>();
         services.AddScoped<DotFawryPaymentVerificationService>();
         services.AddScoped<CryptomusPaymentVerificationService>();
+        services.AddScoped<OxaPayPaymentVerificationService>();
         services.AddScoped<ISupplierFulfillmentDeliverySink, CommerceOrderLicenseKeyDeliverySink>();
         services.AddScoped<IFulfillmentRouter, FulfillmentRouter>();
 

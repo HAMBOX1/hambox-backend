@@ -201,6 +201,35 @@ public sealed class PaymentAttempt : Entity
     }
 
     /// <summary>
+    /// Creates a Pending attempt for OxaPay (a second, independent crypto/invoice gateway alongside
+    /// Cryptomus) — no operator/service concept, so both columns are stored empty rather than made
+    /// nullable, same reasoning as <see cref="CreatePendingCryptomus"/>.
+    /// </summary>
+    public static PaymentAttempt CreatePendingOxaPay(
+        Guid orderId,
+        string partnerTxId,
+        decimal expectedAmount,
+        string expectedCurrency,
+        DateTimeOffset expiresOnUtc,
+        string? pendingPromotionsJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(partnerTxId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedCurrency);
+
+        return new PaymentAttempt(
+            Guid.NewGuid(),
+            orderId,
+            "OxaPay",
+            partnerTxId,
+            string.Empty,
+            string.Empty,
+            expectedAmount,
+            expectedCurrency,
+            expiresOnUtc,
+            pendingPromotionsJson);
+    }
+
+    /// <summary>
     /// Records provider/callback context as it becomes known. Safe to call repeatedly (e.g. once
     /// from the browser callback, again from the webhook) — it never changes <see cref="Status"/>.
     /// </summary>

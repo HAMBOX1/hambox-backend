@@ -17,6 +17,9 @@ public interface IPaymentGatewayConfigurationProvider
 
     Task<DotFawrySettings> GetDotFawrySettingsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Unlike the others, has no <c>IOptions&lt;T&gt;</c>/appsettings floor to fall back to — OxaPay's key only ever lives in this DB row.</summary>
+    Task<OxaPaySettings> GetOxaPaySettingsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>True only when an admin has explicitly enabled this gateway's DB row (defaults to false for an unconfigured/missing row).</summary>
     Task<bool> IsEnabledAsync(string gatewayKey, CancellationToken cancellationToken = default);
 

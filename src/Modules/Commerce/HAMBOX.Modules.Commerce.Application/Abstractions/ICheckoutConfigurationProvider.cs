@@ -12,4 +12,7 @@ public interface ICheckoutConfigurationProvider
 
     /// <summary>Whether Cryptomus checkout has its required non-secret/secret settings populated.</summary>
     bool IsCryptomusCheckoutEnabled { get; }
+
+    /// <summary>Whether OxaPay checkout has its required settings populated. A second, independent crypto gateway alongside Cryptomus.</summary>
+    bool IsOxaPayCheckoutEnabled { get; }
 }

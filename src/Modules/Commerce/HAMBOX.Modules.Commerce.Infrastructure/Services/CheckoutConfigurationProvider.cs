@@ -65,6 +65,20 @@ internal sealed class CheckoutConfigurationProvider(
             && !string.IsNullOrWhiteSpace(settings.PublicWebhookUrl);
     });
 
+    // Same shape as Cryptomus above — OxaPay also invoices directly in USD, so admin-enabled +
+    // settings presence is the whole gate. A second, independent crypto gateway, not a replacement.
+    public bool IsOxaPayCheckoutEnabled => CheckAsync(async () =>
+    {
+        if (!await gatewaySettings.IsEnabledAsync("oxapay"))
+        {
+            return false;
+        }
+
+        var settings = await gatewaySettings.GetOxaPaySettingsAsync();
+        return !string.IsNullOrWhiteSpace(settings.MerchantApiKey)
+            && !string.IsNullOrWhiteSpace(settings.PublicWebhookUrl);
+    });
+
     // ICheckoutConfigurationProvider's members are synchronous properties (read by
     // GetCheckoutConfigurationQueryHandler and elsewhere as plain bools) but resolving admin-managed
     // settings now requires an (in-memory-cached, sub-millisecond in the common case) async DB read.

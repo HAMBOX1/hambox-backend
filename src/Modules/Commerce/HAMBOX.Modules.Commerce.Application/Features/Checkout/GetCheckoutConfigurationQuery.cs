@@ -10,7 +10,8 @@ public sealed record CheckoutConfigurationDto(
     bool DevelopmentCheckoutEnabled,
     bool DotCheckoutEnabled,
     bool DotFawryCheckoutEnabled,
-    bool CryptomusCheckoutEnabled);
+    bool CryptomusCheckoutEnabled,
+    bool OxaPayCheckoutEnabled);
 
 internal sealed class GetCheckoutConfigurationQueryHandler(ICheckoutConfigurationProvider configuration)
     : IRequestHandler<GetCheckoutConfigurationQuery, Result<CheckoutConfigurationDto>>
@@ -23,5 +24,6 @@ internal sealed class GetCheckoutConfigurationQueryHandler(ICheckoutConfiguratio
                 configuration.IsDevelopmentCheckoutEnabled,
                 configuration.IsDotCheckoutEnabled,
                 configuration.IsDotFawryCheckoutEnabled,
-                configuration.IsCryptomusCheckoutEnabled)));
+                configuration.IsCryptomusCheckoutEnabled,
+                configuration.IsOxaPayCheckoutEnabled)));
 }

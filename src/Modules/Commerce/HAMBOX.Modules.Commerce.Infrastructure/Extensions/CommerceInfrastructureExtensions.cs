@@ -91,6 +91,24 @@ public static class CommerceInfrastructureExtensions
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<ICryptomusPaymentGateway>());
 
+        // OxaPay: a second, independent crypto gateway alongside Cryptomus — same shape, no
+        // appsettings fallback for the merchant key (see OxaPaySettings).
+        services.Configure<OxaPaySettings>(configuration.GetSection(OxaPaySettings.SectionName));
+        services.AddSingleton<IValidateOptions<OxaPaySettings>, OxaPaySettingsValidator>();
+        services.AddHttpClient<IOxaPayPaymentGateway, OxaPayPaymentGateway>((sp, client) =>
+            {
+                var oxapaySettings = sp.GetRequiredService<IOptions<OxaPaySettings>>().Value;
+                if (!string.IsNullOrWhiteSpace(oxapaySettings.BaseUrl))
+                {
+                    client.BaseAddress = new Uri(oxapaySettings.BaseUrl);
+                }
+
+                client.Timeout = TimeSpan.FromSeconds(oxapaySettings.RequestTimeoutSeconds > 0 ? oxapaySettings.RequestTimeoutSeconds : 15);
+                client.MaxResponseContentBufferSize = 1024 * 1024;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<IOxaPayPaymentGateway>());
+
         // Cost-based automated-supplier selection — reuses the same CurrencyExchangeRateService
         // DotFawryChargeAmountResolver already relies on (registered by AddSharedInfrastructure).
         services.AddScoped<ISupplierRoutingEngine, SupplierRoutingEngine>();

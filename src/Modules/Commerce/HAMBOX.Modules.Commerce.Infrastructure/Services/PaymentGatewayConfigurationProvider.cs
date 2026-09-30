@@ -24,7 +24,8 @@ internal sealed class PaymentGatewayConfigurationProvider(
     IMemoryCache cache,
     IOptions<CryptomusSettings> cryptomusOptions,
     IOptions<DotSettings> dotOptions,
-    IOptions<DotFawrySettings> dotFawryOptions) : IPaymentGatewayConfigurationProvider
+    IOptions<DotFawrySettings> dotFawryOptions,
+    IOptions<OxaPaySettings> oxapayOptions) : IPaymentGatewayConfigurationProvider
 {
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
@@ -77,6 +78,22 @@ internal sealed class PaymentGatewayConfigurationProvider(
             ServiceId = Coalesce(row?.SecondaryId, defaults.ServiceId),
             Username = Coalesce(row?.ApiKey, defaults.Username),
             Password = Coalesce(row?.ApiSecret, defaults.Password),
+            RequestTimeoutSeconds = defaults.RequestTimeoutSeconds,
+        };
+    }
+
+    public async Task<OxaPaySettings> GetOxaPaySettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var row = await GetRowAsync("oxapay", cancellationToken);
+        var defaults = oxapayOptions.Value;
+
+        return new OxaPaySettings
+        {
+            BaseUrl = Coalesce(row?.BaseUrl, defaults.BaseUrl),
+            MerchantApiKey = row?.ApiKey ?? string.Empty,
+            PublicWebhookUrl = Coalesce(row?.WebhookUrl, defaults.PublicWebhookUrl),
+            FrontendResultUrl = Coalesce(row?.FrontendResultUrl, defaults.FrontendResultUrl),
+            InvoiceLifetimeMinutes = defaults.InvoiceLifetimeMinutes,
             RequestTimeoutSeconds = defaults.RequestTimeoutSeconds,
         };
     }
