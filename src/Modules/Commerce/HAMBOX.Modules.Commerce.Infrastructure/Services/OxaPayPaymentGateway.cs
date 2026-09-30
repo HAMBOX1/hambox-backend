@@ -16,11 +16,12 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Services;
 /// Cryptomus, there is no appsettings fallback for the API key, since it was only ever handed to
 /// HAMBOX to enter into the dashboard.
 /// <para>
-/// The exact shape of OxaPay's Payment Information response (whether fields sit at the top level or
-/// nested under <c>data</c>, matching the documented Generate Invoice response) has not been
-/// confirmed against a live call yet — <see cref="OxaPayResponseEnvelope"/> tolerates both by trying
-/// <c>data</c> first and falling back to the envelope's own fields. Verify with a real Test
-/// Connection / invoice once real credentials are entered.
+/// Every OxaPay v1 response shares one envelope — <c>{ data, message, error, status, version }</c>,
+/// confirmed live against Payment History (<c>GET /v1/payment</c>) during rollout — with the
+/// endpoint-specific payload always nested under <c>data</c>. The envelope's own <c>status</c> is a
+/// numeric HTTP-status echo, not the invoice's string status, so it must not share a class with any
+/// endpoint's payload fields (an earlier version of this file made exactly that mistake and threw a
+/// deserialization exception on every call once real credentials were entered).
 /// </para>
 /// </summary>
 internal sealed class OxaPayPaymentGateway(
@@ -59,13 +60,13 @@ internal sealed class OxaPayPaymentGateway(
         };
         ApplyAuthHeader(httpRequest, settings.MerchantApiKey);
 
-        var result = await SendAsync<OxaPayResponseEnvelope>(httpRequest, "CreateInvoice", cancellationToken);
+        var result = await SendAsync<OxaPayEnvelope<CreateInvoiceData>>(httpRequest, "CreateInvoice", cancellationToken);
         if (result.IsFailure)
         {
             return Result.Failure<OxaPayInvoiceResult>(result.Error);
         }
 
-        return MapCreateInvoiceResult(result.Value, request.OrderId);
+        return MapCreateInvoiceResult(result.Value.Data, request.OrderId);
     }
 
     public async Task<Result<OxaPayInvoiceResult>> GetPaymentInfoByTrackIdAsync(
@@ -75,13 +76,13 @@ internal sealed class OxaPayPaymentGateway(
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, PaymentInfoPathPrefix + Uri.EscapeDataString(trackId));
         ApplyAuthHeader(httpRequest, settings.MerchantApiKey);
 
-        var result = await SendAsync<OxaPayResponseEnvelope>(httpRequest, "GetPaymentInfo", cancellationToken);
+        var result = await SendAsync<OxaPayEnvelope<PaymentInfoData>>(httpRequest, "GetPaymentInfo", cancellationToken);
         if (result.IsFailure)
         {
             return Result.Failure<OxaPayInvoiceResult>(result.Error);
         }
 
-        return MapStatusResult(result.Value);
+        return MapStatusResult(result.Value.Data);
     }
 
     /// <summary>
@@ -95,15 +96,17 @@ internal sealed class OxaPayPaymentGateway(
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, $"{PaymentHistoryPath}?size=1");
         ApplyAuthHeader(httpRequest, settings.MerchantApiKey);
 
-        var result = await SendAsync<OxaPayResponseEnvelope>(httpRequest, "TestConnection", cancellationToken);
+        // Payload shape doesn't matter here — only that the call authenticates and returns 2xx —
+        // so the generic parameter is `object?`, which System.Text.Json always deserializes
+        // successfully (as a JsonElement) regardless of what `data` actually contains.
+        var result = await SendAsync<OxaPayEnvelope<object?>>(httpRequest, "TestConnection", cancellationToken);
         return result.IsSuccess
             ? PaymentGatewayTestResult.Success("OxaPay accepted a payment-history request — credentials are valid.")
             : PaymentGatewayTestResult.Failure(result.Error.Description);
     }
 
-    private static Result<OxaPayInvoiceResult> MapCreateInvoiceResult(OxaPayResponseEnvelope response, string orderId)
+    private static Result<OxaPayInvoiceResult> MapCreateInvoiceResult(CreateInvoiceData? data, string orderId)
     {
-        var data = response.Data;
         if (data is null || string.IsNullOrWhiteSpace(data.TrackId))
         {
             return Result.Failure<OxaPayInvoiceResult>(CommerceErrors.OxaPayProviderUnavailable);
@@ -118,9 +121,8 @@ internal sealed class OxaPayPaymentGateway(
             null));
     }
 
-    private static Result<OxaPayInvoiceResult> MapStatusResult(OxaPayResponseEnvelope response)
+    private static Result<OxaPayInvoiceResult> MapStatusResult(PaymentInfoData? data)
     {
-        var data = response.Data ?? response.AsFallbackData();
         if (data is null || string.IsNullOrWhiteSpace(data.TrackId))
         {
             return Result.Failure<OxaPayInvoiceResult>(CommerceErrors.OxaPayProviderUnavailable);
@@ -129,7 +131,7 @@ internal sealed class OxaPayPaymentGateway(
         return Result.Success(new OxaPayInvoiceResult(
             data.TrackId,
             data.OrderId,
-            data.PaymentUrl,
+            null,
             data.Status ?? "waiting",
             data.Amount,
             data.Currency));
@@ -208,57 +210,41 @@ internal sealed class OxaPayPaymentGateway(
     }
 
     /// <summary>
-    /// Tolerates both a <c>{ data: {...} }</c> envelope (documented for Generate Invoice) and a flat
-    /// top-level response (how the Payment Information excerpt available at implementation time read)
-    /// — see the class doc comment.
+    /// The envelope every OxaPay v1 response shares — confirmed live (see class doc comment).
+    /// <typeparamref name="TData"/> is whatever sits under <c>data</c> for that specific endpoint;
+    /// <see cref="Status"/> here is the wrapper's own numeric HTTP-status echo, deliberately kept
+    /// separate from any endpoint payload's own (string) invoice status.
     /// </summary>
-    private sealed class OxaPayResponseEnvelope
+    private sealed class OxaPayEnvelope<TData>
     {
         [JsonPropertyName("data")]
-        public OxaPayResultBody? Data { get; init; }
+        public TData? Data { get; init; }
 
+        [JsonPropertyName("message")]
+        public string? Message { get; init; }
+
+        [JsonPropertyName("status")]
+        public int Status { get; init; }
+    }
+
+    /// <summary>Generate Invoice's <c>data</c> (<c>POST /v1/payment/invoice</c>).</summary>
+    private sealed class CreateInvoiceData
+    {
         [JsonPropertyName("track_id")]
         public string? TrackId { get; init; }
 
-        [JsonPropertyName("order_id")]
-        public string? OrderId { get; init; }
-
         [JsonPropertyName("payment_url")]
         public string? PaymentUrl { get; init; }
-
-        [JsonPropertyName("status")]
-        public string? Status { get; init; }
-
-        [JsonPropertyName("amount")]
-        public decimal? Amount { get; init; }
-
-        [JsonPropertyName("currency")]
-        public string? Currency { get; init; }
-
-        public OxaPayResultBody? AsFallbackData() =>
-            string.IsNullOrWhiteSpace(TrackId)
-                ? null
-                : new OxaPayResultBody
-                {
-                    TrackId = TrackId,
-                    OrderId = OrderId,
-                    PaymentUrl = PaymentUrl,
-                    Status = Status,
-                    Amount = Amount,
-                    Currency = Currency,
-                };
     }
 
-    private sealed class OxaPayResultBody
+    /// <summary>Payment Information's <c>data</c> (<c>GET /v1/payment/{track_id}</c>).</summary>
+    private sealed class PaymentInfoData
     {
         [JsonPropertyName("track_id")]
         public string? TrackId { get; init; }
 
         [JsonPropertyName("order_id")]
         public string? OrderId { get; init; }
-
-        [JsonPropertyName("payment_url")]
-        public string? PaymentUrl { get; init; }
 
         [JsonPropertyName("status")]
         public string? Status { get; init; }
