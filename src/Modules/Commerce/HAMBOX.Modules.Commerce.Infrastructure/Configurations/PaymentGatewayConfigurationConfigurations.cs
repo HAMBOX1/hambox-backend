@@ -12,6 +12,7 @@ internal sealed class PaymentGatewayConfigurationConfiguration : IEntityTypeConf
         builder.HasKey(g => g.Id);
         builder.Property(g => g.GatewayKey).HasMaxLength(50).IsRequired();
         builder.Property(g => g.DisplayName).HasMaxLength(100).IsRequired();
+        builder.Property(g => g.FeePercent).HasPrecision(5, 2);
         builder.Property(g => g.BaseUrl).HasMaxLength(500);
         builder.Property(g => g.AccountId).HasMaxLength(200);
         builder.Property(g => g.SecondaryId).HasMaxLength(200);

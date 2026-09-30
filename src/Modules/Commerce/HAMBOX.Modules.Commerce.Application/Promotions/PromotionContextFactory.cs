@@ -36,7 +36,8 @@ internal static class PromotionContextFactory
         bool isAuthenticated,
         string? userId,
         string? countryCode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        decimal? taxRateOverridePercent = null)
     {
         var isFirstPurchase = userId is null
             ? true
@@ -54,6 +55,7 @@ internal static class PromotionContextFactory
             isFirstPurchase,
             cart.AppliedCouponCode,
             membership,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            taxRateOverridePercent);
     }
 }

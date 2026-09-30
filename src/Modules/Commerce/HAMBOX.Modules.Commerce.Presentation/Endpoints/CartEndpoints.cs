@@ -11,6 +11,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Cart.RemoveCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.UpdateCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.Membership;
+using HAMBOX.Modules.Commerce.Application.Features.Checkout.TotalsPreview;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.GetOrderById;
 using HAMBOX.Modules.Commerce.Application.RateLimiting;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
@@ -277,6 +278,30 @@ internal static class CartEndpoints
         .RequireAuthorization()
         .RequireCustomerContext()
         .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
+
+        group.MapGet("checkout/totals-preview", async Task<Results<Ok<CartTotalsDto>, BadRequest<ProblemDetails>>> (
+            [FromQuery] string paymentMethod,
+            [FromQuery] string? country,
+            [FromHeader(Name = GuestCartHeader)] string? guestCartId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetCheckoutTotalsPreviewQuery(guestCartId, paymentMethod, country));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("GetCheckoutTotalsPreview")
+        .AllowAnonymous();
 
         group.MapGet("checkout/membership/preview", async Task<Results<Ok<MembershipCheckoutPreviewDto>, BadRequest<ProblemDetails>>> (
             [FromQuery] Guid planId,

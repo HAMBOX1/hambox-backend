@@ -45,7 +45,7 @@ internal sealed class GetPaymentGatewayByKeyQueryHandler(ICommerceDbContext dbCo
     }
 
     internal static PaymentGatewayDetailDto ToDetail(PaymentGatewayConfiguration g) => new(
-        g.GatewayKey, g.DisplayName, g.IsEnabled, g.IsTestMode, g.BaseUrl, g.AccountId, g.SecondaryId,
+        g.GatewayKey, g.DisplayName, g.IsEnabled, g.IsTestMode, g.FeePercent, g.BaseUrl, g.AccountId, g.SecondaryId,
         !string.IsNullOrEmpty(g.ApiKey), !string.IsNullOrEmpty(g.ApiSecret),
         g.WebhookUrl, g.FrontendResultUrl, g.AdditionalConfigJson, g.ModifiedOnUtc);
 }
@@ -67,7 +67,7 @@ internal sealed class UpdatePaymentGatewayGeneralCommandHandler(
         }
 
         var r = request.Request;
-        gateway.UpdateGeneral(r.DisplayName, r.IsTestMode, r.BaseUrl, r.AccountId, r.WebhookUrl, r.FrontendResultUrl, r.AdditionalConfigJson, CurrentUserId(currentUser));
+        gateway.UpdateGeneral(r.DisplayName, r.IsTestMode, r.FeePercent, r.BaseUrl, r.AccountId, r.WebhookUrl, r.FrontendResultUrl, r.AdditionalConfigJson, CurrentUserId(currentUser));
         await dbContext.SaveChangesAsync(cancellationToken);
         settingsProvider.InvalidateCache(request.GatewayKey);
 

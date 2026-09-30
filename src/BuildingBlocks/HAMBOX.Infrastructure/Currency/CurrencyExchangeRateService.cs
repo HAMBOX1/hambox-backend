@@ -63,15 +63,18 @@ public sealed class CurrencyExchangeRateService(
 
         foreach (var code in settings.SupportedCurrencies)
         {
-            if (fetched.TryGetValue(code, out var rate) && rate > 0)
+            // A row in StaticRates is a deliberate admin override and always wins, regardless of
+            // Provider — leaving a currency out of the table means "use the live/auto rate";
+            // adding a row overrides just that currency without switching the whole store to manual.
+            if (settings.StaticRates.TryGetValue(code, out var overrideRate) && overrideRate > 0)
             {
-                normalized[code] = rate;
+                normalized[code] = overrideRate;
                 continue;
             }
 
-            if (settings.StaticRates.TryGetValue(code, out var fallback) && fallback > 0)
+            if (fetched.TryGetValue(code, out var rate) && rate > 0)
             {
-                normalized[code] = fallback;
+                normalized[code] = rate;
             }
         }
 

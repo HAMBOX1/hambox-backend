@@ -38,6 +38,9 @@ public sealed class PaymentGatewayConfiguration : Entity
 
     public bool IsTestMode { get; private set; }
 
+    /// <summary>This gateway's own fee/tax percentage (0-100) applied instead of the platform default rate when orders are paid through it. Null means "use the platform default".</summary>
+    public decimal? FeePercent { get; private set; }
+
     public string? BaseUrl { get; private set; }
 
     /// <summary>Plaintext account/merchant/partner identifier — not considered a secret by any provider seen so far.</summary>
@@ -76,6 +79,7 @@ public sealed class PaymentGatewayConfiguration : Entity
     public void UpdateGeneral(
         string displayName,
         bool isTestMode,
+        decimal? feePercent,
         string? baseUrl,
         string? accountId,
         string? webhookUrl,
@@ -84,9 +88,14 @@ public sealed class PaymentGatewayConfiguration : Entity
         Guid? modifiedByUserId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        if (feePercent is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(feePercent), "Fee percent must be between 0 and 100.");
+        }
 
         DisplayName = displayName.Trim();
         IsTestMode = isTestMode;
+        FeePercent = feePercent;
         BaseUrl = NullIfWhitespace(baseUrl);
         AccountId = NullIfWhitespace(accountId);
         WebhookUrl = NullIfWhitespace(webhookUrl);

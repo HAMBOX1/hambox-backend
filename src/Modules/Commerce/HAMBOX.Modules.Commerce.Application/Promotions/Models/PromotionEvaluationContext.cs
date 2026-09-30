@@ -13,4 +13,5 @@ public sealed record PromotionEvaluationContext(
     bool IsFirstPurchase,
     string? AppliedCouponCode,
     MembershipSnapshot Membership,
-    DateTime UtcNow);
+    DateTime UtcNow,
+    decimal? TaxRateOverridePercent = null);

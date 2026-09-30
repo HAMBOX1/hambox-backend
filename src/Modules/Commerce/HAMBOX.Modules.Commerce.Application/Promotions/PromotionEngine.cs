@@ -9,8 +9,6 @@ namespace HAMBOX.Modules.Commerce.Application.Promotions;
 
 internal sealed class PromotionEngine : IPromotionEngine
 {
-    private const decimal TaxRate = 0.05m;
-
     private readonly ICommerceDbContext _dbContext;
     private readonly IReadOnlyDictionary<PromotionType, IPromotionTypeEvaluator> _evaluators;
     private readonly IPlatformSettingsProvider _platformSettings;
@@ -136,9 +134,17 @@ internal sealed class PromotionEngine : IPromotionEngine
             applied.Add(ToDto(couponCandidate));
         }
 
+        var taxRatePercent = context.TaxRateOverridePercent;
+        if (taxRatePercent is null)
+        {
+            var commerceSettings = await _platformSettings.GetAsync<CommerceSettingsPayload>(
+                PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+            taxRatePercent = commerceSettings.TaxRatePercent;
+        }
+
         var totalDiscount = Math.Min(subtotal, applied.Sum(p => p.DiscountAmount));
         var taxableAmount = subtotal - totalDiscount;
-        var tax = decimal.Round(Math.Max(0m, taxableAmount) * TaxRate, 2);
+        var tax = decimal.Round(Math.Max(0m, taxableAmount) * (taxRatePercent.Value / 100m), 2);
         var total = taxableAmount + tax;
 
         return new PromotionEvaluationResult(

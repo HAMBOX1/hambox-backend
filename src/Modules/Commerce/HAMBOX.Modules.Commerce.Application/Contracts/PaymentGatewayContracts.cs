@@ -13,6 +13,7 @@ public sealed record PaymentGatewayDetailDto(
     string DisplayName,
     bool IsEnabled,
     bool IsTestMode,
+    decimal? FeePercent,
     string? BaseUrl,
     string? AccountId,
     string? SecondaryId,
@@ -26,6 +27,7 @@ public sealed record PaymentGatewayDetailDto(
 public sealed record UpdatePaymentGatewayGeneralRequest(
     string DisplayName,
     bool IsTestMode,
+    decimal? FeePercent,
     string? BaseUrl,
     string? AccountId,
     string? WebhookUrl,

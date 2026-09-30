@@ -87,6 +87,12 @@ internal sealed class PaymentGatewayConfigurationProvider(
         return row?.IsEnabled ?? false;
     }
 
+    public async Task<decimal?> GetFeePercentAsync(string gatewayKey, CancellationToken cancellationToken = default)
+    {
+        var row = await GetRowAsync(gatewayKey, cancellationToken);
+        return row?.FeePercent;
+    }
+
     public void InvalidateCache(string gatewayKey) => cache.Remove(CacheKey(gatewayKey));
 
     private async Task<PaymentGatewayConfiguration?> GetRowAsync(string gatewayKey, CancellationToken cancellationToken)

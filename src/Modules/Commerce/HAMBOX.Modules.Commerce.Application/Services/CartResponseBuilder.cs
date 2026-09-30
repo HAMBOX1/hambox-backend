@@ -23,19 +23,22 @@ internal sealed class CartResponseBuilder
     private readonly IPromotionEngine _promotionEngine;
     private readonly IMembershipEngine _membershipEngine;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IPaymentGatewayConfigurationProvider _paymentGatewaySettings;
 
     public CartResponseBuilder(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
         IPromotionEngine promotionEngine,
         IMembershipEngine membershipEngine,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IPaymentGatewayConfigurationProvider paymentGatewaySettings)
     {
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _promotionEngine = promotionEngine;
         _membershipEngine = membershipEngine;
         _currentUserService = currentUserService;
+        _paymentGatewaySettings = paymentGatewaySettings;
     }
 
     public async Task<CartDto> BuildAsync(
@@ -67,9 +70,13 @@ internal sealed class CartResponseBuilder
         BuildOrderAmountsAsync(
             ShoppingCart cart,
             string? countryCode,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string? gatewayKey = null)
     {
         var products = await LoadProductsAsync(cart, cancellationToken);
+        var taxRateOverridePercent = gatewayKey is null
+            ? null
+            : await _paymentGatewaySettings.GetFeePercentAsync(gatewayKey, cancellationToken);
         var context = await PromotionContextFactory.CreateAsync(
             _commerceDbContext,
             _membershipEngine,
@@ -78,7 +85,8 @@ internal sealed class CartResponseBuilder
             isAuthenticated: true,
             _currentUserService.UserId,
             countryCode,
-            cancellationToken);
+            cancellationToken,
+            taxRateOverridePercent);
 
         var evaluation = await _promotionEngine.EvaluateAsync(context, cancellationToken);
         return (evaluation.Subtotal, evaluation.TotalDiscount, evaluation.Tax, evaluation.Total, evaluation);

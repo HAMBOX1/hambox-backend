@@ -270,8 +270,10 @@ internal static class PlatformSettingsDefaultsFactory
 
     // InvoicePrefix default matches the "ORD-" literal every checkout handler hardcoded before this
     // setting was wired in — an install that never touches this field must see no behavior change.
+    // TaxRatePercent default (5%) matches the flat rate PromotionEngine hardcoded before this setting
+    // was wired in, for the same reason.
     private static CommerceSettingsPayload CreateCommerce() =>
-        new(0m, false, 15, 24, 14, "ORD-", DefaultSupplierMarginPercent: 20m);
+        new(5m, false, 15, 24, 14, "ORD-", DefaultSupplierMarginPercent: 20m);
 
     private static CheckoutSettingsPayload CreateCheckout() =>
         new(true, false, "Card", 60);

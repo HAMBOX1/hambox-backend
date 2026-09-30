@@ -1,16 +1,21 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using HAMBOX.Application.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Infrastructure.Currency;
 
 /// <summary>
-/// Attempts to load rates from a configurable HTTP API, falling back to static configuration.
+/// Attempts to load rates from the admin-configured HTTP API (ExternalApiUrl, read live from the
+/// Currency Platform Setting — not frozen from <c>appsettings</c> at DI-registration time, same reason
+/// as <see cref="DynamicCurrencyExchangeRateProvider"/>'s own live read), falling back to static
+/// configuration.
 /// </summary>
 internal sealed class HttpCurrencyExchangeRateProvider(
     HttpClient httpClient,
+    IServiceProvider rootServiceProvider,
     IOptions<CurrencySettings> options,
     ConfigurationCurrencyExchangeRateProvider fallbackProvider,
     ILogger<HttpCurrencyExchangeRateProvider> logger)
@@ -18,7 +23,7 @@ internal sealed class HttpCurrencyExchangeRateProvider(
 {
     public async Task<IReadOnlyDictionary<string, decimal>> GetRatesAsync(CancellationToken cancellationToken = default)
     {
-        var settings = options.Value;
+        var settings = await ResolveCurrencySettingsAsync(cancellationToken);
         var apiUrl = settings.ExternalApiUrl;
 
         if (string.IsNullOrWhiteSpace(apiUrl))
@@ -59,6 +64,26 @@ internal sealed class HttpCurrencyExchangeRateProvider(
             logger.LogWarning(ex, "Failed to fetch exchange rates from {ApiUrl}. Using configured fallback rates.", apiUrl);
             return await fallbackProvider.GetRatesAsync(cancellationToken);
         }
+    }
+
+    private async Task<HAMBOX.Application.PlatformSettings.CurrencySettingsPayload> ResolveCurrencySettingsAsync(
+        CancellationToken cancellationToken)
+    {
+        using var scope = rootServiceProvider.CreateScope();
+        var platformSettings = scope.ServiceProvider.GetService<IPlatformSettingsProvider>();
+        if (platformSettings is not null)
+        {
+            return await platformSettings.GetCurrencyAsync(cancellationToken);
+        }
+
+        var fallback = options.Value;
+        return new HAMBOX.Application.PlatformSettings.CurrencySettingsPayload(
+            fallback.BaseCurrency,
+            fallback.SupportedCurrencies,
+            fallback.RefreshIntervalMinutes,
+            fallback.Provider,
+            fallback.ExternalApiUrl,
+            fallback.StaticRates);
     }
 
     private sealed class ExchangeRateApiResponse

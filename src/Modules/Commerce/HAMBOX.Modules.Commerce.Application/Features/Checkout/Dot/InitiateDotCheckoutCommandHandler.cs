@@ -101,7 +101,7 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         var resolvedPricingByLine = lineValidation.Value.Lines.ToDictionary(l => (l.ProductId, l.ProductVariantId));
 
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
-            await cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken);
+            await cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken, "dot");
 
         if (evaluation.ValidationErrors.Count > 0)
         {

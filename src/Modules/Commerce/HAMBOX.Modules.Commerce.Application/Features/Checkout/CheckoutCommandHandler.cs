@@ -143,7 +143,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         var resolvedPricingByLine = lineValidation.Value.Lines.ToDictionary(l => (l.ProductId, l.ProductVariantId));
 
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
-            await _cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken);
+            await _cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken, request.PaymentMethod);
 
         if (evaluation.ValidationErrors.Count > 0)
         {
