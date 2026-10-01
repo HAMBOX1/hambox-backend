@@ -37,6 +37,15 @@ public static class LocalizationEndpointExtensions
                 snapshot.UpdatedAtUtc));
         });
 
+        group.MapGet("/detect-currency", async (
+            HttpContext context,
+            GeoCurrencyDetectionService geoCurrency,
+            CancellationToken cancellationToken) =>
+        {
+            var currency = await geoCurrency.DetectCurrencyAsync(context.Connection.RemoteIpAddress, cancellationToken);
+            return Results.Ok(new DetectedCurrencyDto(currency));
+        });
+
         return builder;
     }
 }
@@ -49,3 +58,6 @@ public sealed record ExchangeRatesResponseDto(
     string BaseCurrency,
     IReadOnlyDictionary<string, decimal> Rates,
     DateTimeOffset UpdatedAtUtc);
+
+/// <summary>Geo-detected starting currency for a brand-new visitor.</summary>
+public sealed record DetectedCurrencyDto(string CurrencyCode);

@@ -20,6 +20,7 @@ public static class CurrencyServiceCollectionExtensions
         services.AddSingleton<ICurrencyExchangeRateProvider, DynamicCurrencyExchangeRateProvider>();
 
         services.AddSingleton<CurrencyExchangeRateService>();
+        services.AddHttpClient<GeoCurrencyDetectionService>();
         return services;
     }
 }
