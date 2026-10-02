@@ -279,7 +279,9 @@ public sealed record InventorySettingsPayload(
     int LowStockThreshold,
     int ReservationTimeoutMinutes,
     bool AutomaticReleaseEnabled,
-    string CodeRevealPolicy);
+    string CodeRevealPolicy,
+    bool ShowLowStockBadge = true,
+    bool ShowLowStockMessage = true);
 
 public sealed record QueueSettingsPayload(
     int WorkerIntervalSeconds,

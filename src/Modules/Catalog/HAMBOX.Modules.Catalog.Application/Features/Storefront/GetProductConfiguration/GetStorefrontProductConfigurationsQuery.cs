@@ -1,3 +1,4 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Fulfillment;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
@@ -23,12 +24,18 @@ internal sealed class GetStorefrontProductConfigurationsQueryHandler
     private readonly ICatalogDbContext _db;
     private readonly IInventoryEngine _inventoryEngine;
     private readonly IFulfillmentRouter _fulfillmentRouter;
+    private readonly IPlatformSettingsProvider _platformSettings;
 
-    public GetStorefrontProductConfigurationsQueryHandler(ICatalogDbContext db, IInventoryEngine inventoryEngine, IFulfillmentRouter fulfillmentRouter)
+    public GetStorefrontProductConfigurationsQueryHandler(
+        ICatalogDbContext db,
+        IInventoryEngine inventoryEngine,
+        IFulfillmentRouter fulfillmentRouter,
+        IPlatformSettingsProvider platformSettings)
     {
         _db = db;
         _inventoryEngine = inventoryEngine;
         _fulfillmentRouter = fulfillmentRouter;
+        _platformSettings = platformSettings;
     }
 
     public async Task<Result<IReadOnlyList<StorefrontProductConfigurationDto>>> Handle(
@@ -80,13 +87,19 @@ internal sealed class GetStorefrontProductConfigurationsQueryHandler
         // Deliberately no ProductViewEvent logging here (unlike the single-product query) — loading
         // a page of listing cards is not the same signal as a customer opening a product's own page.
 
+        var inventorySettings = await _platformSettings.GetInventoryAsync(cancellationToken);
+
         var results = products
             .Select(product => StorefrontProductConfigurationBuilder.Build(
                 product,
                 groupsByProduct[product.Id].ToList(),
                 variantsByProduct[product.Id].ToList(),
                 stock,
-                readiness))
+                readiness) with
+            {
+                ShowLowStockBadge = inventorySettings.ShowLowStockBadge,
+                ShowLowStockMessage = inventorySettings.ShowLowStockMessage,
+            })
             .ToList();
 
         return Result.Success<IReadOnlyList<StorefrontProductConfigurationDto>>(results);

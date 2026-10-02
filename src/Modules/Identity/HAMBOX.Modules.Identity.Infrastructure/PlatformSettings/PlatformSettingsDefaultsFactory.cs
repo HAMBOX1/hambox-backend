@@ -288,7 +288,7 @@ internal static class PlatformSettingsDefaultsFactory
         new(false, 100, 0.10m, 30);
 
     private static InventorySettingsPayload CreateInventory() =>
-        new(5, 15, true, "AfterPayment");
+        new(5, 15, true, "AfterPayment", ShowLowStockBadge: true, ShowLowStockMessage: true);
 
     private static QueueSettingsPayload CreateQueue() =>
         new(30, 25, 4, 300);

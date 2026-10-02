@@ -22,6 +22,7 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
     private readonly IInventoryEngine _inventoryEngine;
     private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly ICurrentUserService _currentUser;
+    private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ILogger<GetStorefrontProductConfigurationQueryHandler> _logger;
 
     public GetStorefrontProductConfigurationQueryHandler(
@@ -29,12 +30,14 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
         IInventoryEngine engine,
         IFulfillmentRouter fulfillmentRouter,
         ICurrentUserService currentUser,
+        IPlatformSettingsProvider platformSettings,
         ILogger<GetStorefrontProductConfigurationQueryHandler> logger)
     {
         _db = db;
         _inventoryEngine = engine;
         _fulfillmentRouter = fulfillmentRouter;
         _currentUser = currentUser;
+        _platformSettings = platformSettings;
         _logger = logger;
     }
 
@@ -83,7 +86,14 @@ internal sealed class GetStorefrontProductConfigurationQueryHandler
             await TryLogProductViewAsync(request.ProductId, cancellationToken);
         }
 
-        return Result.Success(StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock, readiness, supplierEffectivePrices));
+        var inventorySettings = await _platformSettings.GetInventoryAsync(cancellationToken);
+        var configuration = StorefrontProductConfigurationBuilder.Build(product, groups, variants, stock, readiness, supplierEffectivePrices);
+
+        return Result.Success(configuration with
+        {
+            ShowLowStockBadge = inventorySettings.ShowLowStockBadge,
+            ShowLowStockMessage = inventorySettings.ShowLowStockMessage,
+        });
     }
 
     private async Task TryLogProductViewAsync(Guid productId, CancellationToken cancellationToken)

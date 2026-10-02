@@ -4,7 +4,9 @@ public sealed record StorefrontProductConfigurationDto(
     Guid ProductId,
     decimal BasePrice,
     IReadOnlyList<ProductOptionGroupDto> OptionGroups,
-    IReadOnlyList<StorefrontVariantDto> Variants);
+    IReadOnlyList<StorefrontVariantDto> Variants,
+    bool ShowLowStockBadge = true,
+    bool ShowLowStockMessage = true);
 
 public sealed record StorefrontVariantDto(
     Guid Id,
