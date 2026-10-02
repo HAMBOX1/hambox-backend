@@ -18,7 +18,7 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Inventory.QuickSetChatDeli
 /// right one is ambiguous from the catalog list; per-variant instructions/fulfillment controls live in
 /// the variant manager instead.
 /// </summary>
-public sealed record QuickSetChatDeliveryCommand(Guid ProductId, int Capacity) : IRequest<Result>;
+public sealed record QuickSetChatDeliveryCommand(Guid ProductId, int Capacity, bool Instant = false) : IRequest<Result>;
 
 public sealed class QuickSetChatDeliveryCommandValidator : AbstractValidator<QuickSetChatDeliveryCommand>
 {
@@ -51,8 +51,17 @@ internal sealed class QuickSetChatDeliveryCommandHandler(ICatalogDbContext db) :
         if (variants.Count == 1)
         {
             var variant = variants[0];
-            variant.SetFulfillmentMode(FulfillmentMode.ChatDelivery);
-            variant.SetManualDeliveryCapacity(request.Capacity);
+            if (request.Instant)
+            {
+                // Switching back to instant delivery from stocked codes — capacity belongs to the chat
+                // mode only, so it is left untouched in case the admin switches back later.
+                variant.SetFulfillmentMode(FulfillmentMode.ManualOnly);
+            }
+            else
+            {
+                variant.SetFulfillmentMode(FulfillmentMode.ChatDelivery);
+                variant.SetManualDeliveryCapacity(request.Capacity);
+            }
         }
         else
         {
@@ -63,8 +72,16 @@ internal sealed class QuickSetChatDeliveryCommandHandler(ICatalogDbContext db) :
             var variant = ProductVariant.Create(request.ProductId, sku);
             variant.SetOptions([]);
             variant.Activate();
-            variant.SetFulfillmentMode(FulfillmentMode.ChatDelivery);
-            variant.SetManualDeliveryCapacity(request.Capacity);
+            if (request.Instant)
+            {
+                variant.SetFulfillmentMode(FulfillmentMode.ManualOnly);
+            }
+            else
+            {
+                variant.SetFulfillmentMode(FulfillmentMode.ChatDelivery);
+                variant.SetManualDeliveryCapacity(request.Capacity);
+            }
+
             db.ProductVariants.Add(variant);
         }
 
