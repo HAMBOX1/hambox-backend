@@ -37,6 +37,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="PendingMergeIntoProductId">The identifier of the product this one is parked as a duplicate of, pending promotion to a variant, if any. See the Merge Products feature.</param>
 /// <param name="PendingMergeIntoProductName">The English name of <see cref="PendingMergeIntoProductId"/>'s product, for display, if any.</param>
 /// <param name="IsFavorite">Admin-only bookmark for quickly finding this product again — always false for anonymous/storefront callers, never shown to customers.</param>
+/// <param name="CategoryDescriptionHtml">The primary category's own customer-facing instructions (set via the admin category form's "Customer instructions" field), if any — shown alongside this product's details. Populated on detail reads only.</param>
 public sealed record ProductDto(
     Guid Id,
     string NameAr,
@@ -66,4 +67,5 @@ public sealed record ProductDto(
     int VariantCount = 0,
     Guid? PendingMergeIntoProductId = null,
     string? PendingMergeIntoProductName = null,
-    bool IsFavorite = false);
+    bool IsFavorite = false,
+    string? CategoryDescriptionHtml = null);

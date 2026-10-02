@@ -42,7 +42,8 @@ internal static class CatalogMapper
         bool isMembersOnly = false,
         bool canPurchase = true,
         IReadOnlyList<string>? requiredPlanNames = null,
-        bool isAdminContext = false)
+        bool isAdminContext = false,
+        string? categoryDescriptionHtml = null)
     {
         var images = includeImages ? ToProductImageDtos(product.Images) : null;
         var primaryImageUrl = GetPrimaryImageUrl(product);
@@ -71,6 +72,7 @@ internal static class CatalogMapper
             CanPurchase: canPurchase,
             RequiredPlanNames: requiredPlanNames,
             LastEditedByName: isAdminContext ? product.LastEditedByName : null,
-            LastEditedOnUtc: isAdminContext ? product.LastEditedOnUtc : null);
+            LastEditedOnUtc: isAdminContext ? product.LastEditedOnUtc : null,
+            CategoryDescriptionHtml: categoryDescriptionHtml);
     }
 }

@@ -43,7 +43,7 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
         var category = await _dbContext.Categories
             .AsNoTracking()
             .Where(c => c.Id == product.CategoryId)
-            .Select(c => new { c.NameEn, c.NameAr, c.ImageUrl, c.EffectiveImageUrl })
+            .Select(c => new { c.NameEn, c.NameAr, c.ImageUrl, c.EffectiveImageUrl, c.DescriptionHtml })
             .FirstOrDefaultAsync(cancellationToken);
 
         var productAccess = await _membershipAccess.GetProductAccessAsync(_currentUser.UserId, product.Id, cancellationToken);
@@ -60,7 +60,8 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
             isMembersOnly: productAccess.IsRestricted,
             canPurchase: canPurchase,
             requiredPlanNames: productAccess.RequiredPlanNames,
-            isAdminContext: _currentUser.IsAdminContext));
+            isAdminContext: _currentUser.IsAdminContext,
+            categoryDescriptionHtml: category?.DescriptionHtml));
     }
 
     internal static bool IsReleasedFor(DateTime? publicReleaseOnUtc, MembershipAccessInfo access)
