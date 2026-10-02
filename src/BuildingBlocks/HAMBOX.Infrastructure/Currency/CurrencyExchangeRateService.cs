@@ -78,6 +78,16 @@ public sealed class CurrencyExchangeRateService(
             }
         }
 
+        // Auto rates for currencies outside the storefront list (supplier cost currencies); an admin
+        // static override in the loop above always wins for the codes it covers.
+        foreach (var (code, rate) in fetched)
+        {
+            if (rate > 0 && !normalized.ContainsKey(code))
+            {
+                normalized[code] = rate;
+            }
+        }
+
         if (!normalized.ContainsKey(settings.BaseCurrency))
         {
             normalized[settings.BaseCurrency] = 1m;

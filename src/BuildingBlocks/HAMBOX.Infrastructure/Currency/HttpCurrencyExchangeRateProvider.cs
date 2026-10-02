@@ -44,9 +44,12 @@ internal sealed class HttpCurrencyExchangeRateProvider(
                 [settings.BaseCurrency] = 1m,
             };
 
-            foreach (var code in settings.SupportedCurrencies)
+            // Every positive rate the API returns is kept, not just the storefront-supported codes:
+            // supplier catalogs price in many currencies (AUD, TRY, CAD, ...) and cost normalization
+            // needs a live rate for each without an admin having to list them first.
+            foreach (var (code, rate) in response.Rates)
             {
-                if (response.Rates.TryGetValue(code, out var rate) && rate > 0)
+                if (rate > 0 && !string.IsNullOrWhiteSpace(code))
                 {
                     rates[code] = rate;
                 }
