@@ -172,6 +172,23 @@ internal sealed class DigitalInventoryCodeConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class DeletedInventoryCodeConfiguration : IEntityTypeConfiguration<DeletedInventoryCode>
+{
+    public void Configure(EntityTypeBuilder<DeletedInventoryCode> builder)
+    {
+        builder.ToTable("DeletedInventoryCodes");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.DigitalCode).IsRequired();
+        builder.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+        builder.Property(x => x.PurchaseCost).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.StatusAtDeletion).HasConversion<string>().HasMaxLength(20);
+        builder.Property(x => x.Reason).IsRequired().HasMaxLength(200);
+        builder.HasIndex(x => x.VariantId);
+        builder.HasIndex(x => x.DeletedOnUtc);
+        builder.HasIndex(x => x.OriginalCodeId);
+    }
+}
+
 internal sealed class InventoryReservationConfiguration : IEntityTypeConfiguration<InventoryReservation>
 {
     public void Configure(EntityTypeBuilder<InventoryReservation> builder)

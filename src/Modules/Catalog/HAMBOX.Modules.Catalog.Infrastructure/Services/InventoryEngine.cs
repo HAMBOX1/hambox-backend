@@ -553,6 +553,8 @@ internal sealed class InventoryEngine : IInventoryEngine
 
             if (removableCodes.Count > 0)
             {
+                _db.DeletedInventoryCodes.AddRange(removableCodes.Select(c =>
+                    DeletedInventoryCode.Archive(c, _currentUser.UserId, "Variant permanently deleted")));
                 _db.DigitalInventoryCodes.RemoveRange(removableCodes);
             }
 

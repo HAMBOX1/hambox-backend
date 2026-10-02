@@ -3,6 +3,7 @@ using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory.QuickSetChatDelivery;
+using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Results;
@@ -23,6 +24,26 @@ internal static class InventoryEndpoints
             .WithApiVersionSet(apiVersionSet)
             .WithTags("Inventory")
             .HasApiVersion(1);
+
+        // Archive of deleted inventory codes. Plaintext secrets, so beyond the permission it is hard-limited
+        // to the primary admin (Owner) — a custom role can be granted the permission but never this.
+        group.MapGet("/deleted-codes", async (
+            [FromQuery] Guid? variantId,
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize,
+            HttpContext httpContext,
+            IRbacAuthorizationService rbac,
+            ISender sender) =>
+        {
+            var userId = rbac.GetCurrentUserId(httpContext.User);
+            if (userId is null || !await rbac.IsOwnerAsync(userId.Value, httpContext.RequestAborted))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            return await Send(sender, new GetDeletedInventoryCodesQuery(variantId, page ?? 1, pageSize ?? 50));
+        })
+            .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
 
         group.MapGet("/statistics", async (
             [FromQuery] Guid? productId,

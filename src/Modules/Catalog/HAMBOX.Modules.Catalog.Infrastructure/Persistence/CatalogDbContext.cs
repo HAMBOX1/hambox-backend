@@ -72,6 +72,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<InventorySupplier> InventorySuppliers => Set<InventorySupplier>();
     public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
     public DbSet<DigitalInventoryCode> DigitalInventoryCodes => Set<DigitalInventoryCode>();
+    public DbSet<DeletedInventoryCode> DeletedInventoryCodes => Set<DeletedInventoryCode>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
@@ -110,6 +111,17 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
             .HasConversion(converter)
             .HasMaxLength(2000);
         modelBuilder.Entity<DigitalInventoryCode>().Property(c => c.Pin)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
+
+        // The deleted-code archive holds the same secrets, so it is encrypted at rest the same way.
+        modelBuilder.Entity<DeletedInventoryCode>().Property(c => c.DigitalCode)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
+        modelBuilder.Entity<DeletedInventoryCode>().Property(c => c.SerialNumber)
+            .HasConversion(converter)
+            .HasMaxLength(2000);
+        modelBuilder.Entity<DeletedInventoryCode>().Property(c => c.Pin)
             .HasConversion(converter)
             .HasMaxLength(2000);
     }

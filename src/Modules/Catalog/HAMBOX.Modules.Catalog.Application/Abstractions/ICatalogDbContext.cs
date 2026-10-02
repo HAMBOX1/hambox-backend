@@ -67,6 +67,9 @@ public interface ICatalogDbContext
     DbSet<InventorySupplier> InventorySuppliers { get; }
     DbSet<InventoryBatch> InventoryBatches { get; }
     DbSet<DigitalInventoryCode> DigitalInventoryCodes { get; }
+
+    /// <summary>Permanent snapshots of deleted inventory codes — readable by the Owner only.</summary>
+    DbSet<DeletedInventoryCode> DeletedInventoryCodes { get; }
     DbSet<InventoryReservation> InventoryReservations { get; }
     DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
     DbSet<SearchQueryLog> SearchQueryLogs { get; }

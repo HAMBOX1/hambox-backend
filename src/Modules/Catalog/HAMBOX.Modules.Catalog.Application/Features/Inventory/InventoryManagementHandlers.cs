@@ -841,6 +841,8 @@ internal sealed class DeleteInventoryCodeCommandHandler : IRequestHandler<Delete
             return Result.Failure(CatalogErrors.InvalidCodeStatus);
         }
 
+        // Deleting removes the code from live stock only — the value is archived, never lost.
+        _db.DeletedInventoryCodes.Add(DeletedInventoryCode.Archive(code, _currentUser.UserId, "Deleted code"));
         _db.DigitalInventoryCodes.Remove(code);
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
             InventoryAuditAction.InventoryAdjusted,
@@ -913,6 +915,7 @@ internal sealed class BulkDeleteInventoryCodesCommandHandler : IRequestHandler<B
             .ToListAsync(cancellationToken);
 
         var removable = codes.Where(c => c.Status is InventoryCodeStatus.Available or InventoryCodeStatus.Disabled).ToList();
+        _db.DeletedInventoryCodes.AddRange(removable.Select(c => DeletedInventoryCode.Archive(c, _currentUser.UserId, "Bulk deleted")));
         _db.DigitalInventoryCodes.RemoveRange(removable);
 
         if (removable.Count > 0)
