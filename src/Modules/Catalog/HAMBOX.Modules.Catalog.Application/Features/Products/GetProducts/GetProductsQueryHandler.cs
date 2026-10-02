@@ -237,6 +237,39 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             }
         }
 
+        if (_currentUser.IsAdminContext && products.Count > 0)
+        {
+            // Sale = what each variant sells for before any supplier-derived price: its own override, else the
+            // product's base price. Supplier-derived prices already show in the list Price column above.
+            var baseVariantRows = await _dbContext.ProductVariants
+                .AsNoTracking()
+                .Where(v => productIds.Contains(v.ProductId) && !v.IsDeleted)
+                .Select(v => new { v.ProductId, v.PriceOverride, v.CostPrice, v.MemberPrice })
+                .ToListAsync(cancellationToken);
+
+            var variantsByProduct = baseVariantRows.ToLookup(v => v.ProductId);
+
+            static (decimal? Min, decimal? Max) Range(IEnumerable<decimal> values)
+            {
+                var list = values.ToList();
+                return list.Count == 0 ? (null, null) : (list.Min(), list.Max());
+            }
+
+            products = products
+                .Select(p =>
+                {
+                    var variants = variantsByProduct[p.Id].ToList();
+                    var (costMin, costMax) = Range(variants.Where(v => v.CostPrice.HasValue).Select(v => v.CostPrice!.Value));
+                    var (memberMin, memberMax) = Range(variants.Where(v => v.MemberPrice.HasValue).Select(v => v.MemberPrice!.Value));
+                    var (saleMin, saleMax) = variants.Count == 0
+                        ? (p.Price, p.Price)
+                        : Range(variants.Select(v => v.PriceOverride ?? p.Price));
+
+                    return p with { PriceTiers = new ProductPriceTiersDto(costMin, costMax, saleMin, saleMax, memberMin, memberMax) };
+                })
+                .ToList();
+        }
+
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
             await TryLogSearchAsync(request.SearchTerm.Trim(), totalCount, cancellationToken);

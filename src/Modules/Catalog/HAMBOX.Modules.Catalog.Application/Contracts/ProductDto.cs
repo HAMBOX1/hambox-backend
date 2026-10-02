@@ -68,4 +68,18 @@ public sealed record ProductDto(
     Guid? PendingMergeIntoProductId = null,
     string? PendingMergeIntoProductName = null,
     bool IsFavorite = false,
-    string? CategoryDescriptionHtml = null);
+    string? CategoryDescriptionHtml = null,
+    ProductPriceTiersDto? PriceTiers = null);
+
+/// <summary>
+/// Admin-only price overview across a product's variants (min–max; equal when there is a single price) so the
+/// catalog list can show cost / sale / member prices without opening each product. Never populated for
+/// anonymous/storefront callers — cost in particular must not leak.
+/// </summary>
+public sealed record ProductPriceTiersDto(
+    decimal? CostMin,
+    decimal? CostMax,
+    decimal? SaleMin,
+    decimal? SaleMax,
+    decimal? MemberMin,
+    decimal? MemberMax);
