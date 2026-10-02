@@ -310,7 +310,7 @@ internal static class ProductEndpoints
             ISender sender) =>
         {
             var result = await sender.Send(new MergeProductsCommand(
-                request.TargetProductId, request.SourceProductIds, request.ConfirmStockLoss));
+                request.TargetProductId, request.SourceProductIds, request.ConfirmStockLoss, request.VariantLabels));
             return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
         })
         .WithName("MergeProducts")
@@ -373,6 +373,10 @@ internal sealed record CreateProductRequest(string NameAr, string NameEn, string
 internal sealed record UpdateProductRequest(string NameAr, string NameEn, string DescriptionAr, string DescriptionEn, decimal Price, Guid CategoryId, ProductStatus Status, IReadOnlyList<Guid>? AdditionalCategoryIds = null, IReadOnlyList<Guid>? CollectionIds = null, DateTime? PublicReleaseOnUtc = null);
 internal sealed record ChangeProductCategoryRequest(Guid CategoryId);
 internal sealed record AdjustProductPriceRequest(PriceAdjustmentMode Mode, decimal Value);
-internal sealed record MergeProductsRequest(Guid TargetProductId, IReadOnlyList<Guid> SourceProductIds, bool ConfirmStockLoss);
+internal sealed record MergeProductsRequest(
+    Guid TargetProductId,
+    IReadOnlyList<Guid> SourceProductIds,
+    bool ConfirmStockLoss,
+    IReadOnlyDictionary<Guid, string>? VariantLabels = null);
 internal sealed record SetPendingMergeRequest(Guid TargetProductId);
 internal sealed record SetProductFavoriteRequest(bool IsFavorite);

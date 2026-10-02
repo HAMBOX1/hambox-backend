@@ -91,17 +91,25 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
 
         foreach (var source in sources.OrderBy(p => p.Id))
         {
-            var optionValue = source.NameEn.Trim().ToLowerInvariant();
+            // The admin may name the variant (e.g. "PC", "Xbox") instead of reusing the source product's
+            // full name, which is identical across near-duplicates and would give indistinguishable options.
+            var label = request.VariantLabels is not null
+                && request.VariantLabels.TryGetValue(source.Id, out var customLabel)
+                && !string.IsNullOrWhiteSpace(customLabel)
+                    ? customLabel.Trim()
+                    : source.NameEn;
+
+            var optionValue = label.ToLowerInvariant();
             if (usedOptionValues.Contains(optionValue))
             {
                 optionValue = $"{optionValue}-{source.Id:N}";
             }
             usedOptionValues.Add(optionValue);
 
-            var option = group.AddOption(optionValue, source.NameEn, sortOrder);
+            var option = group.AddOption(optionValue, label, sortOrder);
             _db.ProductOptions.Add(option);
 
-            var sku = BuildUniqueSku(source.NameEn, usedSkus);
+            var sku = BuildUniqueSku(label == source.NameEn ? source.NameEn : $"{target.NameEn} {label}", usedSkus);
             usedSkus.Add(sku);
 
             var variant = ProductVariant.Create(

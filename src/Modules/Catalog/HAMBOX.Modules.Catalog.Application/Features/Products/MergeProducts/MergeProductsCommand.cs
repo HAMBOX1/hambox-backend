@@ -14,7 +14,8 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.MergeProducts;
 public sealed record MergeProductsCommand(
     Guid TargetProductId,
     IReadOnlyList<Guid> SourceProductIds,
-    bool ConfirmStockLoss) : IRequest<Result<MergeProductsResultDto>>;
+    bool ConfirmStockLoss,
+    IReadOnlyDictionary<Guid, string>? VariantLabels = null) : IRequest<Result<MergeProductsResultDto>>;
 
 public sealed record MergeProductsResultDto(
     Guid TargetProductId,
