@@ -5,6 +5,7 @@ using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.UploadProductImage;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Products.Images.ImportProductImageFromUrl;
 
@@ -14,7 +15,9 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.Images.ImportProd
 /// </summary>
 public sealed record ImportProductImageFromUrlCommand(Guid ProductId, string Url) : IRequest<Result<ProductImageDto>>;
 
-internal sealed class ImportProductImageFromUrlCommandHandler(ISender sender)
+internal sealed class ImportProductImageFromUrlCommandHandler(
+    ISender sender,
+    ILogger<ImportProductImageFromUrlCommandHandler> logger)
     : IRequestHandler<ImportProductImageFromUrlCommand, Result<ProductImageDto>>
 {
     private const long MaxDownloadBytes = 10 * 1024 * 1024;
@@ -47,12 +50,18 @@ internal sealed class ImportProductImageFromUrlCommandHandler(ISender sender)
             if (!response.IsSuccessStatusCode
                 || response.Content.Headers.ContentLength is > MaxDownloadBytes)
             {
+                logger.LogWarning(
+                    "Product image import rejected: {Host} returned {Status} (length {Length}).",
+                    uri.Host, (int)response.StatusCode, response.Content.Headers.ContentLength);
                 return Result.Failure<ProductImageDto>(CatalogErrors.InvalidProductImage);
             }
 
-            var contentType = response.Content.Headers.ContentType?.MediaType;
-            if (string.IsNullOrWhiteSpace(contentType) || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            var contentType = ResolveContentType(response.Content.Headers.ContentType?.MediaType, uri);
+            if (contentType is null)
             {
+                logger.LogWarning(
+                    "Product image import rejected: {Host} sent non-image content type '{ContentType}' for {Path}.",
+                    uri.Host, response.Content.Headers.ContentType?.MediaType, uri.AbsolutePath);
                 return Result.Failure<ProductImageDto>(CatalogErrors.InvalidProductImage);
             }
 
@@ -77,14 +86,41 @@ internal sealed class ImportProductImageFromUrlCommandHandler(ISender sender)
                 fileName = "supplier-image";
             }
 
-            return await sender.Send(
+            var uploaded = await sender.Send(
                 new UploadProductImageCommand(request.ProductId, buffer, fileName, contentType, buffer.Length),
                 cancellationToken);
+            if (uploaded.IsFailure)
+            {
+                logger.LogWarning(
+                    "Product image import rejected by upload rules: {Error} (content type '{ContentType}', {Bytes} bytes, {Host}).",
+                    uploaded.Error.Code, contentType, buffer.Length, uri.Host);
+            }
+
+            return uploaded;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or SocketException)
         {
+            logger.LogWarning(ex, "Product image import failed to download from {Host}.", uri.Host);
             return Result.Failure<ProductImageDto>(CatalogErrors.InvalidProductImage);
         }
+    }
+
+    /// <summary>Some CDNs label images as octet-stream; fall back to the file extension for the well-known raster types.</summary>
+    private static string? ResolveContentType(string? headerType, Uri uri)
+    {
+        if (!string.IsNullOrWhiteSpace(headerType) && headerType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(headerType, "image/jpg", StringComparison.OrdinalIgnoreCase) ? "image/jpeg" : headerType;
+        }
+
+        return Path.GetExtension(uri.AbsolutePath).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => null,
+        };
     }
 
     private static async ValueTask<Stream> ConnectToPublicHostAsync(
