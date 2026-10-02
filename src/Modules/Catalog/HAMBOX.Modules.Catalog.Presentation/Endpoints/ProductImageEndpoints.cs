@@ -2,6 +2,7 @@ using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.DeleteProductImage;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.GetProductImages;
+using HAMBOX.Modules.Catalog.Application.Features.Products.Images.ImportProductImageFromUrl;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.ReorderProductImages;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.SetPrimaryProductImage;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.UploadProductImage;
@@ -106,6 +107,42 @@ internal static class ProductImageEndpoints
         .RequirePermission(PermissionConstants.Catalog.Products.Edit)
         .DisableAntiforgery();
 
+        group.MapPost("from-url", async Task<Results<Created<ProductImageDto>, BadRequest<ProblemDetails>, NotFound<ProblemDetails>>> (
+            Guid productId,
+            ImportProductImageFromUrlRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ImportProductImageFromUrlCommand(productId, request.Url));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Created(
+                    $"/api/v1/products/{productId}/images/{result.Value.Id}",
+                    result.Value);
+            }
+
+            if (result.Error == Catalog.Application.Errors.CatalogErrors.ProductNotFound)
+            {
+                return TypedResults.NotFound(new ProblemDetails
+                {
+                    Title = "Not Found",
+                    Detail = result.Error.Description,
+                    Type = result.Error.Code,
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("ImportProductImageFromUrl")
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         group.MapDelete("{imageId:guid}", async Task<Results<NoContent, NotFound<ProblemDetails>, BadRequest<ProblemDetails>>> (
             Guid productId,
             Guid imageId,
@@ -201,3 +238,5 @@ internal static class ProductImageEndpoints
 }
 
 internal sealed record ReorderProductImagesRequest(IReadOnlyList<Guid> OrderedImageIds);
+
+internal sealed record ImportProductImageFromUrlRequest(string Url);

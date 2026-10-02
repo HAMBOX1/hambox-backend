@@ -108,8 +108,19 @@ internal sealed class BambooSupplierProvider(BambooHttpClient httpClient, ILogge
                 product.Price?.CurrencyCode ?? brand.CurrencyCode ?? "USD",
                 product.MinFaceValue ?? product.Price?.Min,
                 product.MaxFaceValue ?? product.Price?.Max,
-                product.Count is null or > 0)))
+                product.Count is null or > 0,
+                brand.LogoUrl,
+                CombineDescription(brand))))
             .ToArray();
+
+    private static string? CombineDescription(BambooCatalogBrand brand)
+    {
+        var parts = new[] { brand.Description, brand.RedemptionInstructions, brand.TermsAndConditions }
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .Select(part => part!.Trim())
+            .ToArray();
+        return parts.Length == 0 ? null : string.Join("\n\n", parts);
+    }
 
     private static string CombineName(string? brandName, string? productName)
     {

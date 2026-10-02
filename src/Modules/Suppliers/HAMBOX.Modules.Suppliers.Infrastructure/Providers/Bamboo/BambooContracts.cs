@@ -120,7 +120,10 @@ internal sealed record BambooCatalogBrand(
     [property: JsonPropertyName("countryCode")] string? CountryCode,
     [property: JsonPropertyName("currencyCode")] string? CurrencyCode,
     [property: JsonPropertyName("logoUrl")] string? LogoUrl,
-    [property: JsonPropertyName("products")] IReadOnlyList<BambooCatalogProduct>? Products);
+    [property: JsonPropertyName("products")] IReadOnlyList<BambooCatalogProduct>? Products,
+    [property: JsonPropertyName("description")] string? Description = null,
+    [property: JsonPropertyName("redemptionInstructions")] string? RedemptionInstructions = null,
+    [property: JsonPropertyName("termsAndConditions")] string? TermsAndConditions = null);
 
 /// <summary>One orderable denomination within a brand. <see cref="Id"/> is exactly the numeric product id <see cref="BambooHttpClient.PlaceOrderAsync"/> already sends as <c>ProductId</c> — the same identifier space, confirmed by the documented Checkout request shape.</summary>
 internal sealed record BambooCatalogProduct(

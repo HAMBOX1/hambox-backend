@@ -170,7 +170,9 @@ public sealed record SupplierCatalogItemDto(
     string Currency,
     decimal? MinFaceValue,
     decimal? MaxFaceValue,
-    bool Available);
+    bool Available,
+    string? ImageUrl = null,
+    string? Description = null);
 
 public sealed record SupplierCatalogSearchResultDto(
     bool IsSuccess,

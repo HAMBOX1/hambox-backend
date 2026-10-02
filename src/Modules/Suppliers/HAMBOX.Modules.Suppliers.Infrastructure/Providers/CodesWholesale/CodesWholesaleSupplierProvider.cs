@@ -113,7 +113,8 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
             "USD",
             min,
             max,
-            Available: product.Quantity is null or > 0);
+            Available: product.Quantity is null or > 0,
+            ImageUrl: product.Images?.Select(image => image.Url).FirstOrDefault(url => !string.IsNullOrWhiteSpace(url)));
     }
 
     /// <summary>Lowest/highest quantity-tier <c>price</c> values (confirmed real quantity-based pricing — <c>Resource/Price.php</c>'s <c>from</c>/<c>to</c> range fields) — never a guessed single price.</summary>

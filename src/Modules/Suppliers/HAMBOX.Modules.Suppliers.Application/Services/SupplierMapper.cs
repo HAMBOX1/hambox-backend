@@ -102,7 +102,9 @@ public static class SupplierMapper
         item.Currency,
         item.MinFaceValue,
         item.MaxFaceValue,
-        item.Available);
+        item.Available,
+        item.ImageUrl,
+        item.Description);
 }
 
 /// <summary>

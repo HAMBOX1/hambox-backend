@@ -145,7 +145,9 @@ public sealed record SupplierCatalogItem(
     string Currency,
     decimal? MinFaceValue,
     decimal? MaxFaceValue,
-    bool Available);
+    bool Available,
+    string? ImageUrl = null,
+    string? Description = null);
 
 public sealed record SupplierCatalogSearchResult(bool IsSuccess, IReadOnlyList<SupplierCatalogItem> Items, string? Message);
 
