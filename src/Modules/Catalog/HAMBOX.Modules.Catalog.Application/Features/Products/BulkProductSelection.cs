@@ -28,7 +28,7 @@ public sealed record BulkProductSelection(
 /// </summary>
 internal static class BulkProductSelectionResolver
 {
-    private const int MaxMatches = 2000;
+    private const int MaxMatches = 10000;
 
     public static async Task<Result<IReadOnlyList<Guid>>> ResolveAsync(
         ICatalogDbContext db,
