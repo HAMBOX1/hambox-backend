@@ -8,6 +8,7 @@ using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
+using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -59,7 +60,11 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
         // Product.StockQuantity is a bare counter with no serials/codes behind it — a variant's
         // stock is entirely code-driven (DigitalInventoryCode), so this count has no migration
         // path and would silently disappear. Require an explicit confirmation before doing that.
-        var sourceIdsWithStock = sources.Where(p => p.StockQuantity > 0).Select(p => p.Id).ToList();
+        // An untouched creation-default counter is a placeholder, not recorded stock, so it doesn't count.
+        var sourceIdsWithStock = sources
+            .Where(p => p.StockQuantity > 0 && p.StockQuantity != Product.DefaultInitialStock)
+            .Select(p => p.Id)
+            .ToList();
         if (sourceIdsWithStock.Count > 0 && !request.ConfirmStockLoss)
         {
             return Result.Failure<MergeProductsResultDto>(

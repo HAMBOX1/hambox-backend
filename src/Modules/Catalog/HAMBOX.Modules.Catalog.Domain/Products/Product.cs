@@ -106,6 +106,13 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public int StockQuantity { get; private set; }
 
     /// <summary>
+    /// Placeholder counter every new product starts with (see <see cref="Create"/>). It is not real
+    /// inventory — a variant's stock is code-driven — so an untouched value must never be treated as
+    /// "stock that would be lost" (e.g. when merging products).
+    /// </summary>
+    public const int DefaultInitialStock = 100;
+
+    /// <summary>
     /// Gets the quantity currently reserved for pending orders.
     /// </summary>
     public int ReservedQuantity { get; private set; }
@@ -241,7 +248,7 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
             descriptionEn,
             price,
             categoryId);
-        product.SetInitialStock(100);
+        product.SetInitialStock(DefaultInitialStock);
         return product;
     }
 
