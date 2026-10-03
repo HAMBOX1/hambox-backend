@@ -110,32 +110,41 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
         }
 
         var requestedOptionIds = request.OptionIds.Distinct().OrderBy(id => id).ToList();
-        var existingVariants = await _db.ProductVariants
-            .AsNoTracking()
-            .Include(v => v.SelectedOptions)
-            .Where(v => v.ProductId == variant.ProductId && v.Id != variant.Id && !v.IsDeleted)
-            .ToListAsync(cancellationToken);
+        var currentOptionIds = variant.SelectedOptions.Select(o => o.OptionId).OrderBy(id => id).ToList();
+        var optionsChanged = !requestedOptionIds.SequenceEqual(currentOptionIds);
 
-        if (existingVariants.Any(existing =>
+        // The option combination is only validated when it is actually being changed. Re-checking it on every save
+        // meant a variant that predates a newer option group (or an incomplete copy) could not even have its price
+        // edited: "This variant is missing a selection for: ...".
+        if (optionsChanged)
+        {
+            var existingVariants = await _db.ProductVariants
+                .AsNoTracking()
+                .Include(v => v.SelectedOptions)
+                .Where(v => v.ProductId == variant.ProductId && v.Id != variant.Id && !v.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            if (existingVariants.Any(existing =>
+                {
+                    var existingIds = existing.SelectedOptions.Select(o => o.OptionId).OrderBy(id => id).ToList();
+                    return existingIds.SequenceEqual(requestedOptionIds);
+                }))
             {
-                var existingIds = existing.SelectedOptions.Select(o => o.OptionId).OrderBy(id => id).ToList();
-                return existingIds.SequenceEqual(requestedOptionIds);
-            }))
-        {
-            return Result.Failure(CatalogErrors.DuplicateVariantCombination);
-        }
+                return Result.Failure(CatalogErrors.DuplicateVariantCombination);
+            }
 
-        var optionGroups = await _db.ProductOptionGroups
-            .AsNoTracking()
-            .Include(g => g.Options)
-            .Where(g => g.ProductId == variant.ProductId)
-            .ToListAsync(cancellationToken);
+            var optionGroups = await _db.ProductOptionGroups
+                .AsNoTracking()
+                .Include(g => g.Options)
+                .Where(g => g.ProductId == variant.ProductId)
+                .ToListAsync(cancellationToken);
 
-        var missingGroups = VariantCombinationHelper.FindMissingGroups(requestedOptionIds, optionGroups);
-        if (missingGroups.Count > 0)
-        {
-            return Result.Failure(CatalogErrors.IncompleteVariantCombination(
-                missingGroups.Select(g => g.DisplayName).ToList()));
+            var missingGroups = VariantCombinationHelper.FindMissingGroups(requestedOptionIds, optionGroups);
+            if (missingGroups.Count > 0)
+            {
+                return Result.Failure(CatalogErrors.IncompleteVariantCombination(
+                    missingGroups.Select(g => g.DisplayName).ToList()));
+            }
         }
 
         variant.Update(
@@ -151,7 +160,10 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
             request.CostPrice,
             request.MemberPrice);
 
-        variant.SetOptions(requestedOptionIds);
+        if (optionsChanged)
+        {
+            variant.SetOptions(requestedOptionIds);
+        }
 
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
             InventoryAuditAction.VariantUpdated,
