@@ -3,6 +3,7 @@ using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.DeleteProductImage;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.GetProductImages;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.ImportProductImageFromUrl;
+using HAMBOX.Modules.Catalog.Application.Features.Products.Images.Library;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.ReorderProductImages;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.SetPrimaryProductImage;
 using HAMBOX.Modules.Catalog.Application.Features.Products.Images.UploadProductImage;
@@ -25,6 +26,42 @@ internal static class ProductImageEndpoints
 {
     public static void MapProductImageEndpoints(this IEndpointRouteBuilder app, ApiVersionSet apiVersionSet)
     {
+        var library = app.MapGroup("api/v{version:apiVersion}/product-images")
+            .WithApiVersionSet(apiVersionSet)
+            .WithTags("Product Image Library")
+            .HasApiVersion(1);
+
+        // GET /api/v1/product-images/library
+        library.MapGet("library", async (
+            [FromQuery] string? searchTerm,
+            [FromQuery] Guid? categoryId,
+            [FromQuery] bool? withoutImages,
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetProductImageLibraryQuery(
+                searchTerm, categoryId, withoutImages ?? false, page ?? 1, pageSize ?? 48));
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = result.Error.Description });
+        })
+        .WithName("GetProductImageLibrary")
+        .RequirePermission(PermissionConstants.Catalog.Products.View);
+
+        // POST /api/v1/product-images/apply
+        library.MapPost("apply", async (
+            [FromBody] ApplyImageToProductsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ApplyImageToProductsCommand(request.SourceImageId, request.ProductIds));
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = result.Error.Description, Type = result.Error.Code });
+        })
+        .WithName("ApplyImageToProducts")
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         var group = app.MapGroup("api/v{version:apiVersion}/products/{productId:guid}/images")
             .WithApiVersionSet(apiVersionSet)
             .WithTags("Product Images")
@@ -104,6 +141,56 @@ internal static class ProductImageEndpoints
             });
         })
         .WithName("UploadProductImage")
+        .RequirePermission(PermissionConstants.Catalog.Products.Edit)
+        .DisableAntiforgery();
+
+        // POST /api/v1/products/{productId}/images/{imageId}/replace
+        group.MapPost("{imageId:guid}/replace", async Task<Results<Ok<ProductImageDto>, BadRequest<ProblemDetails>, NotFound<ProblemDetails>>> (
+            Guid productId,
+            Guid imageId,
+            IFormFile file,
+            ISender sender) =>
+        {
+            if (file.Length <= 0)
+            {
+                return TypedResults.BadRequest(new ProblemDetails
+                {
+                    Title = "Bad Request",
+                    Detail = "An image file is required.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
+            await using var stream = file.OpenReadStream();
+            var result = await sender.Send(new ReplaceProductImageCommand(
+                productId, imageId, stream, file.FileName, file.ContentType, file.Length));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            if (result.Error == Catalog.Application.Errors.CatalogErrors.ProductNotFound
+                || result.Error == Catalog.Application.Errors.CatalogErrors.ProductImageNotFound)
+            {
+                return TypedResults.NotFound(new ProblemDetails
+                {
+                    Title = "Not Found",
+                    Detail = result.Error.Description,
+                    Type = result.Error.Code,
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("ReplaceProductImage")
         .RequirePermission(PermissionConstants.Catalog.Products.Edit)
         .DisableAntiforgery();
 
@@ -240,3 +327,5 @@ internal static class ProductImageEndpoints
 internal sealed record ReorderProductImagesRequest(IReadOnlyList<Guid> OrderedImageIds);
 
 internal sealed record ImportProductImageFromUrlRequest(string Url);
+
+internal sealed record ApplyImageToProductsRequest(Guid SourceImageId, IReadOnlyList<Guid> ProductIds);

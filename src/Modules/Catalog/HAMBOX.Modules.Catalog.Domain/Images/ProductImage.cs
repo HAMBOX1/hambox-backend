@@ -86,6 +86,21 @@ public sealed class ProductImage : Entity
     public bool IsPrimary { get; private set; }
 
     /// <summary>
+    /// Swaps the stored file behind this image while keeping its identity, display order and primary flag.
+    /// </summary>
+    public void ReplaceFile(string url, string storageKey, string fileName, string contentType, long fileSizeBytes)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
+
+        Url = url;
+        StorageKey = storageKey;
+        FileName = fileName;
+        ContentType = contentType;
+        FileSizeBytes = fileSizeBytes;
+    }
+
+    /// <summary>
     /// Creates a new product image.
     /// </summary>
     /// <param name="productId">The identifier of the owning product.</param>
