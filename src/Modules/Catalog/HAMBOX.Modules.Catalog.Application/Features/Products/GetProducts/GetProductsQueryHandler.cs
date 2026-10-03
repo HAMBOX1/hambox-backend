@@ -162,9 +162,11 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             .ToList();
 
         var productIds = products.Select(p => p.Id).ToList();
+        // Instant codes kept on a variant that is currently On-Delivery stay saved for the admin but are never
+        // counted as stock — the variant's stock there is its chat-delivery capacity only (added below).
         var stockByProduct = await _dbContext.ProductVariants
             .AsNoTracking()
-            .Where(v => productIds.Contains(v.ProductId))
+            .Where(v => productIds.Contains(v.ProductId) && v.FulfillmentMode != FulfillmentMode.ChatDelivery)
             .Join(
                 _dbContext.DigitalInventoryCodes.AsNoTracking().Where(c => c.Status == InventoryCodeStatus.Available),
                 v => v.Id,
