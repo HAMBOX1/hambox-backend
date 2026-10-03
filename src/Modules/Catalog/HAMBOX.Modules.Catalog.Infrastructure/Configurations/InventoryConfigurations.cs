@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Catalog.Domain.Enums;
+using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -169,6 +170,20 @@ internal sealed class DigitalInventoryCodeConfiguration : IEntityTypeConfigurati
         builder.HasIndex(x => x.CodeHash).IsUnique();
         builder.HasIndex(x => new { x.VariantId, x.Status });
         builder.HasIndex(x => x.BatchId);
+    }
+}
+
+internal sealed class CategoryFacetSettingConfiguration : IEntityTypeConfiguration<CategoryFacetSetting>
+{
+    public void Configure(EntityTypeBuilder<CategoryFacetSetting> builder)
+    {
+        builder.ToTable("CategoryFacetSettings");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.GroupKey).IsRequired().HasMaxLength(100);
+        builder.Property(x => x.DisplayNameEn).HasMaxLength(200);
+        builder.Property(x => x.DisplayNameAr).HasMaxLength(200);
+        builder.HasIndex(x => new { x.CategoryId, x.GroupKey }).IsUnique();
+        builder.HasIndex(x => new { x.CategoryId, x.SortOrder });
     }
 }
 

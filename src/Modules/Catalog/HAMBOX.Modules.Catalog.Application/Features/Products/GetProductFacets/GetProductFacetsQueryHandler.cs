@@ -1,5 +1,7 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
+using HAMBOX.Modules.Catalog.Application.Features.Categories.CategoryFilters;
+using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -13,10 +15,24 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
     public async Task<Result<IReadOnlyList<ProductFacetGroupDto>>> Handle(
         GetProductFacetsQuery request, CancellationToken cancellationToken)
     {
-        var groupKeys = await db.ProductOptionGroups.AsNoTracking()
-            .Select(g => g.Key)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+        // The admin's filter list for this category (own, else nearest ancestor's, else the store-wide default)
+        // decides which filters are offered, in which order and under which name. Nothing configured at all
+        // keeps the original behaviour: every option group becomes a filter.
+        var sourceId = await CategoryFilterResolver.ResolveSourceAsync(db, request.CategoryId, cancellationToken);
+        IReadOnlyList<CategoryFacetSetting> configured = sourceId is { } source
+            ? await db.CategoryFacetSettings.AsNoTracking()
+                .Where(s => s.CategoryId == source && s.IsVisible)
+                .OrderBy(s => s.SortOrder)
+                .ToListAsync(cancellationToken)
+            : [];
+
+        var groupKeys = sourceId is not null
+            ? configured.Select(s => s.GroupKey).ToList()
+            : await db.ProductOptionGroups.AsNoTracking()
+                .Select(g => g.Key)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        var settingByKey = configured.ToDictionary(s => s.GroupKey, StringComparer.OrdinalIgnoreCase);
 
         var facetGroups = new List<ProductFacetGroupDto>();
 
@@ -70,10 +86,18 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
                 .Select(r => new ProductFacetOptionDto(r.Value, r.Label, r.Count))
                 .ToList();
 
-            facetGroups.Add(new ProductFacetGroupDto(groupKey, rows[0].DisplayName, options));
+            settingByKey.TryGetValue(groupKey, out var setting);
+            facetGroups.Add(new ProductFacetGroupDto(
+                groupKey,
+                setting?.DisplayNameEn ?? rows[0].DisplayName,
+                options,
+                setting?.DisplayNameAr));
         }
 
+        // A configured list keeps the admin's order; the legacy "everything" list stays alphabetical.
         return Result.Success<IReadOnlyList<ProductFacetGroupDto>>(
-            facetGroups.OrderBy(g => g.DisplayName, StringComparer.OrdinalIgnoreCase).ToList());
+            sourceId is not null
+                ? facetGroups
+                : facetGroups.OrderBy(g => g.DisplayName, StringComparer.OrdinalIgnoreCase).ToList());
     }
 }

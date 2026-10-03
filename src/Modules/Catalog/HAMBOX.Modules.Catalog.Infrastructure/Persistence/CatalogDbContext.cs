@@ -73,6 +73,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
     public DbSet<DigitalInventoryCode> DigitalInventoryCodes => Set<DigitalInventoryCode>();
     public DbSet<DeletedInventoryCode> DeletedInventoryCodes => Set<DeletedInventoryCode>();
+    public DbSet<CategoryFacetSetting> CategoryFacetSettings => Set<CategoryFacetSetting>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();

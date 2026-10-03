@@ -70,6 +70,9 @@ public interface ICatalogDbContext
 
     /// <summary>Permanent snapshots of deleted inventory codes — readable by the Owner only.</summary>
     DbSet<DeletedInventoryCode> DeletedInventoryCodes { get; }
+
+    /// <summary>Admin-defined storefront filter lists, per category (plus a store-wide default).</summary>
+    DbSet<CategoryFacetSetting> CategoryFacetSettings { get; }
     DbSet<InventoryReservation> InventoryReservations { get; }
     DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
     DbSet<SearchQueryLog> SearchQueryLogs { get; }
