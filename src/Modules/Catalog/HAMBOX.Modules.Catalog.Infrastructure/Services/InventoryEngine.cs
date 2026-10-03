@@ -377,6 +377,8 @@ internal sealed class InventoryEngine : IInventoryEngine
             inventoryValue * 1.2m - purchaseCost);
     }
 
+    private const int MaxCodeLength = 1000;
+
     public async Task<ImportCodesResult> ImportCodesAsync(
         Guid variantId,
         Guid batchId,
@@ -473,7 +475,9 @@ internal sealed class InventoryEngine : IInventoryEngine
 
         foreach (var (item, hash) in normalized)
         {
-            if (hash is null)
+            // A code can be a whole multi-line account block (email, security email, 2FA codes, ...), but it is
+            // stored encrypted in a fixed-width column, so anything beyond this is rejected rather than truncated.
+            if (hash is null || item.DigitalCode.Trim().Length > MaxCodeLength)
             {
                 invalid++;
                 continue;
@@ -496,7 +500,7 @@ internal sealed class InventoryEngine : IInventoryEngine
                 item.PurchaseCost ?? batch.PurchaseCost,
                 null,
                 batch.Currency,
-                null,
+                item.Notes,
                 item.ExpirationDate);
 
             _db.DigitalInventoryCodes.Add(code);

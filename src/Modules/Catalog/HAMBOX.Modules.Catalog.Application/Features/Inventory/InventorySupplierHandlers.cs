@@ -167,7 +167,8 @@ internal sealed class GetInventoryBatchesQueryHandler : IRequestHandler<GetInven
 public sealed record ImportInventoryCodesCommand(
     Guid VariantId,
     Guid BatchId,
-    IReadOnlyList<string> Codes) : IRequest<Result<ImportCodesResultDto>>;
+    IReadOnlyList<string> Codes,
+    string? Note = null) : IRequest<Result<ImportCodesResultDto>>;
 
 public sealed record ImportCodeDuplicateDto(string Code, string ProductName, string VariantName, string? BatchName);
 
@@ -192,7 +193,7 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
     public async Task<Result<ImportCodesResultDto>> Handle(ImportInventoryCodesCommand request, CancellationToken cancellationToken)
     {
         var items = request.Codes
-            .Select(c => new ImportCodeItem(c))
+            .Select(c => new ImportCodeItem(c, Notes: string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim()))
             .ToList();
 
         try

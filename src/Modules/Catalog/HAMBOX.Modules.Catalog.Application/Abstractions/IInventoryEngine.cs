@@ -121,7 +121,8 @@ public sealed record ImportCodeItem(
     string? SerialNumber = null,
     string? Pin = null,
     decimal? PurchaseCost = null,
-    DateTimeOffset? ExpirationDate = null);
+    DateTimeOffset? ExpirationDate = null,
+    string? Notes = null);
 
 /// <summary>Where a submitted code was already found — global across the whole catalog, not just the target variant/batch.</summary>
 public sealed record ImportCodeDuplicate(string Code, string ProductName, string VariantSku, string? BatchName);

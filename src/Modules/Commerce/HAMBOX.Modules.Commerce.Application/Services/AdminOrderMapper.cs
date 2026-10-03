@@ -94,6 +94,11 @@ public static class AdminOrderMapper
             return "—";
         }
 
+        if (key.Contains('\n'))
+        {
+            return "•••••••• (multi-line)";
+        }
+
         if (key.Length <= 8)
         {
             return new string('•', key.Length);

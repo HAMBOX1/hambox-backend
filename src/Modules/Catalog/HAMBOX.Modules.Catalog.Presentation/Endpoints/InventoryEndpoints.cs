@@ -274,7 +274,7 @@ internal static class InventoryEndpoints
             Guid variantId,
             Guid batchId,
             [FromBody] ImportCodesRequest body,
-            ISender sender) => await Send(sender, new ImportInventoryCodesCommand(variantId, batchId, body.Codes)))
+            ISender sender) => await Send(sender, new ImportInventoryCodesCommand(variantId, batchId, body.Codes, body.Note)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Import);
 
         group.MapGet("/variants/{variantId:guid}/codes", async (
@@ -463,7 +463,7 @@ internal sealed record CreateBatchRequest(
     decimal PurchaseCost,
     decimal? ExpectedMargin,
     string? Notes);
-internal sealed record ImportCodesRequest(IReadOnlyList<string> Codes);
+internal sealed record ImportCodesRequest(IReadOnlyList<string> Codes, string? Note = null);
 
 internal sealed record SetVariantFulfillmentModeRequest(FulfillmentMode FulfillmentMode);
 
