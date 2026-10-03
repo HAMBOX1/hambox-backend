@@ -119,6 +119,12 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         MemberPrice = memberPrice;
     }
 
+    /// <summary>Sets just the (informational) cost price, leaving every other field untouched.</summary>
+    public void SetCostPrice(decimal? costPrice) => CostPrice = costPrice;
+
+    /// <summary>Sets just the Elite-member sale price, leaving every other field untouched.</summary>
+    public void SetMemberPrice(decimal? memberPrice) => MemberPrice = memberPrice;
+
     /// <summary>
     /// Changes how a shortfall for this variant is sourced. Kept as its own method (not folded into
     /// <see cref="Update"/>) so callers can audit the before/after value distinctly — this is a

@@ -67,6 +67,12 @@ internal static class InventoryEndpoints
             await Send(sender, new GenerateProductVariantsCommand(productId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
+        group.MapPut("/products/{productId:guid}/variant-prices", async (
+            Guid productId,
+            [FromBody] SetProductVariantPricesRequest body,
+            ISender sender) => await Send(sender, new SetProductVariantPricesCommand(productId, body.Field, body.Value)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
         group.MapPost("/products/{productId:guid}/quick-chat-delivery", async (
             Guid productId,
             [FromBody] QuickSetChatDeliveryRequest body,
@@ -463,6 +469,7 @@ internal sealed record CreateBatchRequest(
     decimal PurchaseCost,
     decimal? ExpectedMargin,
     string? Notes);
+internal sealed record SetProductVariantPricesRequest(string Field, decimal? Value);
 internal sealed record ImportCodesRequest(IReadOnlyList<string> Codes, string? Note = null);
 
 internal sealed record SetVariantFulfillmentModeRequest(FulfillmentMode FulfillmentMode);
