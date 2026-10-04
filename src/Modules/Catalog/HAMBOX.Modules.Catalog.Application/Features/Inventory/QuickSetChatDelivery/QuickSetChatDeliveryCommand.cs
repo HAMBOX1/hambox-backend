@@ -18,7 +18,7 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Inventory.QuickSetChatDeli
 /// right one is ambiguous from the catalog list; per-variant instructions/fulfillment controls live in
 /// the variant manager instead.
 /// </summary>
-public sealed record QuickSetChatDeliveryCommand(Guid ProductId, int Capacity, bool Instant = false) : IRequest<Result>;
+public sealed record QuickSetChatDeliveryCommand(Guid ProductId, int Capacity, bool Instant = false, Guid? VariantId = null) : IRequest<Result>;
 
 public sealed class QuickSetChatDeliveryCommandValidator : AbstractValidator<QuickSetChatDeliveryCommand>
 {
@@ -43,7 +43,18 @@ internal sealed class QuickSetChatDeliveryCommandHandler(ICatalogDbContext db) :
             .Where(v => v.ProductId == request.ProductId && !v.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        if (variants.Count > 1)
+        // An explicit variant id removes the ambiguity, so the catalog list can switch one sub-product at a time.
+        if (request.VariantId is { } variantId)
+        {
+            var target = variants.FirstOrDefault(v => v.Id == variantId);
+            if (target is null)
+            {
+                return Result.Failure(CatalogErrors.VariantNotFound);
+            }
+
+            variants = [target];
+        }
+        else if (variants.Count > 1)
         {
             return Result.Failure(CatalogErrors.ProductHasMultipleVariantsForQuickAction);
         }

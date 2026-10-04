@@ -76,7 +76,7 @@ internal static class InventoryEndpoints
         group.MapPost("/products/{productId:guid}/quick-chat-delivery", async (
             Guid productId,
             [FromBody] QuickSetChatDeliveryRequest body,
-            ISender sender) => await SendEmpty(sender, new QuickSetChatDeliveryCommand(productId, body.Capacity, body.Instant)))
+            ISender sender) => await SendEmpty(sender, new QuickSetChatDeliveryCommand(productId, body.Capacity, body.Instant, body.VariantId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
         group.MapPost("/products/{productId:guid}/variants/bulk-update", async (
@@ -442,7 +442,7 @@ internal sealed record CreateVariantRequest(
     int LowStockThreshold,
     IReadOnlyList<Guid> OptionIds);
 
-internal sealed record QuickSetChatDeliveryRequest(int Capacity, bool Instant = false);
+internal sealed record QuickSetChatDeliveryRequest(int Capacity, bool Instant = false, Guid? VariantId = null);
 
 internal sealed record CreateOptionGroupRequest(string Key, string DisplayName, int SortOrder, bool IsRequired, Guid? ParentOptionId = null);
 internal sealed record CreateOptionRequest(string Value, string Label, int SortOrder, string? DescriptionHtml = null);
