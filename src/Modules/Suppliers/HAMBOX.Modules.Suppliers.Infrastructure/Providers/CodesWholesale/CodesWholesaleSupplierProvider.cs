@@ -162,6 +162,17 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
             logger.LogInformation(
                 "CodesWholesale catalog loaded for supplier {SupplierId}: {Count} products in {Seconds:F1}s.",
                 context.SupplierId, products.Count, (DateTimeOffset.UtcNow - started).TotalSeconds);
+
+            // Shape check of the price/stock fields (no secrets): how many products have a stock number or any price.
+            var withStock = products.Count(p => p.Quantity is > 0);
+            var withPrices = products.Count(p => p.Prices is { Count: > 0 });
+            var sample = products
+                .Where(p => p.Quantity is > 0)
+                .Take(3)
+                .Select(p => $"{p.Name}: qty={p.Quantity}, prices=[{string.Join(';', (p.Prices ?? []).Select(x => $"{x.From}-{x.To}={x.Value}"))}]");
+            logger.LogInformation(
+                "CodesWholesale catalog shape: {WithStock} with stock, {WithPrices} with prices. Samples: {Samples}",
+                withStock, withPrices, string.Join(" | ", sample));
             return products;
         }
         finally
