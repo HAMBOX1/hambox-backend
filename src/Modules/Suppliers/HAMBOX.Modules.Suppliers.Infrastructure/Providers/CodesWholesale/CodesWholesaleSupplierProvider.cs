@@ -130,16 +130,44 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
     }
 
     /// <summary>Bounds how long a pulled catalog is reused across the search box's rapid-fire keystroke requests — never relied on for <see cref="GetAvailabilityAsync"/>'s own correctness, which always pulls fresh (mirrors <c>GlobeTopperSupplierProvider</c>'s identical split).</summary>
-    private static readonly TimeSpan SearchCatalogCacheTtl = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SearchCatalogCacheTtl = TimeSpan.FromMinutes(15);
 
-    private Task<IReadOnlyList<CodesWholesaleProduct>> GetCachedProductsAsync(SupplierProviderContext context, CancellationToken cancellationToken)
+    /// <summary>
+    /// CodesWholesale's v3 price list comes in many small pages and has no name search, so browsing/searching needs the
+    /// whole list. It is loaded once and cached; a single in-flight load is shared by every caller and keeps running
+    /// even if the first request gives up waiting, so a slow first load never has to be repeated.
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, Task<IReadOnlyList<CodesWholesaleProduct>>> InFlightCatalogLoads = new();
+
+    private async Task<IReadOnlyList<CodesWholesaleProduct>> GetCachedProductsAsync(SupplierProviderContext context, CancellationToken cancellationToken)
     {
         var cacheKey = $"codeswholesale:products:{context.SupplierId}";
-        return cache.GetOrCreateAsync(cacheKey, async entry =>
+        if (cache.TryGetValue(cacheKey, out IReadOnlyList<CodesWholesaleProduct>? cached) && cached is not null)
         {
-            entry.AbsoluteExpirationRelativeToNow = SearchCatalogCacheTtl;
-            return await httpClient.GetAllProductsAsync(context, productIds: null, cancellationToken);
-        })!;
+            return cached;
+        }
+
+        var load = InFlightCatalogLoads.GetOrAdd(context.SupplierId, _ => LoadCatalogAsync(context, cacheKey));
+        return await load.WaitAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<CodesWholesaleProduct>> LoadCatalogAsync(SupplierProviderContext context, string cacheKey)
+    {
+        try
+        {
+            var started = DateTimeOffset.UtcNow;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            var products = await httpClient.GetAllProductsAsync(context, productIds: null, timeout.Token);
+            cache.Set(cacheKey, products, SearchCatalogCacheTtl);
+            logger.LogInformation(
+                "CodesWholesale catalog loaded for supplier {SupplierId}: {Count} products in {Seconds:F1}s.",
+                context.SupplierId, products.Count, (DateTimeOffset.UtcNow - started).TotalSeconds);
+            return products;
+        }
+        finally
+        {
+            InFlightCatalogLoads.TryRemove(context.SupplierId, out _);
+        }
     }
 
     /// <summary>Bounded so a mapping set with unexpectedly many external ids can never turn one sync tick into an unbounded number of HTTP calls or one unreasonably long query string.</summary>

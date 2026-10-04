@@ -219,7 +219,7 @@ internal sealed class CodesWholesaleHttpClient(HttpClient httpClient, IOptions<C
     public async Task<IReadOnlyList<CodesWholesaleProduct>> GetAllProductsAsync(
         SupplierProviderContext context, IReadOnlyList<string>? productIds, CancellationToken cancellationToken)
     {
-        const int maxPages = 200;
+        const int maxPages = 3000;
         var all = new List<CodesWholesaleProduct>();
         string? token = null;
 
