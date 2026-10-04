@@ -74,8 +74,15 @@ internal sealed class CodesWholesaleAccount
 /// <summary>One quantity-tier price entry (confirmed field names: <c>Resource/Price.php</c>, <c>Product::getDefaultPrice</c>/<c>getLowestPrice</c>). <see cref="From"/>/<see cref="To"/> are the quantity range this <see cref="Value"/> applies to — genuine documented quantity-based pricing, not invented.</summary>
 internal sealed class CodesWholesalePrice
 {
+    /// <summary>API v3 names the amount <c>value</c>.</summary>
+    [JsonPropertyName("value")]
+    public decimal? ValueV3 { get; set; }
+
+    /// <summary>API v2 named the amount <c>price</c>; still read so either version's payload works.</summary>
     [JsonPropertyName("price")]
-    public decimal Value { get; set; }
+    public decimal? ValueV2 { get; set; }
+
+    public decimal Value => ValueV3 ?? ValueV2 ?? 0m;
 
     [JsonPropertyName("priceRangeLabel")]
     public string? RangeLabel { get; set; }
