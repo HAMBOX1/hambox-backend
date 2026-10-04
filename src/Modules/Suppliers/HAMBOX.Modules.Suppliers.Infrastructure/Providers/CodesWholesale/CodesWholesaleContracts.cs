@@ -133,6 +133,10 @@ internal sealed class CodesWholesaleProductListResponse
 {
     [JsonPropertyName("items")]
     public IReadOnlyList<CodesWholesaleProduct>? Items { get; set; }
+
+    /// <summary>API v3 pages the product list; pass this back as <c>continuationToken</c> to get the next page. Null/empty on the last page.</summary>
+    [JsonPropertyName("continuationToken")]
+    public string? ContinuationToken { get; set; }
 }
 
 /// <summary>Request body for <c>POST /v2/orders</c>. Field name confirmed: <c>OrderRequest::CLIENT_ORDER_ID = "orderId"</c> — CodesWholesale's own name for the caller-supplied reference sent on the wire, distinct from the <c>clientOrderId</c> name it's echoed back under in the response (see <see cref="CodesWholesaleOrder"/>).</summary>
@@ -218,9 +222,53 @@ internal sealed class CodesWholesaleCode
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
+    /// <summary>API v3 calls the code's kind <c>codeType</c>; v2 called it <c>status</c>. Both are read.</summary>
+    [JsonPropertyName("codeType")]
+    public string? CodeType { get; set; }
+
     [JsonPropertyName("code")]
     public string? Code { get; set; }
 
     [JsonPropertyName("filename")]
     public string? FileName { get; set; }
+
+    /// <summary>The kind of code, from whichever of <see cref="Status"/> / <see cref="CodeType"/> the API sent.</summary>
+    public string? Kind => string.IsNullOrWhiteSpace(CodeType) ? Status : CodeType;
+}
+
+internal enum CodesWholesaleCodeKind
+{
+    Unknown,
+    Text,
+    Image,
+    PreOrder,
+}
+
+internal static class CodesWholesaleCodeKinds
+{
+    /// <summary>
+    /// Matches loosely on purpose ("Text code" in v2, a differently-cased/worded value in v3): anything that is
+    /// not clearly text, image or pre-order stays <see cref="CodesWholesaleCodeKind.Unknown"/> and is never
+    /// treated as delivered.
+    /// </summary>
+    public static CodesWholesaleCodeKind Classify(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return CodesWholesaleCodeKind.Unknown;
+        }
+
+        var value = raw.Trim().ToLowerInvariant().Replace("_", " ").Replace("-", " ");
+        if (value.Contains("pre"))
+        {
+            return CodesWholesaleCodeKind.PreOrder;
+        }
+
+        if (value.Contains("image"))
+        {
+            return CodesWholesaleCodeKind.Image;
+        }
+
+        return value.Contains("text") ? CodesWholesaleCodeKind.Text : CodesWholesaleCodeKind.Unknown;
+    }
 }

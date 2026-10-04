@@ -195,15 +195,47 @@ internal sealed class CodesWholesaleHttpClient(HttpClient httpClient, IOptions<C
     /// no filters at all pulls the full price list in one call, matching <c>SearchCatalogAsync</c>'s use.
     /// </summary>
     public Task<CodesWholesaleProductListResponse> GetProductsAsync(
-        SupplierProviderContext context, IReadOnlyList<string>? productIds, CancellationToken cancellationToken)
+        SupplierProviderContext context,
+        IReadOnlyList<string>? productIds,
+        CancellationToken cancellationToken,
+        string? continuationToken = null)
     {
-        var path = CodesWholesaleProviderConstants.ProductsPath;
+        var query = new List<string>();
         if (productIds is { Count: > 0 })
         {
-            path += "?productIds=" + Uri.EscapeDataString(string.Join(',', productIds));
+            query.Add("productIds=" + Uri.EscapeDataString(string.Join(',', productIds)));
         }
 
+        if (!string.IsNullOrWhiteSpace(continuationToken))
+        {
+            query.Add("continuationToken=" + Uri.EscapeDataString(continuationToken));
+        }
+
+        var path = CodesWholesaleProviderConstants.ProductsPath + (query.Count > 0 ? "?" + string.Join('&', query) : string.Empty);
         return SendAsync<CodesWholesaleProductListResponse>(context, HttpMethod.Get, path, body: null, cancellationToken);
+    }
+
+    /// <summary>API v3 returns the price list in pages; follows <c>continuationToken</c> until it runs out (bounded).</summary>
+    public async Task<IReadOnlyList<CodesWholesaleProduct>> GetAllProductsAsync(
+        SupplierProviderContext context, IReadOnlyList<string>? productIds, CancellationToken cancellationToken)
+    {
+        const int maxPages = 200;
+        var all = new List<CodesWholesaleProduct>();
+        string? token = null;
+
+        for (var page = 0; page < maxPages; page++)
+        {
+            var response = await GetProductsAsync(context, productIds, cancellationToken, token);
+            all.AddRange(response.Items ?? []);
+
+            token = response.ContinuationToken;
+            if (string.IsNullOrWhiteSpace(token) || (response.Items?.Count ?? 0) == 0)
+            {
+                break;
+            }
+        }
+
+        return all;
     }
 
     public Task<CodesWholesaleOrder> CreateOrderAsync(SupplierProviderContext context, CodesWholesaleOrderRequest order, CancellationToken cancellationToken) =>

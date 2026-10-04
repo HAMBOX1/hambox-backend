@@ -32,20 +32,20 @@ internal static class CodesWholesaleProviderConstants
     /// <summary>Documented as a fixed scope every API consumer sends (<c>CodesWholesaleClientConfig</c>), not a per-merchant secret.</summary>
     public const string OAuthScope = "administration";
 
-    public const string AccountPath = "/v2/accounts/current";
+    public const string AccountPath = "/v3/accounts/current";
 
-    public const string ProductsPath = "/v2/products";
+    public const string ProductsPath = "/v3/products";
 
-    public const string ProductByIdPathFormat = "/v2/products/{0}";
+    public const string ProductByIdPathFormat = "/v3/products/{0}";
 
-    public const string OrdersPath = "/v2/orders";
+    public const string OrdersPath = "/v3/orders";
 
-    public const string OrderByIdPathFormat = "/v2/orders/{0}";
+    public const string OrderByIdPathFormat = "/v3/orders/{0}";
 
     /// <summary><c>Order::getHistory</c>'s only documented filters — used by this integration purely as a reconciliation fallback (see <c>CodesWholesaleSupplierProvider.GetOrderStatusAsync</c>'s remarks), never for admin browsing.</summary>
-    public const string OrderHistoryPathFormat = "/v2/orders?startFrom={0}&endOn={1}";
+    public const string OrderHistoryPathFormat = "/v3/orders?startFrom={0}&endOn={1}";
 
-    public const string CodeByIdPathFormat = "/v2/codes/{0}";
+    public const string CodeByIdPathFormat = "/v3/codes/{0}";
 
     /// <summary>Code::STATUS value meaning the delivered text code is present and usable now.</summary>
     public const string CodeStatusText = "Text code";

@@ -138,8 +138,7 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
         return cache.GetOrCreateAsync(cacheKey, async entry =>
         {
             entry.AbsoluteExpirationRelativeToNow = SearchCatalogCacheTtl;
-            var response = await httpClient.GetProductsAsync(context, productIds: null, cancellationToken);
-            return response.Items ?? [];
+            return await httpClient.GetAllProductsAsync(context, productIds: null, cancellationToken);
         })!;
     }
 
@@ -159,8 +158,8 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
         {
             foreach (var batch in requestedIds.Chunk(AvailabilityBatchSize))
             {
-                var response = await httpClient.GetProductsAsync(context, batch, cancellationToken);
-                foreach (var product in response.Items ?? [])
+                var products = await httpClient.GetAllProductsAsync(context, batch, cancellationToken);
+                foreach (var product in products)
                 {
                     if (!string.IsNullOrWhiteSpace(product.ProductId))
                     {
@@ -343,23 +342,24 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
 
         foreach (var entry in entries)
         {
-            if (string.Equals(entry.Status, CodesWholesaleProviderConstants.CodeStatusPreOrder, StringComparison.Ordinal))
+            var kind = CodesWholesaleCodeKinds.Classify(entry.Kind);
+            if (kind == CodesWholesaleCodeKind.PreOrder)
             {
                 allDelivered = false;
                 continue;
             }
 
-            if (string.Equals(entry.Status, CodesWholesaleProviderConstants.CodeStatusImage, StringComparison.Ordinal))
+            if (kind == CodesWholesaleCodeKind.Image)
             {
                 throw new CodesWholesaleAmbiguousResponseException(
                     $"CodesWholesale order {order.OrderId} delivered an image-format code (codeId {entry.CodeId}), which this integration cannot store as a text license key — manual reconciliation required. Do not map this product for automated fulfillment.");
             }
 
-            if (!string.Equals(entry.Status, CodesWholesaleProviderConstants.CodeStatusText, StringComparison.Ordinal))
+            if (kind != CodesWholesaleCodeKind.Text)
             {
-                // Unrecognized status string — never guessed as delivered. Stays pending; a later
+                // Unrecognized code kind — never guessed as delivered. Stays pending; a later
                 // reconciliation attempt re-checks it.
-                logger.LogWarning("CodesWholesale order {OrderId} returned an unrecognized code status '{Status}' for codeId {CodeId}.", order.OrderId, entry.Status, entry.CodeId);
+                logger.LogWarning("CodesWholesale order {OrderId} returned an unrecognized code kind '{Kind}' for codeId {CodeId}.", order.OrderId, entry.Kind, entry.CodeId);
                 allDelivered = false;
                 continue;
             }
