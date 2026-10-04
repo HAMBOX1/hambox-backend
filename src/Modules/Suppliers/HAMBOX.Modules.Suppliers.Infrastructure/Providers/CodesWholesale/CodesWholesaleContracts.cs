@@ -82,6 +82,7 @@ internal sealed class CodesWholesalePrice
     [JsonPropertyName("price")]
     public decimal? ValueV2 { get; set; }
 
+    [JsonIgnore]
     public decimal Value => ValueV3 ?? ValueV2 ?? 0m;
 
     [JsonPropertyName("priceRangeLabel")]
