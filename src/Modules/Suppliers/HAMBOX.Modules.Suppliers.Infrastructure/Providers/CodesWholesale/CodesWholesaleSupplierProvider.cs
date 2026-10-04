@@ -130,7 +130,7 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
     }
 
     /// <summary>Bounds how long a pulled catalog is reused across the search box's rapid-fire keystroke requests — never relied on for <see cref="GetAvailabilityAsync"/>'s own correctness, which always pulls fresh (mirrors <c>GlobeTopperSupplierProvider</c>'s identical split).</summary>
-    private static readonly TimeSpan SearchCatalogCacheTtl = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan SearchCatalogCacheTtl = TimeSpan.FromMinutes(60);
 
     /// <summary>
     /// CodesWholesale's v3 price list comes in many small pages and has no name search, so browsing/searching needs the
@@ -156,7 +156,7 @@ internal sealed class CodesWholesaleSupplierProvider(CodesWholesaleHttpClient ht
         try
         {
             var started = DateTimeOffset.UtcNow;
-            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(20));
             var products = await httpClient.GetAllProductsAsync(context, productIds: null, timeout.Token);
             cache.Set(cacheKey, products, SearchCatalogCacheTtl);
             logger.LogInformation(

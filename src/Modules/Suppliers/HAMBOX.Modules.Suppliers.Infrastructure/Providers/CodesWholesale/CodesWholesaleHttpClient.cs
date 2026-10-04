@@ -215,28 +215,56 @@ internal sealed class CodesWholesaleHttpClient(HttpClient httpClient, IOptions<C
         return SendAsync<CodesWholesaleProductListResponse>(context, HttpMethod.Get, path, body: null, cancellationToken);
     }
 
-    /// <summary>API v3 returns the price list in pages; follows <c>continuationToken</c> until it runs out (bounded).</summary>
+    /// <summary>
+    /// API v3 returns the price list in pages; follows <c>continuationToken</c> until it runs out (bounded). The
+    /// whole list is ~460 pages, so pages are fetched at a polite pace and a throttled page ("Too many requests",
+    /// HTTP 429) is waited out and retried instead of failing the whole load.
+    /// </summary>
     public async Task<IReadOnlyList<CodesWholesaleProduct>> GetAllProductsAsync(
         SupplierProviderContext context, IReadOnlyList<string>? productIds, CancellationToken cancellationToken)
     {
         const int maxPages = 3000;
+        const int maxRetriesPerPage = 8;
         var all = new List<CodesWholesaleProduct>();
         string? token = null;
 
         for (var page = 0; page < maxPages; page++)
         {
-            var response = await GetProductsAsync(context, productIds, cancellationToken, token);
-            all.AddRange(response.Items ?? []);
+            CodesWholesaleProductListResponse? response = null;
+            for (var attempt = 0; attempt <= maxRetriesPerPage; attempt++)
+            {
+                try
+                {
+                    response = await GetProductsAsync(context, productIds, cancellationToken, token);
+                    break;
+                }
+                catch (CodesWholesaleApiException ex) when (IsThrottled(ex) && attempt < maxRetriesPerPage)
+                {
+                    // 2s, 4s, 8s ... capped at 30s.
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, 2 << attempt)), cancellationToken);
+                }
+            }
+
+            all.AddRange(response!.Items ?? []);
 
             token = response.ContinuationToken;
             if (string.IsNullOrWhiteSpace(token) || (response.Items?.Count ?? 0) == 0)
             {
                 break;
             }
+
+            // Only the multi-page price-list pull needs pacing; id-filtered availability batches are tiny.
+            if (productIds is null)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+            }
         }
 
         return all;
     }
+
+    private static bool IsThrottled(CodesWholesaleApiException ex) =>
+        ex.HttpStatusCode == 429 || ex.Message.Contains("Too many requests", StringComparison.OrdinalIgnoreCase);
 
     public Task<CodesWholesaleOrder> CreateOrderAsync(SupplierProviderContext context, CodesWholesaleOrderRequest order, CancellationToken cancellationToken) =>
         SendAsync<CodesWholesaleOrder>(context, HttpMethod.Post, CodesWholesaleProviderConstants.OrdersPath, order, cancellationToken);
