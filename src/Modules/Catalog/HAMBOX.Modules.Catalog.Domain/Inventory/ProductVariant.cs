@@ -143,6 +143,19 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         ManualDeliveryCapacity = capacity;
     }
 
+    /// <summary>
+    /// Re-parents this variant under another product (a merge). The variant keeps its SKU, status, codes,
+    /// fulfillment mode and prices; if it never had a price of its own it takes <paramref name="inheritedPrice"/>
+    /// (the old product's base price) so its customer price does not silently change to the new parent's.
+    /// The caller is responsible for assigning the new product's option via <see cref="SetOptions"/>.
+    /// </summary>
+    public void MoveToProduct(Guid productId, decimal? inheritedPrice, int sortOrder)
+    {
+        ProductId = productId;
+        PriceOverride ??= inheritedPrice;
+        SortOrder = sortOrder;
+    }
+
     public void SetOptions(IEnumerable<Guid> optionIds)
     {
         _selectedOptions.Clear();

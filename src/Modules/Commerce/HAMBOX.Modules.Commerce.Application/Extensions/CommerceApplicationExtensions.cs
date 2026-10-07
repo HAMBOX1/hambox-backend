@@ -24,6 +24,7 @@ public static class CommerceApplicationExtensions
         services.AddScoped<IMembershipEngine, MembershipEngine>();
         services.AddScoped<IMembershipAccessProvider, MembershipAccessProvider>();
         services.AddScoped<ICommerceVariantUsageProvider, CommerceVariantUsageProvider>();
+        services.AddScoped<ICommerceVariantRelocator, CommerceVariantRelocator>();
         services.AddScoped<MembershipOperationsService>();
         services.AddScoped<ReferralRewardService>();
         services.AddScoped<ReferralLifecycleService>();

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Variants;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -12,6 +13,7 @@ using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Products.MergeProducts;
 
@@ -21,11 +23,25 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
 
     private readonly ICatalogDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICatalogSuppliersTransactionService _transaction;
+    private readonly IVariantSupplierLinkMover _supplierLinks;
+    private readonly ICommerceVariantRelocator _commerceRelocator;
+    private readonly ILogger<MergeProductsCommandHandler> _logger;
 
-    public MergeProductsCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    public MergeProductsCommandHandler(
+        ICatalogDbContext db,
+        ICurrentUserService currentUser,
+        ICatalogSuppliersTransactionService transaction,
+        IVariantSupplierLinkMover supplierLinks,
+        ICommerceVariantRelocator commerceRelocator,
+        ILogger<MergeProductsCommandHandler> logger)
     {
         _db = db;
         _currentUser = currentUser;
+        _transaction = transaction;
+        _supplierLinks = supplierLinks;
+        _commerceRelocator = commerceRelocator;
+        _logger = logger;
     }
 
     public async Task<Result<MergeProductsResultDto>> Handle(MergeProductsCommand request, CancellationToken cancellationToken)
@@ -45,23 +61,28 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
             return Result.Failure<MergeProductsResultDto>(CatalogErrors.ProductNotFound);
         }
 
-        // A source that already has its own variants would be silently orphaned (its variants stay
-        // put, but the product they belong to disappears from the main catalog list) — block this
-        // rather than guess what the admin wants; they can handle that product on its own first.
-        var sourceIdsWithVariants = await ProductMergeGuard.GetProductIdsWithVariantsAsync(
-            _db, request.SourceProductIds, cancellationToken);
-
-        if (sourceIdsWithVariants.Count > 0)
+        if (request.SourceProductIds.Contains(target.Id))
         {
-            return Result.Failure<MergeProductsResultDto>(
-                CatalogErrors.ProductMergeSourceHasVariants(sourceIdsWithVariants[0]));
+            return Result.Failure<MergeProductsResultDto>(CatalogErrors.ProductPendingMergeSelfReference);
         }
+
+        // A source that already has variants (its own stock, On-Delivery setup, supplier links...) is merged by
+        // MOVING those variants under the target - see the move step below - not by creating a fresh empty one.
+        var sourceVariants = await _db.ProductVariants
+            .Include(v => v.SelectedOptions)
+            .Where(v => !v.IsDeleted && request.SourceProductIds.Contains(v.ProductId))
+            .OrderBy(v => v.SortOrder)
+            .ToListAsync(cancellationToken);
+        var variantsBySource = sourceVariants.GroupBy(v => v.ProductId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var movedOptionLabels = await LoadOptionLabelsAsync(sourceVariants, cancellationToken);
 
         // Product.StockQuantity is a bare counter with no serials/codes behind it — a variant's
         // stock is entirely code-driven (DigitalInventoryCode), so this count has no migration
         // path and would silently disappear. Require an explicit confirmation before doing that.
         // An untouched creation-default counter is a placeholder, not recorded stock, so it doesn't count.
         var sourceIdsWithStock = sources
+            .Where(p => !variantsBySource.ContainsKey(p.Id))
             .Where(p => p.StockQuantity > 0 && p.StockQuantity != Product.DefaultInitialStock)
             .Select(p => p.Id)
             .ToList();
@@ -92,6 +113,7 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
             await _db.ProductVariants.Where(v => !v.IsDeleted).Select(v => v.Sku).ToListAsync(cancellationToken));
 
         var createdVariantIds = new List<Guid>();
+        var moves = new List<VariantMove>();
         var sortOrder = group.Options.Count;
 
         foreach (var source in sources.OrderBy(p => p.Id))
@@ -110,6 +132,42 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
                 optionValue = $"{optionValue}-{source.Id:N}";
             }
             usedOptionValues.Add(optionValue);
+
+            if (variantsBySource.TryGetValue(source.Id, out var movingVariants))
+            {
+                foreach (var moving in movingVariants)
+                {
+                    var movedLabel = movingVariants.Count == 1
+                        ? label
+                        : $"{label} - {DescribeVariant(moving, movedOptionLabels)}";
+                    var movedValue = movedLabel.ToLowerInvariant();
+                    if (usedOptionValues.Contains(movedValue))
+                    {
+                        movedValue = $"{movedValue}-{moving.Id:N}";
+                    }
+                    usedOptionValues.Add(movedValue);
+
+                    var movedOption = group.AddOption(movedValue, movedLabel, sortOrder);
+                    _db.ProductOptions.Add(movedOption);
+
+                    moving.MoveToProduct(target.Id, source.Price, sortOrder);
+                    moving.SetOptions([movedOption.Id]);
+
+                    _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+                        InventoryAuditAction.VariantUpdated,
+                        productId: target.Id,
+                        variantId: moving.Id,
+                        performedByUserId: _currentUser.UserId,
+                        details: $"Moved from product '{source.NameEn}' ({source.Id}) into '{target.NameEn}' by merge"));
+
+                    moves.Add(new VariantMove(moving.Id, source.Id, target.Id));
+                    createdVariantIds.Add(moving.Id);
+                    sortOrder++;
+                }
+
+                _db.Products.Remove(source);
+                continue;
+            }
 
             var option = group.AddOption(optionValue, label, sortOrder);
             _db.ProductOptions.Add(option);
@@ -143,9 +201,70 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
         // One SaveChangesAsync — every new option/variant and every source removal is part of the
         // same EF change-tracking session, so this commits atomically (all or nothing), consistent
         // with every other multi-entity handler in this module (e.g. CreateProductVariantCommandHandler).
-        await _db.SaveChangesAsync(cancellationToken);
+        if (moves.Count == 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            // Catalog and Suppliers commit together: a variant that moved but kept pointing its supplier
+            // mapping at the old product would stop being fulfilled from its supplier.
+            await _transaction.ExecuteAsync(
+                async ct =>
+                {
+                    await _db.SaveChangesAsync(ct);
+
+                    foreach (var move in moves)
+                    {
+                        await _db.ProductInstructions
+                            .Where(i => i.VariantId == move.VariantId)
+                            .ExecuteUpdateAsync(s => s.SetProperty(i => i.ProductId, move.ToProductId), ct);
+                    }
+
+                    await _supplierLinks.MoveAsync(moves, ct);
+                },
+                cancellationToken);
+
+            // Cart lines / alert subscriptions are operational, not history: a failure here must not undo
+            // a merge that already committed, and the call is idempotent so it can be repeated by hand.
+            foreach (var move in moves)
+            {
+                try
+                {
+                    await _commerceRelocator.MoveVariantAsync(move.VariantId, move.ToProductId, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Merge moved variant {VariantId} but could not update its cart/alert rows", move.VariantId);
+                }
+            }
+        }
 
         return Result.Success(new MergeProductsResultDto(target.Id, createdVariantIds, sources.Count));
+    }
+
+    private async Task<Dictionary<Guid, string>> LoadOptionLabelsAsync(
+        IReadOnlyCollection<ProductVariant> variants, CancellationToken cancellationToken)
+    {
+        var optionIds = variants.SelectMany(v => v.SelectedOptions).Select(o => o.OptionId).Distinct().ToList();
+        if (optionIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _db.ProductOptions
+            .Where(o => optionIds.Contains(o.Id))
+            .ToDictionaryAsync(o => o.Id, o => o.Label, cancellationToken);
+    }
+
+    /// <summary>Names a moved variant after the options it used to carry, falling back to its SKU.</summary>
+    private static string DescribeVariant(ProductVariant variant, IReadOnlyDictionary<Guid, string> optionLabels)
+    {
+        var labels = variant.SelectedOptions
+            .Select(o => optionLabels.GetValueOrDefault(o.OptionId))
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .ToList();
+        return labels.Count > 0 ? string.Join(" / ", labels) : variant.Sku;
     }
 
     private static void ApplySourceStatus(ProductVariant variant, ProductStatus sourceStatus)

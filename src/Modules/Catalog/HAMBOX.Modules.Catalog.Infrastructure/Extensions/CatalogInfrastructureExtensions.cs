@@ -51,6 +51,7 @@ public static class CatalogInfrastructureExtensions
         services.AddScoped<ICatalogImportParser, CatalogImportParser>();
         services.AddSingleton<IImportTemplateGenerator, CatalogImportTemplateGenerator>();
         services.AddScoped<ICatalogSuppliersTransactionService, CatalogSuppliersTransactionService>();
+        services.AddScoped<IVariantSupplierLinkMover, VariantSupplierLinkMover>();
         services.AddScoped<IBackgroundJobHandler, ExportCatalogJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ExecuteCatalogImportJobHandler>();
 

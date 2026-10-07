@@ -305,13 +305,6 @@ internal sealed class SetPendingMergeCommandHandler : IRequestHandler<SetPending
             return Result.Failure(CatalogErrors.ProductPendingMergeTargetAlsoPending);
         }
 
-        var sourceIdsWithVariants = await ProductMergeGuard.GetProductIdsWithVariantsAsync(
-            _db, [request.ProductId], cancellationToken);
-        if (sourceIdsWithVariants.Count > 0)
-        {
-            return Result.Failure(CatalogErrors.ProductPendingMergeSourceHasVariants(request.ProductId));
-        }
-
         product.SetPendingMerge(request.TargetProductId);
 
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
