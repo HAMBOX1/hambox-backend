@@ -29,19 +29,34 @@ internal static class InventoryEndpoints
         // to the primary admin (Owner) — a custom role can be granted the permission but never this.
         group.MapGet("/deleted-codes", async (
             [FromQuery] Guid? variantId,
+            [FromQuery] string? searchTerm,
             [FromQuery] int? page,
             [FromQuery] int? pageSize,
             HttpContext httpContext,
             IRbacAuthorizationService rbac,
             ISender sender) =>
         {
-            var userId = rbac.GetCurrentUserId(httpContext.User);
-            if (userId is null || !await rbac.IsOwnerAsync(userId.Value, httpContext.RequestAborted))
+            if (!await IsOwnerAsync(httpContext, rbac))
             {
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
 
-            return await Send(sender, new GetDeletedInventoryCodesQuery(variantId, page ?? 1, pageSize ?? 50));
+            return await Send(sender, new GetDeletedInventoryCodesQuery(variantId, searchTerm, page ?? 1, pageSize ?? 50));
+        })
+            .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
+
+        group.MapPost("/deleted-codes/{archiveId:guid}/restore", async (
+            Guid archiveId,
+            HttpContext httpContext,
+            IRbacAuthorizationService rbac,
+            ISender sender) =>
+        {
+            if (!await IsOwnerAsync(httpContext, rbac))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            return await SendEmpty(sender, new RestoreDeletedInventoryCodeCommand(archiveId));
         })
             .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
 
@@ -393,6 +408,12 @@ internal static class InventoryEndpoints
             return Results.BadRequest(Problem(result));
         })
         .RequirePermission(PermissionConstants.Catalog.Inventory.Export);
+    }
+
+    private static async Task<bool> IsOwnerAsync(HttpContext httpContext, IRbacAuthorizationService rbac)
+    {
+        var userId = rbac.GetCurrentUserId(httpContext.User);
+        return userId is not null && await rbac.IsOwnerAsync(userId.Value, httpContext.RequestAborted);
     }
 
     private static async Task<Results<Ok<T>, BadRequest<ProblemDetails>>> Send<T>(ISender sender, IRequest<Result<T>> request)
