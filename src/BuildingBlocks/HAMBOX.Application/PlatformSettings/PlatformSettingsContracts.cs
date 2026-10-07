@@ -219,7 +219,12 @@ public sealed record AuthenticationSettingsPayload(
     bool RequireUppercase,
     int SessionTimeoutMinutes,
     int RememberMeDurationDays,
-    bool AdminOtpEnabled);
+    bool AdminOtpEnabled,
+    // Admin-portal-only (never applied to the customer/storefront auth context): an admin session
+    // idle (no refresh activity) past AdminIdleTimeoutMinutes, or older than AdminMaxSessionLifetimeHours
+    // regardless of activity, must re-authenticate with Email+Password+OTP.
+    int AdminIdleTimeoutMinutes = 30,
+    int AdminMaxSessionLifetimeHours = 8);
 
 public sealed record SecuritySettingsPayload(
     int MaxFailedAccessAttempts,

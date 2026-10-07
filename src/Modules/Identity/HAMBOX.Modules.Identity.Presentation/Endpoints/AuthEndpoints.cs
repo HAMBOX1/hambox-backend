@@ -261,7 +261,7 @@ public static class AuthEndpoints
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
 
-            var command = new LogoutCommand(refreshTokenPlaintext);
+            var command = new LogoutCommand(refreshTokenPlaintext, httpContext.Connection.RemoteIpAddress?.ToString());
             var result = await sender.Send(command, ct);
 
             AuthCookieWriter.ClearRefreshTokenCookie(httpContext, cookieSettings, environment);
@@ -380,6 +380,16 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var result = await sender.Send(new RevokeAllSessionsCommand(), ct);
+            return LocalizedEndpointResults.FromResult(httpContext, result);
+        }).RequireAuthorization();
+
+        group.MapDelete("sessions/{sessionId:guid}", async (
+            Guid sessionId,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new RevokeSessionCommand(sessionId), ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         }).RequireAuthorization();
 

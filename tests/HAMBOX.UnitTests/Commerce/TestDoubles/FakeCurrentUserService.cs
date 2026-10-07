@@ -11,4 +11,6 @@ internal sealed class FakeCurrentUserService(string? userId, string? displayName
     public bool IsAuthenticated => UserId is not null;
 
     public bool IsAdminContext => UserId is not null;
+
+    public Guid? SessionId => null;
 }

@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using DomainRefreshToken = HAMBOX.Modules.Identity.Domain.Tokens.RefreshToken;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -9,7 +10,9 @@ namespace HAMBOX.Modules.Identity.Application.Features.Logout;
 /// <summary>
 /// Handler for the <see cref="LogoutCommand"/> command.
 /// </summary>
-internal sealed class LogoutCommandHandler(IIdentityDbContext dbContext) : IRequestHandler<LogoutCommand, Result>
+internal sealed class LogoutCommandHandler(
+    IIdentityDbContext dbContext,
+    ISecurityEventLogger securityEventLogger) : IRequestHandler<LogoutCommand, Result>
 {
     /// <inheritdoc />
     public async Task<Result> Handle(LogoutCommand request, CancellationToken cancellationToken)
@@ -33,6 +36,14 @@ internal sealed class LogoutCommandHandler(IIdentityDbContext dbContext) : IRequ
             session?.End();
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await securityEventLogger.LogAsync(
+                SecurityEventType.Logout,
+                SecurityEventSeverity.Low,
+                "User signed out.",
+                targetUserId: token.UserId,
+                ipAddress: request.IpAddress,
+                cancellationToken: cancellationToken);
         }
 
         return Result.Success();

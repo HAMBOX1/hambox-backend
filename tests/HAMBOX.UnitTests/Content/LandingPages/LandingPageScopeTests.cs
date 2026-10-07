@@ -27,6 +27,7 @@ public sealed class LandingPageScopeTests
         public string? DisplayName => null;
         public bool IsAuthenticated => true;
         public bool IsAdminContext => true;
+        public Guid? SessionId => null;
     }
 
     private static ContentDbContext CreateDbContext()

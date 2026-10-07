@@ -52,20 +52,37 @@ internal sealed class ResendAdminOtpCommandHandler(
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(otp.ExpirationMinutes);
         challenge.RecordResend(code, expiresAt);
 
-        dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
-            AdminOtpAuditLog.ActionResent,
-            request.IpAddress,
-            user.Id,
-            challenge.Id));
-
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await emailService.SendAdminLoginOtpAsync(
+        var delivered = await emailService.SendAdminLoginOtpAsync(
             user.Id,
             user.Email,
             code,
             expiresAt,
             cancellationToken);
+
+        if (!delivered)
+        {
+            // The resent code never reached the admin — invalidate it immediately rather than leaving
+            // an undelivered-but-still-guessable code active, and fail closed (no token is ever issued
+            // from this path).
+            challenge.MarkUsed();
+            dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
+                AdminOtpAuditLog.ActionDeliveryFailed,
+                request.IpAddress,
+                user.Id,
+                challenge.Id));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AdminOtpDeliveryFailed);
+        }
+
+        dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
+            AdminOtpAuditLog.ActionResent,
+            request.IpAddress,
+            user.Id,
+            challenge.Id));
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         var resendAvailableAt = DateTimeOffset.UtcNow.AddSeconds(otp.ResendCooldownSeconds);
 

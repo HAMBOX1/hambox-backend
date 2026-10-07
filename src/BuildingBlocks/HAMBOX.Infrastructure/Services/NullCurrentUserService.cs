@@ -19,4 +19,7 @@ public sealed class NullCurrentUserService : ICurrentUserService
 
     /// <inheritdoc />
     public bool IsAdminContext => false;
+
+    /// <inheritdoc />
+    public Guid? SessionId => null;
 }

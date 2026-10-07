@@ -115,6 +115,14 @@ public static class IdentityErrors
         "Identity.AdminLoginChallengeNotFound",
         "The login challenge is invalid or has expired.");
 
+    public static readonly Error AdminOtpDeliveryFailed = new(
+        "Identity.AdminOtpDeliveryFailed",
+        "We couldn't send your verification code. Please try again in a moment.");
+
+    public static readonly Error AdminSessionExpired = new(
+        "Identity.AdminSessionExpired",
+        "Your session has expired. Please sign in again.");
+
     public static readonly Error CustomerContextRequired = new(
         "Identity.CustomerContextRequired",
         "This action requires a customer session.");

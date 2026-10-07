@@ -11,6 +11,7 @@ using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Application.Features.AdminLogin;
@@ -27,7 +28,8 @@ internal sealed class AdminLoginCommandHandler(
     ISecurityEventLogger securityEventLogger,
     IClientInfoParser clientInfoParser,
     ITrustedDeviceService trustedDeviceService,
-    ILoginRiskScorer riskScorer) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
+    ILoginRiskScorer riskScorer,
+    IHostEnvironment environment) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
 {
     public async Task<Result<AdminLoginChallengeResponse>> Handle(
         AdminLoginCommand request,
@@ -147,7 +149,11 @@ internal sealed class AdminLoginCommandHandler(
         var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
         var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
 
-        if (!authentication.AdminOtpEnabled)
+        // Production must never skip OTP, even if Authentication.AdminOtpEnabled was left/flipped to
+        // false in Platform Settings (misconfiguration, or a compromised Settings.Edit account) — the
+        // environment check is the backend-authoritative floor that setting cannot override.
+        var otpRequired = authentication.AdminOtpEnabled || environment.IsProduction();
+        if (!otpRequired)
         {
             dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
                 AdminOtpAuditLog.ActionBypassed,
@@ -204,20 +210,38 @@ internal sealed class AdminLoginCommandHandler(
             request.IpAddress,
             user.Id,
             challenge.Id));
-        dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
-            AdminOtpAuditLog.ActionSent,
-            request.IpAddress,
-            user.Id,
-            challenge.Id));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await emailService.SendAdminLoginOtpAsync(
+        var delivered = await emailService.SendAdminLoginOtpAsync(
             user.Id,
             user.Email,
             code,
             expiresAt,
             cancellationToken);
+
+        if (!delivered)
+        {
+            // The code never reached the admin — invalidate it immediately rather than leaving an
+            // undelivered-but-still-guessable challenge active for its full expiry window, and fail
+            // closed: no token has been issued, so this never lets anyone in without OTP.
+            challenge.MarkUsed();
+            dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
+                AdminOtpAuditLog.ActionDeliveryFailed,
+                request.IpAddress,
+                user.Id,
+                challenge.Id));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AdminOtpDeliveryFailed);
+        }
+
+        dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
+            AdminOtpAuditLog.ActionSent,
+            request.IpAddress,
+            user.Id,
+            challenge.Id));
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         var resendAvailableAt = DateTimeOffset.UtcNow.AddSeconds(otp.ResendCooldownSeconds);
 

@@ -14,6 +14,7 @@ public sealed class AdminOtpAuditLog : Entity
     public const string ActionLocked = "Locked";
     public const string ActionResent = "Resent";
     public const string ActionBypassed = "Bypassed";
+    public const string ActionDeliveryFailed = "DeliveryFailed";
 
     private AdminOtpAuditLog()
     {

@@ -246,7 +246,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             var baseVariantRows = await _dbContext.ProductVariants
                 .AsNoTracking()
                 .Where(v => productIds.Contains(v.ProductId) && !v.IsDeleted)
-                .Select(v => new { v.ProductId, v.PriceOverride, v.CostPrice, v.MemberPrice })
+                .Select(v => new { v.ProductId, v.PriceOverride, v.CostPrice, v.MemberPrice, v.Sku, v.SortOrder })
                 .ToListAsync(cancellationToken);
 
             var variantsByProduct = baseVariantRows.ToLookup(v => v.ProductId);
@@ -266,8 +266,13 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     var (saleMin, saleMax) = variants.Count == 0
                         ? (p.Price, p.Price)
                         : Range(variants.Select(v => v.PriceOverride ?? p.Price));
+                    var representativeSku = variants.OrderBy(v => v.SortOrder).Select(v => v.Sku).FirstOrDefault();
 
-                    return p with { PriceTiers = new ProductPriceTiersDto(costMin, costMax, saleMin, saleMax, memberMin, memberMax) };
+                    return p with
+                    {
+                        PriceTiers = new ProductPriceTiersDto(costMin, costMax, saleMin, saleMax, memberMin, memberMax),
+                        RepresentativeSku = representativeSku,
+                    };
                 })
                 .ToList();
         }

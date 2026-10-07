@@ -46,4 +46,14 @@ public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor)
             httpContextAccessor.HttpContext?.User.FindFirst("auth_context")?.Value,
             "admin",
             StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public Guid? SessionId
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.User.FindFirst("session_id")?.Value;
+            return Guid.TryParse(value, out var sessionId) ? sessionId : null;
+        }
+    }
 }

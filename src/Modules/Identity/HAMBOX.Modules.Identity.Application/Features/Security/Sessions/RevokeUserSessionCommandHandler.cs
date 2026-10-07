@@ -1,13 +1,17 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Errors;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Identity.Application.Features.Security.Sessions;
 
-internal sealed class RevokeUserSessionCommandHandler(IIdentityDbContext dbContext)
-    : IRequestHandler<RevokeUserSessionCommand, Result>
+internal sealed class RevokeUserSessionCommandHandler(
+    IIdentityDbContext dbContext,
+    ICurrentUserService currentUser,
+    ISecurityEventLogger securityEventLogger) : IRequestHandler<RevokeUserSessionCommand, Result>
 {
     public async Task<Result> Handle(RevokeUserSessionCommand request, CancellationToken cancellationToken)
     {
@@ -37,6 +41,15 @@ internal sealed class RevokeUserSessionCommandHandler(IIdentityDbContext dbConte
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        Guid.TryParse(currentUser.UserId, out var actorUserId);
+        await securityEventLogger.LogAsync(
+            SecurityEventType.SessionRevoked,
+            SecurityEventSeverity.Medium,
+            "An administrator revoked a single session for this user.",
+            actorUserId: actorUserId == Guid.Empty ? null : actorUserId,
+            targetUserId: request.UserId,
+            cancellationToken: cancellationToken);
 
         return Result.Success();
     }

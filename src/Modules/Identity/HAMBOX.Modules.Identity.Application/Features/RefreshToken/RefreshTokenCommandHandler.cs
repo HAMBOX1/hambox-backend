@@ -24,6 +24,7 @@ internal sealed class RefreshTokenCommandHandler(
     ITokenGenerator tokenGenerator,
     IUserClaimsService userClaimsService,
     IPlatformSettingsProvider platformSettings,
+    ISecurityEventLogger securityEventLogger,
     IOptions<JwtSettings> jwtSettings) : IRequestHandler<RefreshTokenCommand, Result<AuthTokenResponse>>
 {
     /// <inheritdoc />
@@ -70,6 +71,15 @@ internal sealed class RefreshTokenCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
         }
 
+        if (existingToken.AuthContext == AuthContextTypes.Admin)
+        {
+            var expiryResult = await RejectIfAdminSessionExpiredAsync(session, existingToken, cancellationToken);
+            if (expiryResult is not null)
+            {
+                return expiryResult;
+            }
+        }
+
         var newRefreshTokenValue = tokenGenerator.GenerateSecureToken();
         var refreshExpiresAt = await ResolveRefreshExpirationAsync(existingToken.IsPersistent, cancellationToken);
         var (newRefreshToken, _) = DomainRefreshToken.Issue(
@@ -102,6 +112,44 @@ internal sealed class RefreshTokenCommandHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt, refreshExpiresAt));
+    }
+
+    /// <summary>
+    /// Admin-portal-only backend-authoritative session lifetime enforcement: idle timeout (no
+    /// refresh activity for <c>AdminIdleTimeoutMinutes</c>) and absolute max lifetime (older than
+    /// <c>AdminMaxSessionLifetimeHours</c> from <see cref="UserSession.StartedOnUtc"/>, regardless of
+    /// activity). Neither can be extended by refreshing — both end the session server-side and
+    /// require a fresh Email+Password+OTP login. Never applied to the customer/storefront context.
+    /// </summary>
+    /// <returns>A failure result if the session has expired; otherwise <see langword="null"/>.</returns>
+    private async Task<Result<AuthTokenResponse>?> RejectIfAdminSessionExpiredAsync(
+        UserSession session, DomainRefreshToken existingToken, CancellationToken cancellationToken)
+    {
+        var auth = await platformSettings.GetAuthenticationAsync(cancellationToken);
+        var idleTimeout = TimeSpan.FromMinutes(auth.AdminIdleTimeoutMinutes);
+        var maxLifetime = TimeSpan.FromHours(auth.AdminMaxSessionLifetimeHours);
+
+        var idleExceeded = session.HasExceededIdleTimeout(idleTimeout);
+        var lifetimeExceeded = session.HasExceededMaxLifetime(maxLifetime);
+        if (!idleExceeded && !lifetimeExceeded)
+        {
+            return null;
+        }
+
+        existingToken.Revoke();
+        session.End();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await securityEventLogger.LogAsync(
+            SecurityEventType.SessionExpired,
+            SecurityEventSeverity.Low,
+            idleExceeded
+                ? $"Admin session ended: idle for longer than {auth.AdminIdleTimeoutMinutes} minutes."
+                : $"Admin session ended: exceeded the {auth.AdminMaxSessionLifetimeHours}-hour maximum session lifetime.",
+            targetUserId: existingToken.UserId,
+            cancellationToken: cancellationToken);
+
+        return Result.Failure<AuthTokenResponse>(IdentityErrors.AdminSessionExpired);
     }
 
     private async Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken)

@@ -1,4 +1,6 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,9 @@ namespace HAMBOX.Modules.Identity.Application.Features.Security.Sessions;
 
 internal sealed class RevokeAllUserSessionsCommandHandler(
     IIdentityDbContext dbContext,
-    IUserAuthorizationInvalidationService invalidationService) : IRequestHandler<RevokeAllUserSessionsCommand, Result>
+    IUserAuthorizationInvalidationService invalidationService,
+    ICurrentUserService currentUser,
+    ISecurityEventLogger securityEventLogger) : IRequestHandler<RevokeAllUserSessionsCommand, Result>
 {
     public async Task<Result> Handle(RevokeAllUserSessionsCommand request, CancellationToken cancellationToken)
     {
@@ -34,6 +38,15 @@ internal sealed class RevokeAllUserSessionsCommandHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await invalidationService.InvalidateUserAsync(request.UserId, cancellationToken);
+
+        Guid.TryParse(currentUser.UserId, out var actorUserId);
+        await securityEventLogger.LogAsync(
+            SecurityEventType.SignOutAllDevices,
+            SecurityEventSeverity.Medium,
+            "An administrator revoked all sessions for this user.",
+            actorUserId: actorUserId == Guid.Empty ? null : actorUserId,
+            targetUserId: request.UserId,
+            cancellationToken: cancellationToken);
 
         return Result.Success();
     }

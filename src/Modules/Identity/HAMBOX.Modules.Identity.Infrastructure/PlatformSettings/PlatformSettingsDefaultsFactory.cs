@@ -239,7 +239,9 @@ internal static class PlatformSettingsDefaultsFactory
             RequireUppercase: false,
             SessionTimeoutMinutes: jwt.AccessTokenExpirationMinutes,
             RememberMeDurationDays: jwt.RefreshTokenExpirationDays,
-            AdminOtpEnabled: true);
+            AdminOtpEnabled: true,
+            AdminIdleTimeoutMinutes: 30,
+            AdminMaxSessionLifetimeHours: 8);
     }
 
     private static SecuritySettingsPayload CreateSecurity(IConfiguration configuration)

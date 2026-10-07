@@ -201,6 +201,7 @@ public sealed class VariantPermanentDeleteConcurrencyTests : IAsyncLifetime
         public string? DisplayName => null;
         public bool IsAuthenticated => UserId is not null;
         public bool IsAdminContext => UserId is not null;
+        public Guid? SessionId => null;
     }
 
     private sealed class ThrowingPlatformSettingsProvider : IPlatformSettingsProvider

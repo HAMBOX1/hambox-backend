@@ -13,4 +13,5 @@ public sealed record UserSessionDto(
     DateTimeOffset StartedOnUtc,
     DateTimeOffset LastActivityOnUtc,
     DateTimeOffset? EndedOnUtc,
-    bool IsActive);
+    bool IsActive,
+    bool IsCurrent = false);

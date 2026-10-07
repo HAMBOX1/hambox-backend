@@ -29,4 +29,11 @@ public interface ICurrentUserService
     /// identities to anonymous visitors.
     /// </summary>
     bool IsAdminContext { get; }
+
+    /// <summary>
+    /// Gets the session identifier (<c>UserSession.Id</c>) carried on the current access token, or
+    /// <see langword="null"/> if the token predates this claim or isn't present. Lets a "sign out
+    /// everywhere" handler distinguish and preserve the caller's own current session.
+    /// </summary>
+    Guid? SessionId { get; }
 }

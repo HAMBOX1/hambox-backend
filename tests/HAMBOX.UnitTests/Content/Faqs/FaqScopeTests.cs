@@ -32,6 +32,7 @@ public sealed class FaqScopeTests
         public string? DisplayName => null;
         public bool IsAuthenticated => true;
         public bool IsAdminContext => true;
+        public Guid? SessionId => null;
     }
 
     private static readonly ICurrentUserService CurrentUser = new FakeCurrentUserService();

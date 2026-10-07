@@ -183,6 +183,20 @@ public sealed class UserSession : Entity
     }
 
     /// <summary>
+    /// Gets a value indicating whether this session has had no recorded activity for longer than
+    /// <paramref name="idleTimeout"/>.
+    /// </summary>
+    public bool HasExceededIdleTimeout(TimeSpan idleTimeout) =>
+        DateTimeOffset.UtcNow - LastActivityOnUtc > idleTimeout;
+
+    /// <summary>
+    /// Gets a value indicating whether this session is older than <paramref name="maxLifetime"/>,
+    /// measured from <see cref="StartedOnUtc"/> regardless of ongoing activity.
+    /// </summary>
+    public bool HasExceededMaxLifetime(TimeSpan maxLifetime) =>
+        DateTimeOffset.UtcNow - StartedOnUtc > maxLifetime;
+
+    /// <summary>
     /// Ends the session.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when the session has already ended.</exception>

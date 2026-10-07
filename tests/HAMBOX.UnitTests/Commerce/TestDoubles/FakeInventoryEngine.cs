@@ -125,6 +125,10 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
 
     public Task<int> ExpireStaleReservationsAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
 
+    public Task<bool> TryConsumeManualDeliveryCapacityAsync(
+        Guid variantId, int quantity, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Not needed by H1 tests.");
+
     public Task<int> ReleaseSoldCodesForOrderAsync(
         Guid orderId, string? performedByUserId, CancellationToken cancellationToken = default) => Task.FromResult(0);
 

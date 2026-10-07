@@ -21,6 +21,7 @@ internal sealed class GetSessionsQueryHandler(
             return Result.Failure<IReadOnlyCollection<UserSessionDto>>(IdentityErrors.AuthenticationRequired);
         }
 
+        var currentSessionId = currentUser.SessionId;
         var sessions = await dbContext.UserSessions
             .Where(s => s.UserId == userId)
             .OrderByDescending(s => s.StartedOnUtc)
@@ -35,7 +36,8 @@ internal sealed class GetSessionsQueryHandler(
                 s.StartedOnUtc,
                 s.LastActivityOnUtc,
                 s.EndedOnUtc,
-                s.EndedOnUtc == null))
+                s.EndedOnUtc == null,
+                s.Id == currentSessionId))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyCollection<UserSessionDto>>(sessions);

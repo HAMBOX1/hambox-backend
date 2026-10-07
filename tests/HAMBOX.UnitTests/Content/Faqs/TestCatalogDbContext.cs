@@ -42,6 +42,8 @@ public sealed class TestCatalogDbContext(DbContextOptions<TestCatalogDbContext> 
     public DbSet<DigitalInventoryCode> DigitalInventoryCodes => Set<DigitalInventoryCode>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
+    public DbSet<DeletedInventoryCode> DeletedInventoryCodes => Set<DeletedInventoryCode>();
+    public DbSet<CategoryFacetSetting> CategoryFacetSettings => Set<CategoryFacetSetting>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
     public DbSet<ProductViewEvent> ProductViewEvents => Set<ProductViewEvent>();
     public DbSet<CatalogPackageJob> CatalogPackageJobs => Set<CatalogPackageJob>();

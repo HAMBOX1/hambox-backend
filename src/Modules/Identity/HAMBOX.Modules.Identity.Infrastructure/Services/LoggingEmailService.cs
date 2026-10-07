@@ -50,6 +50,18 @@ internal sealed class LoggingEmailService(
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken = default)
     {
+        // Unlike the other email types here, an admin OTP code is a security secret, not a
+        // convenience link — logging it is only acceptable as a Development shortcut. Outside
+        // Development (Email.Enabled=false in Staging/Production), delivery must fail closed rather
+        // than silently "succeed" by writing the code to the application log.
+        if (!environment.IsDevelopment())
+        {
+            logger.LogWarning(
+                "Admin OTP delivery skipped for user {UserId}: email delivery is disabled (Email.Enabled=false) outside Development. Treating as a delivery failure.",
+                userId);
+            return Task.FromResult(false);
+        }
+
         LogOtp("AdminLoginOtp", userId, email, expiresAt, code);
         return Task.FromResult(true);
     }
@@ -89,19 +101,10 @@ internal sealed class LoggingEmailService(
             expiresAt,
             correlationId);
 
-        if (environment.IsDevelopment())
-        {
-            logger.LogWarning(
-                "Development OTP for {EmailType}, user {UserId}: {Secret}. Use the code from the most recent sign-in or resend. CorrelationId={CorrelationId}",
-                emailType,
-                userId,
-                secret,
-                correlationId);
-            return;
-        }
-
-        logger.LogDebug(
-            "Email fallback secret for {EmailType}, user {UserId}: {Secret}. CorrelationId={CorrelationId}",
+        // Only reached in Development (see SendAdminLoginOtpAsync) — logging the plaintext code is a
+        // deliberate dev convenience, never acceptable outside Development.
+        logger.LogWarning(
+            "Development OTP for {EmailType}, user {UserId}: {Secret}. Use the code from the most recent sign-in or resend. CorrelationId={CorrelationId}",
             emailType,
             userId,
             secret,

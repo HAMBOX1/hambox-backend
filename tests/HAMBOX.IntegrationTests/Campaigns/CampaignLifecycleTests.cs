@@ -60,6 +60,7 @@ public sealed class CampaignLifecycleTests : IDisposable
         public string? DisplayName => "test-admin@hambox.test";
         public bool IsAuthenticated => true;
         public bool IsAdminContext => true;
+        public Guid? SessionId => null;
     }
 
     private static async Task<StoreTheme> SeedThemeAsync(ThemesDbContext db, string slug, bool published = true)

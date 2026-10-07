@@ -359,5 +359,142 @@ public sealed class CookieAuthFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task RevokeAllSessions_PreservesTheCallersOwnSession_ButRevokesOthers()
+    {
+        // Two separate logged-in "devices" for the same user.
+        using var sessionAClient = _factory.CreateDefaultClient(new Uri("https://localhost"));
+        sessionAClient.DefaultRequestHeaders.Add("User-Agent", "HAMBOX-IntegrationTests/1.0 (DeviceA)");
+        using var sessionALogin = await sessionAClient.PostAsJsonAsync(
+            "api/auth/login", new { Email = _email, Password, RememberMe = false });
+        var sessionABody = await sessionALogin.Content.ReadFromJsonAsync<AccessTokenBody>();
+
+        using var sessionBClient = _factory.CreateDefaultClient(new Uri("https://localhost"));
+        sessionBClient.DefaultRequestHeaders.Add("User-Agent", "HAMBOX-IntegrationTests/1.0 (DeviceB)");
+        using var sessionBLogin = await sessionBClient.PostAsJsonAsync(
+            "api/auth/login", new { Email = _email, Password, RememberMe = false });
+        var sessionBBody = await sessionBLogin.Content.ReadFromJsonAsync<AccessTokenBody>();
+        var sessionBRefreshCookie = ExtractSetCookieValue(sessionBLogin, RefreshCookieName);
+        var sessionBCsrf = ExtractSetCookieValue(sessionBLogin, CsrfCookieName);
+
+        // Caller is session A: ask to sign out everyone else.
+        using var revokeRequest = new HttpRequestMessage(HttpMethod.Post, "api/auth/sessions/revoke-all");
+        revokeRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionABody!.AccessToken);
+        using var revokeResponse = await sessionAClient.SendAsync(revokeRequest);
+        Assert.Equal(HttpStatusCode.OK, revokeResponse.StatusCode);
+
+        // Session A's own still-live access token must keep working, immediately.
+        using var meForA = new HttpRequestMessage(HttpMethod.Get, "api/auth/me");
+        meForA.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionABody.AccessToken);
+        using var meForAResponse = await sessionAClient.SendAsync(meForA);
+        Assert.Equal(HttpStatusCode.OK, meForAResponse.StatusCode);
+
+        // Session B's still-unexpired access token must be rejected in real time — proves the
+        // UserSession was actually ended, not just the refresh token revoked (OnTokenValidated's
+        // ISessionValidator check), so a stolen device can't keep using a live access token after
+        // "sign out all other sessions" ran from a different device.
+        using var meForB = new HttpRequestMessage(HttpMethod.Get, "api/auth/me");
+        meForB.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionBBody!.AccessToken);
+        using var meForBResponse = await sessionBClient.SendAsync(meForB);
+        Assert.Equal(HttpStatusCode.Unauthorized, meForBResponse.StatusCode);
+
+        // Session B's refresh token must be revoked too.
+        using var refreshBRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", sessionBRefreshCookie, sessionBCsrf);
+        using var refreshBResponse = await sessionBClient.SendAsync(refreshBRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, refreshBResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSessions_MarksTheCallingSessionAsCurrent_AndNotOthers()
+    {
+        using var sessionAClient = _factory.CreateDefaultClient(new Uri("https://localhost"));
+        sessionAClient.DefaultRequestHeaders.Add("User-Agent", "HAMBOX-IntegrationTests/1.0 (DeviceA)");
+        using var sessionALogin = await sessionAClient.PostAsJsonAsync(
+            "api/auth/login", new { Email = _email, Password, RememberMe = false });
+        var sessionABody = await sessionALogin.Content.ReadFromJsonAsync<AccessTokenBody>();
+
+        using var sessionBClient = _factory.CreateDefaultClient(new Uri("https://localhost"));
+        sessionBClient.DefaultRequestHeaders.Add("User-Agent", "HAMBOX-IntegrationTests/1.0 (DeviceB)");
+        await sessionBClient.PostAsJsonAsync("api/auth/login", new { Email = _email, Password, RememberMe = false });
+
+        using var sessionsRequest = new HttpRequestMessage(HttpMethod.Get, "api/auth/sessions");
+        sessionsRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessionABody!.AccessToken);
+        using var sessionsResponse = await sessionAClient.SendAsync(sessionsRequest);
+
+        Assert.Equal(HttpStatusCode.OK, sessionsResponse.StatusCode);
+        var sessions = await sessionsResponse.Content.ReadFromJsonAsync<List<SessionListItem>>();
+
+        Assert.Equal(2, sessions!.Count(s => s.IsActive));
+        Assert.Single(sessions, s => s.IsCurrent);
+    }
+
+    [Fact]
+    public async Task RevokeSession_OwnedByCaller_EndsIt_AndRejectsFutureRefresh()
+    {
+        using var loginResponse = await LoginAsync();
+        var body = await loginResponse.Content.ReadFromJsonAsync<AccessTokenBody>();
+        var refreshCookie = ExtractSetCookieValue(loginResponse, RefreshCookieName);
+        var csrfValue = ExtractSetCookieValue(loginResponse, CsrfCookieName);
+
+        using var sessionsRequest = new HttpRequestMessage(HttpMethod.Get, "api/auth/sessions");
+        sessionsRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", body!.AccessToken);
+        using var sessionsResponse = await _client.SendAsync(sessionsRequest);
+        var sessions = await sessionsResponse.Content.ReadFromJsonAsync<List<SessionListItem>>();
+        var currentSessionId = sessions!.Single(s => s.IsCurrent).Id;
+
+        using var revokeRequest = new HttpRequestMessage(HttpMethod.Delete, $"api/auth/sessions/{currentSessionId}");
+        revokeRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", body.AccessToken);
+        using var revokeResponse = await _client.SendAsync(revokeRequest);
+        Assert.Equal(HttpStatusCode.OK, revokeResponse.StatusCode);
+
+        using var refreshRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", refreshCookie, csrfValue);
+        using var refreshResponse = await _client.SendAsync(refreshRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task RevokeSession_NotOwnedByCaller_Fails()
+    {
+        using var ownerLogin = await LoginAsync();
+        var ownerBody = await ownerLogin.Content.ReadFromJsonAsync<AccessTokenBody>();
+
+        using var ownerSessionsRequest = new HttpRequestMessage(HttpMethod.Get, "api/auth/sessions");
+        ownerSessionsRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ownerBody!.AccessToken);
+        using var ownerSessionsResponse = await _client.SendAsync(ownerSessionsRequest);
+        var ownerSessions = await ownerSessionsResponse.Content.ReadFromJsonAsync<List<SessionListItem>>();
+        var ownerSessionId = ownerSessions!.Single(s => s.IsCurrent).Id;
+
+        var otherEmail = $"cookie-auth-other-{Guid.NewGuid():N}@example.com";
+        await SeedActiveUserAsync(otherEmail);
+        using var otherClient = _factory.CreateDefaultClient(new Uri("https://localhost"));
+        otherClient.DefaultRequestHeaders.Add("User-Agent", "HAMBOX-IntegrationTests/1.0 (Other)");
+        using var otherLogin = await otherClient.PostAsJsonAsync(
+            "api/auth/login", new { Email = otherEmail, Password, RememberMe = false });
+        var otherBody = await otherLogin.Content.ReadFromJsonAsync<AccessTokenBody>();
+
+        // The other user tries to revoke the owner's session by guessing/observing its id.
+        using var revokeRequest = new HttpRequestMessage(HttpMethod.Delete, $"api/auth/sessions/{ownerSessionId}");
+        revokeRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", otherBody!.AccessToken);
+        using var revokeResponse = await otherClient.SendAsync(revokeRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, revokeResponse.StatusCode);
+
+        // The owner's session must still be untouched.
+        using var meRequest = new HttpRequestMessage(HttpMethod.Get, "api/auth/me");
+        meRequest.Headers.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ownerBody.AccessToken);
+        using var meResponse = await _client.SendAsync(meRequest);
+        Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
+    }
+
     private sealed record AccessTokenBody(string AccessToken, DateTimeOffset ExpiresAt);
+
+    private sealed record SessionListItem(Guid Id, bool IsActive, bool IsCurrent);
 }
