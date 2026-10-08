@@ -220,7 +220,7 @@ public sealed class DotPaymentVerificationService(
             // Paid but not (yet, or fully) delivered — same safety net an admin-triggered
             // fulfillment retry uses, not a DOT-specific path.
             await jobQueue.EnqueueAsync(
-                OperationalJobTypes.RetryOrderFulfillment,
+                OperationalJobTypes.ExecuteOrderFulfillment,
                 JsonSerializer.Serialize(new { orderId = order.Id }),
                 OperationalJobPriority.High,
                 relatedEntityType: "Order",

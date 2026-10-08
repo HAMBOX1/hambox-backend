@@ -183,7 +183,7 @@ public sealed class CryptomusPaymentVerificationService(
         if (order.Status != OrderStatus.Completed)
         {
             await jobQueue.EnqueueAsync(
-                OperationalJobTypes.RetryOrderFulfillment,
+                OperationalJobTypes.ExecuteOrderFulfillment,
                 JsonSerializer.Serialize(new { orderId = order.Id }),
                 OperationalJobPriority.High,
                 relatedEntityType: "Order",
