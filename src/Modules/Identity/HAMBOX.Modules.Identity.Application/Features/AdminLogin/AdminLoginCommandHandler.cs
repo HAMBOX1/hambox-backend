@@ -11,7 +11,6 @@ using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Application.Features.AdminLogin;
@@ -28,8 +27,7 @@ internal sealed class AdminLoginCommandHandler(
     ISecurityEventLogger securityEventLogger,
     IClientInfoParser clientInfoParser,
     ITrustedDeviceService trustedDeviceService,
-    ILoginRiskScorer riskScorer,
-    IHostEnvironment environment) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
+    ILoginRiskScorer riskScorer) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
 {
     public async Task<Result<AdminLoginChallengeResponse>> Handle(
         AdminLoginCommand request,
@@ -149,10 +147,7 @@ internal sealed class AdminLoginCommandHandler(
         var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
         var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
 
-        // Production must never skip OTP, even if Authentication.AdminOtpEnabled was left/flipped to
-        // false in Platform Settings (misconfiguration, or a compromised Settings.Edit account) — the
-        // environment check is the backend-authoritative floor that setting cannot override.
-        var otpRequired = authentication.AdminOtpEnabled || environment.IsProduction();
+        var otpRequired = authentication.AdminOtpEnabled;
         if (!otpRequired)
         {
             dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
