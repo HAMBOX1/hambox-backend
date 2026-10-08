@@ -32,7 +32,7 @@ internal abstract class OrderRetryJobHandlerBase(
             ?? throw new InvalidOperationException($"Order {orderId} not found.");
 
         var result = await fulfillment.FulfillMissingAsync(order, cancellationToken);
-        if (result.CodesDelivered == 0)
+        if (result.CodesDelivered == 0 && !result.OrderCompleted)
         {
             throw new InvalidOperationException("No codes were delivered on retry.");
         }

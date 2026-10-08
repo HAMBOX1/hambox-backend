@@ -184,25 +184,24 @@ public sealed class OrderFulfillmentService
         }
 
         var orderCompleted = false;
-        if (delivered > 0 && order.Status is OrderStatus.Pending or OrderStatus.Processing)
+        if (order.Status is OrderStatus.Pending or OrderStatus.Processing)
         {
-            var allKeys = await _commerceDb.OrderLicenseKeys
-                .Where(k => k.OrderId == order.Id)
-                .ToListAsync(cancellationToken);
+            // existingKeys + delivered, not a fresh query: the keys added above are still unsaved, so a
+            // database count would miss them and leave a fully delivered order stuck in Processing.
+            // Also runs when nothing new was delivered, so a retry can finish an order whose keys
+            // are all attached but whose status never advanced.
+            var totalKeys = existingKeys.Count + delivered;
 
             var required = order.Items
                 .Where(i => i.LineItemType == OrderLineItemType.Product)
                 .Sum(i => i.Quantity);
 
-            if (allKeys.Count >= required && required > 0)
+            if (totalKeys >= required && required > 0)
             {
-                if (order.Status == OrderStatus.Processing || order.Status == OrderStatus.Pending)
-                {
-                    order.Complete();
-                    orderCompleted = true;
-                }
+                order.Complete();
+                orderCompleted = true;
             }
-            else if (order.Status == OrderStatus.Pending)
+            else if (delivered > 0 && order.Status == OrderStatus.Pending)
             {
                 order.MarkProcessing();
             }

@@ -68,7 +68,7 @@ internal sealed class RetryAdminOrderFulfillmentCommandHandler
 
                 result = await _fulfillmentService.FulfillMissingAsync(order, ct);
 
-                if (result.CodesDelivered == 0)
+                if (result.CodesDelivered == 0 && !result.OrderCompleted)
                 {
                     throw new InvalidOperationException(CommerceErrors.OrderFulfillmentNothingToRetry.Description);
                 }
