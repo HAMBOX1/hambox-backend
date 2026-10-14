@@ -17,6 +17,9 @@ internal sealed class OrderPaymentCallbackConfiguration : IEntityTypeConfigurati
         builder.Property(c => c.Status).HasMaxLength(32).IsRequired();
         builder.Property(c => c.TransactionId).HasMaxLength(128);
         builder.Property(c => c.PayloadJson).IsRequired();
+        builder.Property(c => c.SignatureVerificationResult).HasMaxLength(64);
+        builder.Property(c => c.GatewayReference).HasMaxLength(200);
+        builder.Property(c => c.ProcessingResult).HasMaxLength(64);
 
         builder.HasIndex(c => c.OrderId).HasDatabaseName("IX_OrderPaymentCallbacks_OrderId");
         builder.HasIndex(c => c.OccurredOnUtc).HasDatabaseName("IX_OrderPaymentCallbacks_OccurredOnUtc");

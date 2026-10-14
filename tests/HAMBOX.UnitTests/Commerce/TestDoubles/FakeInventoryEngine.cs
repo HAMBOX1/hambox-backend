@@ -110,6 +110,41 @@ internal sealed class FakeInventoryEngine(ICatalogDbContext catalogDb) : IInvent
         return reserved;
     }
 
+    /// <summary>Codes held for a pending order (configured per test), by order id.</summary>
+    public Dictionary<Guid, List<ReservedCodeSnapshot>> HeldByOrder { get; } = [];
+
+    public List<(Guid OrderId, string Reason)> OrderReleases { get; } = [];
+
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveForOrderAsync(
+        Guid variantId, int maxQuantity, string? userId, Guid orderId, DateTimeOffset holdUntilUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var available = AvailableStockByVariant.GetValueOrDefault(variantId);
+        var toReserve = Math.Min(available, maxQuantity);
+        var reserved = toReserve <= 0 ? [] : ReserveInternal(variantId, toReserve);
+        if (!HeldByOrder.TryGetValue(orderId, out var list))
+        {
+            HeldByOrder[orderId] = list = [];
+        }
+
+        list.AddRange(reserved);
+        return Task.FromResult<IReadOnlyList<ReservedCodeSnapshot>>(reserved);
+    }
+
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ClaimOrderHoldsAsync(
+        Guid orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ReservedCodeSnapshot>>(
+            HeldByOrder.TryGetValue(orderId, out var list) ? list.ToList() : []);
+
+    public Task<int> ReleaseReservationsForOrderAsync(
+        Guid orderId, string reason, CancellationToken cancellationToken = default)
+    {
+        OrderReleases.Add((orderId, reason));
+        var count = HeldByOrder.TryGetValue(orderId, out var list) ? list.Count : 0;
+        HeldByOrder.Remove(orderId);
+        return Task.FromResult(count);
+    }
+
     public Task ReleaseReservationsForCartAsync(Guid cartId, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 

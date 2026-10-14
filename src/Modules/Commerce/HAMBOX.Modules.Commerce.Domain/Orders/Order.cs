@@ -112,6 +112,52 @@ public sealed class Order : AggregateRoot
 
     public OrderKind Kind { get; private set; }
 
+    /// <summary>When not <see cref="OrderHoldKind.None"/>, nothing is delivered automatically — an admin must release the hold.</summary>
+    public OrderHoldKind HoldKind { get; private set; }
+
+    public string? HoldReason { get; private set; }
+
+    public DateTimeOffset? HeldOnUtc { get; private set; }
+
+    public string? HoldReleasedByUserId { get; private set; }
+
+    public DateTimeOffset? HoldReleasedOnUtc { get; private set; }
+
+    public bool IsOnHold => HoldKind != OrderHoldKind.None;
+
+    public void PlaceOnHold(OrderHoldKind kind, string reason)
+    {
+        if (kind == OrderHoldKind.None)
+        {
+            throw new ArgumentException("Use ReleaseHold to clear a hold.", nameof(kind));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.Refunded or OrderStatus.Failed)
+        {
+            throw new InvalidOperationException("Only open orders can be placed on hold.");
+        }
+
+        HoldKind = kind;
+        HoldReason = reason.Trim().Length > 500 ? reason.Trim()[..500] : reason.Trim();
+        HeldOnUtc = DateTimeOffset.UtcNow;
+        HoldReleasedByUserId = null;
+        HoldReleasedOnUtc = null;
+    }
+
+    public void ReleaseHold(string releasedByUserId)
+    {
+        if (HoldKind == OrderHoldKind.None)
+        {
+            return;
+        }
+
+        HoldKind = OrderHoldKind.None;
+        HoldReleasedByUserId = releasedByUserId;
+        HoldReleasedOnUtc = DateTimeOffset.UtcNow;
+    }
+
     public MembershipCheckoutAction? MembershipAction { get; private set; }
 
     public Guid? MembershipPlanId { get; private set; }

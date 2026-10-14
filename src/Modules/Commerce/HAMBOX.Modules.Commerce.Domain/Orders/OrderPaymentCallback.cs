@@ -18,9 +18,15 @@ public sealed class OrderPaymentCallback : Entity
         string eventType,
         string status,
         string? transactionId,
-        string payloadJson)
+        string payloadJson,
+        string? signatureVerificationResult,
+        string? gatewayReference,
+        string? processingResult)
         : base(id)
     {
+        SignatureVerificationResult = signatureVerificationResult;
+        GatewayReference = gatewayReference;
+        ProcessingResult = processingResult;
         OrderId = orderId;
         Provider = provider;
         EventType = eventType;
@@ -44,13 +50,25 @@ public sealed class OrderPaymentCallback : Entity
 
     public DateTimeOffset OccurredOnUtc { get; private set; }
 
+    /// <summary>How the callback's authenticity was established (Scope §14.3): HMAC valid, verified against the gateway's status API, ...</summary>
+    public string? SignatureVerificationResult { get; private set; }
+
+    /// <summary>The gateway's own reference for the payment (their transaction / track / invoice id).</summary>
+    public string? GatewayReference { get; private set; }
+
+    /// <summary>What HAMBOX did with it: Paid, Failed, Pending, AmountMismatch, Duplicate, ...</summary>
+    public string? ProcessingResult { get; private set; }
+
     public static OrderPaymentCallback Create(
         Guid orderId,
         string provider,
         string eventType,
         string status,
         string? transactionId,
-        string payloadJson)
+        string payloadJson,
+        string? signatureVerificationResult = null,
+        string? gatewayReference = null,
+        string? processingResult = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
@@ -64,6 +82,9 @@ public sealed class OrderPaymentCallback : Entity
             eventType,
             status,
             transactionId,
-            payloadJson);
+            payloadJson,
+            signatureVerificationResult,
+            gatewayReference,
+            processingResult);
     }
 }

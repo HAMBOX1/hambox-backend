@@ -216,6 +216,8 @@ internal sealed class InventoryReservationConfiguration : IEntityTypeConfigurati
         builder.HasIndex(x => new { x.IsActive, x.ExpiresOnUtc });
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.CartId);
+        builder.HasIndex(x => x.OrderId);
+        builder.Property(x => x.ReleaseReason).HasMaxLength(200);
     }
 }
 

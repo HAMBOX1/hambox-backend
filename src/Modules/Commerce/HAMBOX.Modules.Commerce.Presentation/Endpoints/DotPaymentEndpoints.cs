@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Application.Features.Checkout.RecordPaymentWebhook;
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.Dot;
@@ -124,6 +125,10 @@ internal static class DotPaymentEndpoints
         {
             if (!DotNotificationIpAllowlist.IsAllowed(httpContext))
             {
+                await sender.Send(new RecordPaymentWebhookCommand(
+                    "Dot", "NotApplicable", "RejectedIp", request.DotTransId, request.PartnerTransId,
+                    System.Text.Json.JsonSerializer.Serialize(new { request.DotTransId, request.PartnerTransId, request.ResultCode }),
+                    httpContext.Connection.RemoteIpAddress?.ToString()));
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
 

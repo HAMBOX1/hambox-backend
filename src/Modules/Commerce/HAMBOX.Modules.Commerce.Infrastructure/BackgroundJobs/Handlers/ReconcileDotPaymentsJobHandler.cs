@@ -19,7 +19,8 @@ internal sealed class ReconcileDotPaymentsJobHandler(
     IBackgroundJobSerializer serializer,
     ICommerceDbContext commerceDbContext,
     DotPaymentVerificationService verificationService,
-    ILogger<ReconcileDotPaymentsJobHandler> logger)
+    ILogger<ReconcileDotPaymentsJobHandler> logger,
+    OrderStockHoldService? stockHold = null)
     : BackgroundJobHandlerBase<string?>(serializer)
 {
     public override string JobType => OperationalJobTypes.ReconcileDotPayments;
@@ -48,6 +49,10 @@ internal sealed class ReconcileDotPaymentsJobHandler(
         foreach (var attempt in stillStale)
         {
             attempt.MarkExpired();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(attempt.OrderId, "Payment window expired", cancellationToken);
+            }
         }
 
         if (stillStale.Count > 0)

@@ -35,7 +35,9 @@ internal sealed class InitiateDotCheckoutCommandHandler(
     IDotPaymentGateway dotGateway,
     IOptions<DotSettings> dotOptions,
     IPlatformSettingsProvider platformSettings,
-    ILogger<InitiateDotCheckoutCommandHandler> logger)
+    ILogger<InitiateDotCheckoutCommandHandler> logger,
+    OrderStockHoldService? stockHold = null,
+    PurchaseControlService? purchaseControl = null)
     : IRequestHandler<InitiateDotCheckoutCommand, Result<DotCheckoutInitiationDto>>
 {
     public async Task<Result<DotCheckoutInitiationDto>> Handle(
@@ -95,6 +97,16 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         if (lineValidation.IsFailure)
         {
             return Result.Failure<DotCheckoutInitiationDto>(lineValidation.Error);
+        }
+
+        if (purchaseControl is not null)
+        {
+            var limits = await purchaseControl.CheckLimitsAsync(
+                currentUserService.UserId, cart.Items, products, cancellationToken);
+            if (limits.IsFailure)
+            {
+                return Result.Failure<DotCheckoutInitiationDto>(limits.Error);
+            }
         }
 
         CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
@@ -169,6 +181,11 @@ internal sealed class InitiateDotCheckoutCommandHandler(
             totalAmount,
             orderItems);
 
+        if (purchaseControl is not null)
+        {
+            await purchaseControl.ApplyAsync(order, products, cancellationToken);
+        }
+
         var partnerTxId = RandomNumberGenerator.GetHexString(40, lowercase: true);
         var reservationMinutes = commerceSettings.ReservationTimeoutMinutes > 0
             ? commerceSettings.ReservationTimeoutMinutes
@@ -201,6 +218,13 @@ internal sealed class InitiateDotCheckoutCommandHandler(
         // knows about with no HAMBOX record to reconcile it against.
         await commerceDbContext.SaveChangesAsync(cancellationToken);
 
+        // Hold the manual stock while the customer pays (Scope §10.2-10.5) so a paid order never finds it gone.
+        // Best-effort: any failure just falls back to reserving at payment confirmation.
+        if (stockHold is not null)
+        {
+            await stockHold.HoldAsync(order, expiresOnUtc, cancellationToken);
+        }
+
         // Before payment, not after — per contract §33.1. Compliance-audit row, not
         // money/inventory-critical, so a separate SaveChanges on Legal's own DbContext is fine (same
         // "sequential, not cross-schema-atomic" treatment RegisterCommandHandler gives this).
@@ -231,6 +255,11 @@ internal sealed class InitiateDotCheckoutCommandHandler(
                 "DOT GetAccessToken failed for partner_txid {PartnerTxId}: {Error}",
                 partnerTxId,
                 tokenResult.IsFailure ? tokenResult.Error.Description : tokenResult.Value.ResultDesc);
+
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment could not be started", cancellationToken);
+            }
 
             return Result.Failure<DotCheckoutInitiationDto>(
                 tokenResult.IsFailure ? tokenResult.Error : CommerceErrors.DotProviderUnavailable);

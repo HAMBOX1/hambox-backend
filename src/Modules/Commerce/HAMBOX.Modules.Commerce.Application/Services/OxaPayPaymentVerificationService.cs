@@ -41,7 +41,8 @@ public sealed class OxaPayPaymentVerificationService(
     ReferralLifecycleService referralLifecycle,
     ICommunicationService communicationService,
     IOperationalJobQueue jobQueue,
-    ILogger<OxaPayPaymentVerificationService> logger)
+    ILogger<OxaPayPaymentVerificationService> logger,
+    OrderStockHoldService? stockHold = null)
 {
     private const decimal AmountToleranceUsd = 0.01m;
 
@@ -126,6 +127,10 @@ public sealed class OxaPayPaymentVerificationService(
         {
             attempt.MarkFailed(status.Status, status.Status);
             order.MarkFailed();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+            }
             RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.Status);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new OxaPayVerificationResult(OxaPayVerificationOutcome.Failed, order.Id, status.Status);
@@ -143,6 +148,10 @@ public sealed class OxaPayPaymentVerificationService(
 
             attempt.MarkFailed("AMOUNT_MISMATCH", "Verified amount did not match the expected charge.");
             order.MarkFailed();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+            }
             RecordAudit(order.Id, "VerificationFailed", "AmountMismatch", attempt, "Verified amount mismatch.");
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new OxaPayVerificationResult(OxaPayVerificationOutcome.Failed, order.Id, "Payment verification failed.");
@@ -250,6 +259,9 @@ public sealed class OxaPayPaymentVerificationService(
         });
 
         commerceDbContext.OrderPaymentCallbacks.Add(OrderPaymentCallback.Create(
-            orderId, "OxaPay", eventType, status, attempt.ProviderTransactionId, payload));
+            orderId, "OxaPay", eventType, status, attempt.ProviderTransactionId, payload,
+            signatureVerificationResult: "VerifiedWithGatewayStatusApi",
+            gatewayReference: attempt.ProviderTransactionId ?? attempt.PartnerTxId,
+            processingResult: status));
     }
 }

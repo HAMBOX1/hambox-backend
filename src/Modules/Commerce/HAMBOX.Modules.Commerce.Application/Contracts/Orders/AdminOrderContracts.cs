@@ -55,7 +55,10 @@ public sealed record AdminOrderDetailDto(
     DateTimeOffset CreatedOnUtc,
     string? LastEditedByName,
     DateTimeOffset? LastEditedOnUtc,
-    IReadOnlyList<AdminOrderSupplierRoutingDto> SupplierRouting);
+    IReadOnlyList<AdminOrderSupplierRoutingDto> SupplierRouting,
+    string? HoldKind = null,
+    string? HoldReason = null,
+    DateTimeOffset? HeldOnUtc = null);
 
 /// <summary>
 /// One automated-supplier routing decision for one order item, admin-visible only — see
@@ -141,7 +144,10 @@ public sealed record AdminOrderPaymentCallbackDto(
     string Status,
     string? TransactionId,
     string PayloadJson,
-    DateTimeOffset OccurredOnUtc);
+    DateTimeOffset OccurredOnUtc,
+    string? SignatureVerificationResult = null,
+    string? GatewayReference = null,
+    string? ProcessingResult = null);
 
 public sealed record AdminCustomerOrderHistoryItemDto(
     Guid Id,

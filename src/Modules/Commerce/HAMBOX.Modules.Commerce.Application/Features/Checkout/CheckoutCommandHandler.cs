@@ -41,6 +41,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly IOperationalJobQueue _jobQueue;
     private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ILogger<CheckoutCommandHandler> _logger;
+    private readonly PurchaseControlService? _purchaseControl;
 
     public CheckoutCommandHandler(
         ICommerceDbContext commerceDbContext,
@@ -58,8 +59,10 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         ReferralLifecycleService referralLifecycle,
         IOperationalJobQueue jobQueue,
         IPlatformSettingsProvider platformSettings,
-        ILogger<CheckoutCommandHandler> logger)
+        ILogger<CheckoutCommandHandler> logger,
+        PurchaseControlService? purchaseControl = null)
     {
+        _purchaseControl = purchaseControl;
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _legalDbContext = legalDbContext;
@@ -137,6 +140,16 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         if (lineValidation.IsFailure)
         {
             return Result.Failure<Contracts.OrderDto>(lineValidation.Error);
+        }
+
+        if (_purchaseControl is not null)
+        {
+            var limits = await _purchaseControl.CheckLimitsAsync(
+                _currentUserService.UserId, cart.Items, products, cancellationToken);
+            if (limits.IsFailure)
+            {
+                return Result.Failure<Contracts.OrderDto>(limits.Error);
+            }
         }
 
         CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
@@ -272,6 +285,20 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     orderItems);
 
                 order.RecordPayment(paymentResult!.Provider, paymentResult.TransactionId!);
+
+                // Sensitive product / suspicious activity: take the money, but park the order for an admin —
+                // the manual stock reserved above goes straight back to the pool.
+                if (_purchaseControl is not null
+                    && await _purchaseControl.ApplyAsync(order, products, ct) is not null)
+                {
+                    var heldCodeIds = reservedCodesByLine.Values.SelectMany(l => l).Select(c => c.CodeId).ToList();
+                    if (heldCodeIds.Count > 0)
+                    {
+                        await _inventoryEngine.ReleaseReservationsAsync(heldCodeIds, ct);
+                    }
+
+                    reservedCodesByLine.Clear();
+                }
                 OrderPaymentCallbackRecorder.Record(_commerceDbContext, order.Id, paymentResult);
 
                 await _promotionRedemptionService.RedeemAsync(

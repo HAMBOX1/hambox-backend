@@ -33,7 +33,9 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
     ICryptomusPaymentGateway cryptomusGateway,
     IOptions<CryptomusSettings> cryptomusOptions,
     IPlatformSettingsProvider platformSettings,
-    ILogger<InitiateCryptomusCheckoutCommandHandler> logger)
+    ILogger<InitiateCryptomusCheckoutCommandHandler> logger,
+    OrderStockHoldService? stockHold = null,
+    PurchaseControlService? purchaseControl = null)
     : IRequestHandler<InitiateCryptomusCheckoutCommand, Result<CryptomusCheckoutInitiationDto>>
 {
     public async Task<Result<CryptomusCheckoutInitiationDto>> Handle(
@@ -93,6 +95,16 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
         if (lineValidation.IsFailure)
         {
             return Result.Failure<CryptomusCheckoutInitiationDto>(lineValidation.Error);
+        }
+
+        if (purchaseControl is not null)
+        {
+            var limits = await purchaseControl.CheckLimitsAsync(
+                currentUserService.UserId, cart.Items, products, cancellationToken);
+            if (limits.IsFailure)
+            {
+                return Result.Failure<CryptomusCheckoutInitiationDto>(limits.Error);
+            }
         }
 
         CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
@@ -157,6 +169,11 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
             totalAmount,
             orderItems);
 
+        if (purchaseControl is not null)
+        {
+            await purchaseControl.ApplyAsync(order, products, cancellationToken);
+        }
+
         var partnerTxId = RandomNumberGenerator.GetHexString(40, lowercase: true);
         var reservationMinutes = commerceSettings.ReservationTimeoutMinutes > 0
             ? commerceSettings.ReservationTimeoutMinutes
@@ -186,6 +203,13 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
         // Cryptomus knows about with no HAMBOX record to reconcile it against.
         await commerceDbContext.SaveChangesAsync(cancellationToken);
 
+        // Hold the manual stock while the customer pays (Scope §10.2-10.5) so a paid order never finds it gone.
+        // Best-effort: any failure just falls back to reserving at payment confirmation.
+        if (stockHold is not null)
+        {
+            await stockHold.HoldAsync(order, expiresOnUtc, cancellationToken);
+        }
+
         await LegalAcceptanceRecorder.RecordAsync(
             legalDbContext,
             currentUserService.UserId!,
@@ -208,6 +232,11 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
                 "Cryptomus CreateInvoice failed for order_id {OrderId}: {Error}",
                 partnerTxId,
                 invoiceResult.IsFailure ? invoiceResult.Error.Description : "no payment URL returned");
+
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment could not be started", cancellationToken);
+            }
 
             return Result.Failure<CryptomusCheckoutInitiationDto>(
                 invoiceResult.IsFailure ? invoiceResult.Error : CommerceErrors.CryptomusProviderUnavailable);

@@ -195,7 +195,10 @@ internal sealed class GetAdminOrderByIdQueryHandler
                 c.Status,
                 c.TransactionId,
                 c.PayloadJson,
-                c.OccurredOnUtc)).ToList(),
+                c.OccurredOnUtc,
+                c.SignatureVerificationResult,
+                c.GatewayReference,
+                c.ProcessingResult)).ToList(),
             customerOrders.Select(o =>
             {
                 customerKeysByOrder.TryGetValue(o.Id, out var keys);
@@ -213,6 +216,9 @@ internal sealed class GetAdminOrderByIdQueryHandler
             order.CreatedOnUtc,
             order.LastEditedByName,
             order.LastEditedOnUtc,
-            supplierRouting));
+            supplierRouting,
+            order.IsOnHold ? order.HoldKind.ToString() : null,
+            order.IsOnHold ? order.HoldReason : null,
+            order.IsOnHold ? order.HeldOnUtc : null));
     }
 }

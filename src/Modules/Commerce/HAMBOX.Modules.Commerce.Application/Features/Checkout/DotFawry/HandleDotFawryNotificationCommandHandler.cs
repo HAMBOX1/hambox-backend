@@ -24,8 +24,16 @@ internal sealed class HandleDotFawryNotificationCommandHandler(
             // endpoint responds "1") — DOT retrying an unresolvable partnerTransId all day helps no
             // one; log it so it's visible for investigation.
             logger.LogWarning("DOT Fawry notification for unknown partnerTransId.");
+            PaymentWebhookLogRecorder.Add(
+                commerceDbContext, "DotFawry", "NotApplicable", "OrderNotFound",
+                request.DotTransId, request.PartnerTransId, System.Text.Json.JsonSerializer.Serialize(new { request.DotTransId, request.PartnerTransId, Msisdn = MsisdnMasker.Mask(request.Msisdn), request.ResultCode, request.ResultDesc }));
+            await commerceDbContext.SaveChangesAsync(cancellationToken);
             return Result.Success();
         }
+
+        var wasResolved = attempt.Status is HAMBOX.Modules.Commerce.Domain.Enums.PaymentAttemptStatus.Succeeded
+            or HAMBOX.Modules.Commerce.Domain.Enums.PaymentAttemptStatus.Failed
+            or HAMBOX.Modules.Commerce.Domain.Enums.PaymentAttemptStatus.Expired;
 
         attempt.RecordProviderContext(
             request.DotTransId,
@@ -39,7 +47,21 @@ internal sealed class HandleDotFawryNotificationCommandHandler(
         // with DOT server-to-server. Safe to call repeatedly: DOT resends if the endpoint returns
         // anything other than "1", and the verification service's guarded claim makes every
         // repeat a no-op once the attempt is resolved.
-        await verificationService.VerifyAndFinalizeAsync(attempt.Id, cancellationToken);
+        var alreadyResolved = wasResolved;
+        var verification = await verificationService.VerifyAndFinalizeAsync(attempt.Id, cancellationToken);
+
+        var processingResult = alreadyResolved ? "Duplicate" : verification.Outcome switch
+        {
+            DotFawryVerificationOutcome.Succeeded => "Paid",
+            DotFawryVerificationOutcome.Failed => "Failed",
+            DotFawryVerificationOutcome.StillPending => "Pending",
+            _ => "OrderNotFound",
+        };
+        PaymentWebhookLogRecorder.Add(
+            commerceDbContext, "DotFawry", "NotApplicable", processingResult,
+            request.DotTransId, request.PartnerTransId, System.Text.Json.JsonSerializer.Serialize(new { request.DotTransId, request.PartnerTransId, Msisdn = MsisdnMasker.Mask(request.Msisdn), request.ResultCode, request.ResultDesc }),
+            verification.OrderId ?? attempt.OrderId, attempt.Id);
+        await commerceDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

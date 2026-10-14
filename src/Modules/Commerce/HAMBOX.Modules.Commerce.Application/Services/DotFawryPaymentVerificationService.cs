@@ -49,7 +49,8 @@ public sealed class DotFawryPaymentVerificationService(
     ReferralLifecycleService referralLifecycle,
     ICommunicationService communicationService,
     IOperationalJobQueue jobQueue,
-    ILogger<DotFawryPaymentVerificationService> logger)
+    ILogger<DotFawryPaymentVerificationService> logger,
+    OrderStockHoldService? stockHold = null)
 {
     /// <summary>
     /// Direct Billing resultCodes that are documented, terminal billing outcomes reported
@@ -158,6 +159,10 @@ public sealed class DotFawryPaymentVerificationService(
             {
                 attempt.MarkFailed(attempt.LastReasonCode, attempt.LastReasonDescription);
                 order.MarkFailed();
+                if (stockHold is not null)
+                {
+                    await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+                }
                 RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, attempt.LastReasonDescription);
                 await commerceDbContext.SaveChangesAsync(cancellationToken);
                 return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, attempt.LastReasonDescription);
@@ -179,6 +184,10 @@ public sealed class DotFawryPaymentVerificationService(
         {
             attempt.MarkFailed(status.BillingTransactionResultCode, status.BillingTransactionResultDesc);
             order.MarkFailed();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+            }
             RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.BillingTransactionResultDesc);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new DotFawryVerificationResult(DotFawryVerificationOutcome.Failed, order.Id, status.BillingTransactionResultDesc);
@@ -307,6 +316,9 @@ public sealed class DotFawryPaymentVerificationService(
         });
 
         commerceDbContext.OrderPaymentCallbacks.Add(OrderPaymentCallback.Create(
-            orderId, "DotFawry", eventType, status, attempt.ProviderTransactionId, payload));
+            orderId, "DotFawry", eventType, status, attempt.ProviderTransactionId, payload,
+            signatureVerificationResult: "VerifiedWithGatewayStatusApi",
+            gatewayReference: attempt.ProviderTransactionId ?? attempt.PartnerTxId,
+            processingResult: status));
     }
 }

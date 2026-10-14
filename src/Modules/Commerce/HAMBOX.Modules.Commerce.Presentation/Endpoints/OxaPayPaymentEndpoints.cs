@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Application.Features.Checkout.RecordPaymentWebhook;
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
@@ -104,6 +105,9 @@ internal static class OxaPayPaymentEndpoints
 
             if (!OxaPayWebhookSignatureVerifier.IsValid(rawBody, hmacHeader, settings.MerchantApiKey))
             {
+                await sender.Send(new RecordPaymentWebhookCommand(
+                    "OxaPay", string.IsNullOrEmpty(hmacHeader) ? "Missing" : "Invalid", "RejectedSignature", null, null, rawBody,
+                    httpContext.Connection.RemoteIpAddress?.ToString()));
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
 

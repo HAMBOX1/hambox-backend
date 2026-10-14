@@ -31,6 +31,8 @@ public static class CommerceApplicationExtensions
         services.AddScoped<IReferralRedemptionService>(sp => sp.GetRequiredService<ReferralLifecycleService>());
         services.AddScoped<OrderFulfillmentService>();
         services.AddScoped<OrderInventoryReleaseService>();
+        services.AddScoped<OrderStockHoldService>();
+        services.AddScoped<PurchaseControlService>();
         services.AddScoped<IPromotionTypeEvaluator, AutomaticPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, MembershipPromotionEvaluator>();
         services.AddScoped<IPromotionTypeEvaluator, CategoryPromotionEvaluator>();

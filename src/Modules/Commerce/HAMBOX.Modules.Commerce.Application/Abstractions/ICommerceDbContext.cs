@@ -117,6 +117,8 @@ public interface ICommerceDbContext
 
     DbSet<OrderPaymentCallback> OrderPaymentCallbacks { get; }
 
+    DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; }
+
     DbSet<PaymentAttempt> PaymentAttempts { get; }
 
     DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations { get; }

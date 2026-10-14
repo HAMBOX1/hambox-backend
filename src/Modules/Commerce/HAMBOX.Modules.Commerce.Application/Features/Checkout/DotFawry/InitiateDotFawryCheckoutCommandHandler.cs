@@ -38,7 +38,9 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
     IPlatformSettingsProvider platformSettings,
     IPhoneBlocklist phoneBlocklist,
     DotFawryPaymentVerificationService verificationService,
-    ILogger<InitiateDotFawryCheckoutCommandHandler> logger)
+    ILogger<InitiateDotFawryCheckoutCommandHandler> logger,
+    OrderStockHoldService? stockHold = null,
+    PurchaseControlService? purchaseControl = null)
     : IRequestHandler<InitiateDotFawryCheckoutCommand, Result<DotFawryCheckoutInitiationDto>>
 {
     public async Task<Result<DotFawryCheckoutInitiationDto>> Handle(
@@ -103,6 +105,16 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
         if (lineValidation.IsFailure)
         {
             return Result.Failure<DotFawryCheckoutInitiationDto>(lineValidation.Error);
+        }
+
+        if (purchaseControl is not null)
+        {
+            var limits = await purchaseControl.CheckLimitsAsync(
+                currentUserService.UserId, cart.Items, products, cancellationToken);
+            if (limits.IsFailure)
+            {
+                return Result.Failure<DotFawryCheckoutInitiationDto>(limits.Error);
+            }
         }
 
         CartLineValidator.ApplyResolvedPricing(cart, lineValidation.Value);
@@ -179,6 +191,11 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
             totalAmount,
             orderItems);
 
+        if (purchaseControl is not null)
+        {
+            await purchaseControl.ApplyAsync(order, products, cancellationToken);
+        }
+
         var partnerTxId = RandomNumberGenerator.GetHexString(40, lowercase: true);
         var reservationMinutes = commerceSettings.ReservationTimeoutMinutes > 0
             ? commerceSettings.ReservationTimeoutMinutes
@@ -211,6 +228,13 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
         // crashes after the DOT call but before this save, we'd otherwise have a partnerTransId DOT
         // knows about with no HAMBOX record to reconcile it against.
         await commerceDbContext.SaveChangesAsync(cancellationToken);
+
+        // Hold the manual stock while the customer pays (Scope §10.2-10.5) so a paid order never finds it gone.
+        // Best-effort: any failure just falls back to reserving at payment confirmation.
+        if (stockHold is not null)
+        {
+            await stockHold.HoldAsync(order, expiresOnUtc, cancellationToken);
+        }
 
         // Before payment, not after — per contract §33.1. Compliance-audit row, not
         // money/inventory-critical, so a separate SaveChanges on Legal's own DbContext is fine (same

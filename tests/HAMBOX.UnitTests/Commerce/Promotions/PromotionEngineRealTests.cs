@@ -19,7 +19,8 @@ public sealed class PromotionEngineRealTests
     private static readonly DateTime Now = new(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
 
     private static PromotionEngine CreateEngine(
-        HAMBOX.Modules.Commerce.Infrastructure.Persistence.CommerceDbContext db) =>
+        HAMBOX.Modules.Commerce.Infrastructure.Persistence.CommerceDbContext db,
+        FakeCommerceSettingsProvider? settings = null) =>
         new(
             db,
             [
@@ -30,9 +31,10 @@ public sealed class PromotionEngineRealTests
                 new FlashSalePromotionEvaluator(),
                 new CouponPromotionEvaluator(),
             ],
-            new FakeCommerceSettingsProvider());
+            settings ?? new FakeCommerceSettingsProvider());
 
-    private static PromotionEvaluationContext Cart(string? userId = "user-1", string? coupon = null, DateTime? at = null) =>
+    private static PromotionEvaluationContext Cart(
+        string? userId = "user-1", string? coupon = null, DateTime? at = null, decimal? taxOverride = 0m) =>
         new(
             [
                 new PromotionCartLine(ProductA, null, 1, 50m),
@@ -45,7 +47,7 @@ public sealed class PromotionEngineRealTests
             coupon,
             MembershipSnapshot.None,
             at ?? Now,
-            TaxRateOverridePercent: 0m);
+            TaxRateOverridePercent: taxOverride);
 
     private static Promotion ProductDiscount(decimal percent = 20m, Guid? product = null, string? usageLimit = null)
     {
@@ -225,5 +227,54 @@ public sealed class PromotionEngineRealTests
         var result = await CreateEngine(db).EvaluateAsync(Cart());
 
         Assert.Equal(0m, result.TotalDiscount);
+    }
+
+    // ─── tax (audit R24) ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Tax_IsChargedOnTheDiscountedAmount_AtTheGatewayRate()
+    {
+        var (db, _) = CommerceTestDbContextFactory.Create();
+        await SaveAsync(db, ProductDiscount(20m, ProductA)); // 80.00 cart -> 70.00 after the 10.00 discount
+
+        var result = await CreateEngine(db).EvaluateAsync(Cart(taxOverride: 10m));
+
+        Assert.Equal(70m, result.Subtotal - result.TotalDiscount);
+        Assert.Equal(7.00m, result.Tax);
+        Assert.Equal(77.00m, result.Total);
+    }
+
+    [Fact]
+    public async Task Tax_FallsBackToThePlatformRate_WhenTheGatewayHasNone()
+    {
+        var (db, _) = CommerceTestDbContextFactory.Create();
+        var settings = new FakeCommerceSettingsProvider();
+        settings.Commerce = settings.Commerce with { TaxRatePercent = 5m };
+
+        var result = await CreateEngine(db, settings).EvaluateAsync(Cart(taxOverride: null));
+
+        Assert.Equal(80m, result.Subtotal);
+        Assert.Equal(4.00m, result.Tax);
+        Assert.Equal(84.00m, result.Total);
+    }
+
+    [Fact]
+    public async Task Tax_RoundsToTwoDecimals_AndIsNeverNegative()
+    {
+        var (db, _) = CommerceTestDbContextFactory.Create();
+        var promotion = Promotion.Create("Everything free", null, PromotionType.Product, DiscountType.FixedAmount, 10_000m);
+        promotion.AddTarget(PromotionTargetType.Product, ProductA);
+        promotion.AddTarget(PromotionTargetType.Product, ProductB);
+        promotion.Publish();
+        await SaveAsync(db, promotion);
+
+        var result = await CreateEngine(db).EvaluateAsync(Cart(taxOverride: 14.5m));
+
+        Assert.Equal(0m, result.Tax);
+        Assert.Equal(0m, result.Total);
+
+        var (db2, _) = CommerceTestDbContextFactory.Create();
+        var thirds = await CreateEngine(db2).EvaluateAsync(Cart(taxOverride: 7.333m));
+        Assert.Equal(decimal.Round(80m * 0.07333m, 2), thirds.Tax);
     }
 }

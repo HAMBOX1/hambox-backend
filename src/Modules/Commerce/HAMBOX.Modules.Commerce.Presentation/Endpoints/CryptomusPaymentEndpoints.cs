@@ -1,4 +1,6 @@
+using HAMBOX.Modules.Commerce.Application.Features.Checkout.RecordPaymentWebhook;
 using Asp.Versioning.Builder;
+using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout.Cryptomus;
 using HAMBOX.Modules.Commerce.Application.Options;
@@ -90,15 +92,22 @@ internal static class CryptomusPaymentEndpoints
         group.MapPost("payments/cryptomus/webhook", async Task<IResult> (
             HttpContext httpContext,
             ISender sender,
-            IOptions<CryptomusSettings> cryptomusOptions) =>
+            IPaymentGatewayConfigurationProvider settingsProvider) =>
         {
             httpContext.Request.EnableBuffering();
             using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
             var rawBody = await reader.ReadToEndAsync();
             httpContext.Request.Body.Position = 0;
 
-            if (!CryptomusWebhookSignatureVerifier.IsValid(rawBody, cryptomusOptions.Value))
+            // The signing key lives in the admin-managed gateway row (same source the gateway client uses) — reading
+            // appsettings here would reject every webhook once the key is only configured in the dashboard.
+            var cryptomusSettings = await settingsProvider.GetCryptomusSettingsAsync(httpContext.RequestAborted);
+
+            if (!CryptomusWebhookSignatureVerifier.IsValid(rawBody, cryptomusSettings))
             {
+                await sender.Send(new RecordPaymentWebhookCommand(
+                    "Cryptomus", "Invalid", "RejectedSignature", null, null, rawBody,
+                    httpContext.Connection.RemoteIpAddress?.ToString()));
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
 

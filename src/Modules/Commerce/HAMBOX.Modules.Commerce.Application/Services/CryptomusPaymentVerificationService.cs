@@ -39,7 +39,8 @@ public sealed class CryptomusPaymentVerificationService(
     ReferralLifecycleService referralLifecycle,
     ICommunicationService communicationService,
     IOperationalJobQueue jobQueue,
-    ILogger<CryptomusPaymentVerificationService> logger)
+    ILogger<CryptomusPaymentVerificationService> logger,
+    OrderStockHoldService? stockHold = null)
 {
     private const decimal AmountToleranceUsd = 0.01m;
 
@@ -115,6 +116,10 @@ public sealed class CryptomusPaymentVerificationService(
         {
             attempt.MarkFailed(status.Status, status.Status);
             order.MarkFailed();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+            }
             RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.Status);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new CryptomusVerificationResult(CryptomusVerificationOutcome.Failed, order.Id, status.Status);
@@ -132,6 +137,10 @@ public sealed class CryptomusPaymentVerificationService(
 
             attempt.MarkFailed("AMOUNT_MISMATCH", "Verified amount did not match the expected charge.");
             order.MarkFailed();
+            if (stockHold is not null)
+            {
+                await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
+            }
             RecordAudit(order.Id, "VerificationFailed", "AmountMismatch", attempt, "Verified amount mismatch.");
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new CryptomusVerificationResult(CryptomusVerificationOutcome.Failed, order.Id, "Payment verification failed.");
@@ -240,6 +249,9 @@ public sealed class CryptomusPaymentVerificationService(
         });
 
         commerceDbContext.OrderPaymentCallbacks.Add(OrderPaymentCallback.Create(
-            orderId, "Cryptomus", eventType, status, attempt.ProviderTransactionId, payload));
+            orderId, "Cryptomus", eventType, status, attempt.ProviderTransactionId, payload,
+            signatureVerificationResult: "VerifiedWithGatewayStatusApi",
+            gatewayReference: attempt.ProviderTransactionId ?? attempt.PartnerTxId,
+            processingResult: status));
     }
 }

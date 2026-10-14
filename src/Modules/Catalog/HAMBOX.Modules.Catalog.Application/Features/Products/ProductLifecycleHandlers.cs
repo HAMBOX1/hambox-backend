@@ -19,6 +19,12 @@ public sealed record SetPendingMergeCommand(Guid ProductId, Guid TargetProductId
 public sealed record ClearPendingMergeCommand(Guid ProductId) : IRequest<Result>;
 public sealed record SetProductFavoriteCommand(Guid ProductId, bool IsFavorite) : IRequest<Result>;
 
+public sealed record ProductPurchaseControlsDto(int? MaxQuantityPerOrder, int? MaxQuantityPerUserPerDay, bool RequiresManualReview);
+
+public sealed record SetProductPurchaseControlsCommand(Guid ProductId, ProductPurchaseControlsDto Controls) : IRequest<Result>;
+
+public sealed record GetProductPurchaseControlsQuery(Guid ProductId) : IRequest<Result<ProductPurchaseControlsDto>>;
+
 internal sealed class PublishProductCommandHandler : IRequestHandler<PublishProductCommand, Result>
 {
     private readonly ICatalogDbContext _db;
@@ -372,5 +378,48 @@ internal sealed class SetProductFavoriteCommandHandler : IRequestHandler<SetProd
 
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+}
+
+internal sealed class SetProductPurchaseControlsCommandHandler : IRequestHandler<SetProductPurchaseControlsCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+
+    public SetProductPurchaseControlsCommandHandler(ICatalogDbContext db) => _db = db;
+
+    public async Task<Result> Handle(SetProductPurchaseControlsCommand request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        var controls = request.Controls;
+        if (controls.MaxQuantityPerOrder is <= 0 || controls.MaxQuantityPerUserPerDay is <= 0)
+        {
+            return Result.Failure(CatalogErrors.InvalidPurchaseLimit);
+        }
+
+        product.SetPurchaseControls(controls.MaxQuantityPerOrder, controls.MaxQuantityPerUserPerDay, controls.RequiresManualReview);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+internal sealed class GetProductPurchaseControlsQueryHandler : IRequestHandler<GetProductPurchaseControlsQuery, Result<ProductPurchaseControlsDto>>
+{
+    private readonly ICatalogDbContext _db;
+
+    public GetProductPurchaseControlsQueryHandler(ICatalogDbContext db) => _db = db;
+
+    public async Task<Result<ProductPurchaseControlsDto>> Handle(GetProductPurchaseControlsQuery request, CancellationToken cancellationToken)
+    {
+        var product = await _db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        return product is null
+            ? Result.Failure<ProductPurchaseControlsDto>(CatalogErrors.ProductNotFound)
+            : Result.Success(new ProductPurchaseControlsDto(
+                product.MaxQuantityPerOrder, product.MaxQuantityPerUserPerDay, product.RequiresManualReview));
     }
 }

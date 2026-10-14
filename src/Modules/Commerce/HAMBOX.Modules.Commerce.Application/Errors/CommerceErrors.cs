@@ -195,6 +195,26 @@ public static class CommerceErrors
         "Checkout.MembershipPurchaseLimitExceeded",
         $"Your membership plan allows up to {limit} purchase(s) per month. You've reached that limit for this month.");
 
+    public static Error PurchaseLimitPerOrderExceeded(string productName, int limit) => new(
+        "Checkout.PurchaseLimitPerOrderExceeded",
+        $"You can buy at most {limit} of \"{productName}\" in one order.");
+
+    public static Error PurchaseLimitPerDayExceeded(string productName, int limit, int alreadyBought) => new(
+        "Checkout.PurchaseLimitPerDayExceeded",
+        $"You can buy at most {limit} of \"{productName}\" every 24 hours (you already bought {alreadyBought}).");
+
+    public static readonly Error OrderNotOnHold = new(
+        "Commerce.OrderNotOnHold",
+        "This order is not on hold.");
+
+    public static readonly Error HoldReasonRequired = new(
+        "Commerce.HoldReasonRequired",
+        "Enter a reason for holding this order.");
+
+    public static readonly Error OrderCannotBeHeld = new(
+        "Commerce.OrderCannotBeHeld",
+        "Only open orders can be placed on hold.");
+
     public static readonly Error PaymentMethodNotSupported = new(
         "Checkout.PaymentMethodNotSupported",
         "The selected payment method is not supported.");

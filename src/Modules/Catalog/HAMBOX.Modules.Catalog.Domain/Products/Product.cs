@@ -188,6 +188,32 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public bool IsFavorite { get; private set; }
 
+    /// <summary>Largest quantity of this product one order may contain (null = unlimited). Enforced at every checkout path.</summary>
+    public int? MaxQuantityPerOrder { get; private set; }
+
+    /// <summary>Largest total quantity one customer may buy of this product in any rolling 24 hours (null = unlimited).</summary>
+    public int? MaxQuantityPerUserPerDay { get; private set; }
+
+    /// <summary>Sensitive product: every paid order containing it waits for an admin to approve before anything is delivered.</summary>
+    public bool RequiresManualReview { get; private set; }
+
+    public void SetPurchaseControls(int? maxQuantityPerOrder, int? maxQuantityPerUserPerDay, bool requiresManualReview)
+    {
+        if (maxQuantityPerOrder is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxQuantityPerOrder), "Must be greater than zero.");
+        }
+
+        if (maxQuantityPerUserPerDay is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxQuantityPerUserPerDay), "Must be greater than zero.");
+        }
+
+        MaxQuantityPerOrder = maxQuantityPerOrder;
+        MaxQuantityPerUserPerDay = maxQuantityPerUserPerDay;
+        RequiresManualReview = requiresManualReview;
+    }
+
     /// <summary>
     /// Toggles the admin bookmark. Not tracked as an edit for <see cref="LastEditedOnUtc"/> purposes
     /// — it's personal catalog-navigation state, not a change to the product itself.

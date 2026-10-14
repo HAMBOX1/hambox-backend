@@ -83,6 +83,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     public DbSet<OrderPaymentCallback> OrderPaymentCallbacks => Set<OrderPaymentCallback>();
 
+    public DbSet<PaymentWebhookLog> PaymentWebhookLogs => Set<PaymentWebhookLog>();
+
     public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
 
     public DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations => Set<PaymentGatewayConfiguration>();

@@ -368,4 +368,8 @@ public static class CatalogErrors
     public static readonly Error InstructionsNotFound = new(
         "Instructions.NotFound",
         "Save instructions content before publishing.");
+
+    public static readonly Error InvalidPurchaseLimit = new(
+        "Catalog.InvalidPurchaseLimit",
+        "Purchase limits must be greater than zero (or left empty for no limit).");
 }

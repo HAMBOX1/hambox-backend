@@ -47,6 +47,12 @@ internal sealed class ExecuteOrderFulfillmentJobHandler(
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)
             ?? throw new InvalidOperationException($"Order {orderId} not found.");
 
+        if (order.IsOnHold)
+        {
+            // Parked for manual review / paused by an admin: no stock, no supplier purchase until released.
+            return;
+        }
+
         var wasAlreadyCompleted = order.Status == OrderStatus.Completed;
 
         // Checkout deliberately skips ChatDelivery inline (see CheckoutCommandHandler's reservation

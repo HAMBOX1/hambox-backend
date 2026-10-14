@@ -140,6 +140,67 @@ internal sealed class InventoryEngine : IInventoryEngine
         CancellationToken cancellationToken = default) =>
         ReserveCodesCoreAsync(variantId, maxQuantity, requireFullQuantity: false, userId, cartId, cancellationToken);
 
+    public Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveForOrderAsync(
+        Guid variantId,
+        int maxQuantity,
+        string? userId,
+        Guid orderId,
+        DateTimeOffset holdUntilUtc,
+        CancellationToken cancellationToken = default) =>
+        ReserveCodesCoreAsync(
+            variantId, maxQuantity, requireFullQuantity: false, userId, cartId: null, cancellationToken,
+            orderId, holdUntilUtc);
+
+    public async Task<IReadOnlyList<ReservedCodeSnapshot>> ClaimOrderHoldsAsync(
+        Guid orderId, CancellationToken cancellationToken = default)
+    {
+        var holds = await _db.InventoryReservations
+            .Where(r => r.OrderId == orderId && r.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (holds.Count == 0)
+        {
+            return [];
+        }
+
+        var codeIds = holds.Select(h => h.CodeId).ToList();
+        var codes = await _db.DigitalInventoryCodes
+            .Where(c => codeIds.Contains(c.Id) && c.Status == InventoryCodeStatus.Reserved)
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+
+        var keepUntil = DateTimeOffset.UtcNow.AddMinutes(10);
+        var claimed = new List<ReservedCodeSnapshot>();
+        foreach (var hold in holds)
+        {
+            if (!codes.TryGetValue(hold.CodeId, out var code))
+            {
+                continue;
+            }
+
+            hold.ExtendTo(keepUntil);
+            claimed.Add(new ReservedCodeSnapshot(code.Id, hold.VariantId, code.DigitalCode, hold.ExpiresOnUtc));
+        }
+
+        await PersistIfNotEnlistedAsync(cancellationToken);
+        return claimed;
+    }
+
+    public async Task<int> ReleaseReservationsForOrderAsync(
+        Guid orderId, string reason, CancellationToken cancellationToken = default)
+    {
+        var active = await _db.InventoryReservations
+            .Where(r => r.OrderId == orderId && r.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (active.Count == 0)
+        {
+            return 0;
+        }
+
+        await ReleaseReservationRecordsAsync(active, cancellationToken, reason);
+        return active.Count;
+    }
+
     /// <summary>
     /// Shared reservation body for both the all-or-nothing and partial entry points. The locking
     /// primitive (<see cref="GetLockedAvailableCodeIdsAsync"/>) already only ever locks and returns
@@ -154,6 +215,35 @@ internal sealed class InventoryEngine : IInventoryEngine
         bool requireFullQuantity,
         string? userId,
         Guid? cartId,
+        CancellationToken cancellationToken,
+        Guid? orderId = null,
+        DateTimeOffset? holdUntilUtc = null)
+    {
+        // The UPDLOCK row lock only survives for the length of a transaction. Callers that already run inside
+        // one (checkout, payment confirmation) keep theirs; a caller with none — a hosted-gateway hold, an admin
+        // action — gets one here, so two concurrent callers can never both pick the same code.
+        if (_db is CatalogDbContext catalogDbContext && catalogDbContext.Database.CurrentTransaction is null)
+        {
+            await using var transaction = await catalogDbContext.Database.BeginTransactionAsync(cancellationToken);
+            var reservedInTransaction = await ReserveCodesInnerAsync(
+                variantId, quantity, requireFullQuantity, userId, cartId, orderId, holdUntilUtc, cancellationToken);
+            await catalogDbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return reservedInTransaction;
+        }
+
+        return await ReserveCodesInnerAsync(
+            variantId, quantity, requireFullQuantity, userId, cartId, orderId, holdUntilUtc, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveCodesInnerAsync(
+        Guid variantId,
+        int quantity,
+        bool requireFullQuantity,
+        string? userId,
+        Guid? cartId,
+        Guid? orderId,
+        DateTimeOffset? holdUntilUtc,
         CancellationToken cancellationToken)
     {
         if (quantity <= 0)
@@ -185,12 +275,19 @@ internal sealed class InventoryEngine : IInventoryEngine
         {
             var previous = code.Status;
             code.Reserve();
-            var reservation = InventoryReservation.Create(
-                code.Id,
-                variantId,
-                userId,
-                cartId,
-                inventorySettings.ReservationTimeoutMinutes);
+            var reservation = orderId is Guid heldOrderId
+                ? InventoryReservation.CreateForOrder(
+                    code.Id,
+                    variantId,
+                    userId,
+                    heldOrderId,
+                    holdUntilUtc ?? DateTimeOffset.UtcNow.AddMinutes(inventorySettings.ReservationTimeoutMinutes))
+                : InventoryReservation.Create(
+                    code.Id,
+                    variantId,
+                    userId,
+                    cartId,
+                    inventorySettings.ReservationTimeoutMinutes);
             _db.InventoryReservations.Add(reservation);
 
             var batch = await _db.InventoryBatches.FirstAsync(b => b.Id == code.BatchId, cancellationToken);
@@ -202,7 +299,9 @@ internal sealed class InventoryEngine : IInventoryEngine
                 batchId: code.BatchId,
                 codeId: code.Id,
                 performedByUserId: userId ?? _currentUser.UserId,
-                details: $"Reserved until {reservation.ExpiresOnUtc:O}"));
+                details: orderId is null
+                    ? $"Reserved until {reservation.ExpiresOnUtc:O}"
+                    : $"Held for pending order {orderId} until {reservation.ExpiresOnUtc:O}"));
 
             reserved.Add(new ReservedCodeSnapshot(code.Id, variantId, code.DigitalCode, reservation.ExpiresOnUtc));
         }
@@ -281,7 +380,7 @@ internal sealed class InventoryEngine : IInventoryEngine
             return 0;
         }
 
-        await ReleaseReservationRecordsAsync(stale, cancellationToken);
+        await ReleaseReservationRecordsAsync(stale, cancellationToken, "Reservation expired");
         return stale.Count;
     }
 
@@ -702,7 +801,8 @@ internal sealed class InventoryEngine : IInventoryEngine
 
     private async Task ReleaseReservationRecordsAsync(
         IReadOnlyList<InventoryReservation> reservations,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? reason = null)
     {
         foreach (var reservation in reservations)
         {
@@ -719,10 +819,11 @@ internal sealed class InventoryEngine : IInventoryEngine
                     variantId: code.VariantId,
                     batchId: code.BatchId,
                     codeId: code.Id,
-                    performedByUserId: _currentUser.UserId));
+                    performedByUserId: _currentUser.UserId,
+                    details: reason is null ? null : $"Released: {reason}"));
             }
 
-            reservation.Release();
+            reservation.Release(reason);
         }
 
         await PersistIfNotEnlistedAsync(cancellationToken);

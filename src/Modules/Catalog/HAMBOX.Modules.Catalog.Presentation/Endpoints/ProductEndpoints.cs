@@ -227,6 +227,21 @@ internal static class ProductEndpoints
             .WithName("SetProductFavorite")
             .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
+        // GET/PUT /api/v1/products/{id}/purchase-controls — per-order / per-customer-per-day caps and the
+        // "sensitive product, review every order" flag (audit R22).
+        group.MapGet("{id:guid}/purchase-controls", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetProductPurchaseControlsQuery(id));
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound();
+        })
+            .WithName("GetProductPurchaseControls")
+            .RequirePermission(PermissionConstants.Catalog.Products.View);
+
+        group.MapPut("{id:guid}/purchase-controls", async (Guid id, [FromBody] ProductPurchaseControlsDto request, ISender sender) =>
+            await SendEmptyResult(sender, new SetProductPurchaseControlsCommand(id, request)))
+            .WithName("SetProductPurchaseControls")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         group.MapPost("{id:guid}/duplicate", async Task<Results<Ok<Guid>, BadRequest<ProblemDetails>>> (
             Guid id,
             [FromBody] DuplicateProductRequest? request,

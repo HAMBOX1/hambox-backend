@@ -34,6 +34,12 @@ public static class AdminOrderMapper
     }
 
     public static string ResolveOrderStatusLabel(Order order) =>
+        order.IsOnHold && order.PaymentStatus == PaymentStatus.Paid
+            && order.Status is OrderStatus.Pending or OrderStatus.Processing
+            ? (order.HoldKind == OrderHoldKind.ManualReview ? "Pending Manual Review" : "On Hold")
+            : ResolveBaseOrderStatusLabel(order);
+
+    private static string ResolveBaseOrderStatusLabel(Order order) =>
         order.Status switch
         {
             OrderStatus.Processing => "Processing",

@@ -1213,6 +1213,27 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<DateTimeOffset?>("HeldOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("HoldKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("None");
+
+                    b.Property<string>("HoldReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("HoldReleasedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("HoldReleasedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1477,6 +1498,10 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("GatewayReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -1490,8 +1515,16 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ProcessingResult")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("Provider")
                         .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SignatureVerificationResult")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
@@ -1621,6 +1654,73 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasDatabaseName("IX_PaymentAttempts_Status_ExpiresOnUtc");
 
                     b.ToTable("PaymentAttempts", "commerce");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Orders.PaymentWebhookLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("GatewayReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("MerchantReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PaymentAttemptId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProcessingResult")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("ReceivedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SignatureVerificationResult")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("SourceIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("IX_PaymentWebhookLogs_OrderId");
+
+                    b.HasIndex("ReceivedOnUtc")
+                        .HasDatabaseName("IX_PaymentWebhookLogs_ReceivedOnUtc");
+
+                    b.HasIndex("Provider", "ProcessingResult")
+                        .HasDatabaseName("IX_PaymentWebhookLogs_Provider_Result");
+
+                    b.ToTable("PaymentWebhookLogs", "commerce");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.PaymentGateways.PaymentGatewayConfiguration", b =>

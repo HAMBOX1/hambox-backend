@@ -33,6 +33,30 @@ public interface IInventoryEngine
         Guid? cartId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Holds whatever manual stock exists (up to <paramref name="maxQuantity"/>, never throws) for a pending,
+    /// unpaid order until <paramref name="holdUntilUtc"/> — same row-locking as <see cref="ReservePartialCodesAsync"/>,
+    /// so no other buyer can take the code while the customer is off paying. The hold is consumed by
+    /// <see cref="ClaimOrderHoldsAsync"/> once the order is paid, or released by
+    /// <see cref="ReleaseReservationsForOrderAsync"/> / the expiry sweep.
+    /// </summary>
+    Task<IReadOnlyList<ReservedCodeSnapshot>> ReserveForOrderAsync(
+        Guid variantId,
+        int maxQuantity,
+        string? userId,
+        Guid orderId,
+        DateTimeOffset holdUntilUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The still-active holds of <paramref name="orderId"/> (grouped by variant by the caller). Also pushes their
+    /// expiry a few minutes out so the very next expiry sweep cannot release a code the paid order is about to take.
+    /// </summary>
+    Task<IReadOnlyList<ReservedCodeSnapshot>> ClaimOrderHoldsAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>Releases every active hold of <paramref name="orderId"/> back to stock, recording <paramref name="reason"/>.</summary>
+    Task<int> ReleaseReservationsForOrderAsync(Guid orderId, string reason, CancellationToken cancellationToken = default);
+
     Task ReleaseReservationsForCartAsync(Guid cartId, CancellationToken cancellationToken = default);
 
     Task ReleaseReservationsAsync(IEnumerable<Guid> codeIds, CancellationToken cancellationToken = default);

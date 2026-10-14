@@ -86,6 +86,16 @@ public sealed class OrderFulfillmentService
             throw new InvalidOperationException("Cancelled, refunded, or failed orders cannot be fulfilled.");
         }
 
+        if (order.IsOnHold)
+        {
+            // Flagged for manual review (or paused by an admin): nothing is delivered and no supplier is
+            // called until an admin releases the hold. The paid order stays exactly as it is.
+            _logger.LogInformation(
+                "Order {OrderId} is on hold ({HoldKind}: {Reason}); automatic fulfillment skipped.",
+                order.Id, order.HoldKind, order.HoldReason);
+            return new OrderFulfillmentResult(0, false, []);
+        }
+
         var existingKeys = await _commerceDb.OrderLicenseKeys
             .Where(k => k.OrderId == order.Id)
             .ToListAsync(cancellationToken);
@@ -93,6 +103,12 @@ public sealed class OrderFulfillmentService
         var keysByItem = existingKeys.GroupBy(k => k.OrderItemId).ToDictionary(g => g.Key, g => g.Count());
         var delivered = 0;
         var pendingChatDeliveryTickets = new List<ChatDeliveryPendingTicket>();
+
+        // The stock held for this order while the customer paid (hosted gateways) is claimed BEFORE the stale
+        // sweep so the sweep can never hand a paid order's code back to the pool.
+        var heldCodes = (await _inventoryEngine.ClaimOrderHoldsAsync(order.Id, cancellationToken))
+            .GroupBy(c => c.VariantId)
+            .ToDictionary(g => g.Key, g => new Queue<ReservedCodeSnapshot>(g));
 
         await _inventoryEngine.ExpireStaleReservationsAsync(cancellationToken);
 
@@ -140,12 +156,24 @@ public sealed class OrderFulfillmentService
                 // rest" semantics possible; it also makes ManualOnly/admin-retry correctly deliver a
                 // partial quantity for one order line instead of one short line throwing and blocking
                 // every other line in the same order from being processed at all.
-                var reserved = await _inventoryEngine.ReservePartialCodesAsync(
-                    variantId,
-                    missing,
-                    order.UserId,
-                    cartId: null,
-                    cancellationToken);
+                var reserved = new List<ReservedCodeSnapshot>();
+                if (heldCodes.TryGetValue(variantId, out var heldQueue))
+                {
+                    while (reserved.Count < missing && heldQueue.Count > 0)
+                    {
+                        reserved.Add(heldQueue.Dequeue());
+                    }
+                }
+
+                if (reserved.Count < missing)
+                {
+                    reserved.AddRange(await _inventoryEngine.ReservePartialCodesAsync(
+                        variantId,
+                        missing - reserved.Count,
+                        order.UserId,
+                        cartId: null,
+                        cancellationToken));
+                }
 
                 _logger.LogInformation(
                     "FulfillmentRouting: order {OrderId} item {OrderItemId} mode {Mode} — manual reserved {ManualQuantity} of {RequestedQuantity}.",
@@ -182,6 +210,13 @@ public sealed class OrderFulfillmentService
             // inventory-backed variant at checkout. There is no genuine deliverable to auto-assign
             // here — skip rather than fabricate a license key; an admin must resolve these via
             // AssignManualCodeAsync with a real code.
+        }
+
+        // Held codes this order did not end up needing (e.g. the line is supplier-fulfilled) go straight back to stock.
+        var unusedHeld = heldCodes.Values.SelectMany(q => q).Select(c => c.CodeId).ToList();
+        if (unusedHeld.Count > 0)
+        {
+            await _inventoryEngine.ReleaseReservationsAsync(unusedHeld, cancellationToken);
         }
 
         var orderCompleted = false;
@@ -354,7 +389,7 @@ public sealed class OrderFulfillmentService
     public async Task<AutomatedSupplierFulfillmentSummary> QueueAutomatedSupplierFulfillmentAsync(
         Order order, CancellationToken cancellationToken)
     {
-        if (order.Kind == OrderKind.Membership || order.PaymentStatus != PaymentStatus.Paid)
+        if (order.Kind == OrderKind.Membership || order.PaymentStatus != PaymentStatus.Paid || order.IsOnHold)
         {
             return new AutomatedSupplierFulfillmentSummary(0, 0, 0);
         }

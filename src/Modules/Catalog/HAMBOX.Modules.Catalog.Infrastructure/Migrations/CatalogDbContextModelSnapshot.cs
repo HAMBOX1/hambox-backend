@@ -885,6 +885,13 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTimeOffset?>("ReleasedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -899,6 +906,8 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.HasIndex("CartId");
 
                     b.HasIndex("CodeId");
+
+                    b.HasIndex("OrderId");
 
                     b.HasIndex("UserId");
 
@@ -1469,6 +1478,12 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LastEditedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int?>("MaxQuantityPerOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MaxQuantityPerUserPerDay")
+                        .HasColumnType("int");
+
                     b.Property<string>("ModifiedBy")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -1494,6 +1509,11 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<DateTime?>("PublicReleaseOnUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("RequiresManualReview")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<int>("ReservedQuantity")
                         .ValueGeneratedOnAdd()

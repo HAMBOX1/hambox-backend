@@ -7,6 +7,8 @@ using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetAdminOrders;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetAdminOrderStatistics;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RefundAdminOrder;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.ResendAdminOrderCodes;
+using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetPaymentWebhookLogs;
+using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.OrderHold;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RetryAdminOrderFulfillment;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RevealAdminOrderLicenseKey;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.UpdateAdminOrderStatus;
@@ -145,6 +147,34 @@ internal static class OrderManagementEndpoints
         .WithName("RetryAdminOrderFulfillment")
         .RequirePermission(PermissionConstants.Orders.Edit);
 
+        group.MapGet("payment-webhooks", async Task<IResult> (
+            [FromQuery] string? provider,
+            [FromQuery] string? result,
+            [FromQuery] int? take,
+            ISender sender) =>
+        {
+            var logs = await sender.Send(new GetPaymentWebhookLogsQuery(provider, result, take ?? 100));
+            return logs.IsSuccess ? Results.Ok(logs.Value) : Results.BadRequest();
+        })
+        .WithName("GetPaymentWebhookLogs")
+        .RequirePermission(PermissionConstants.Orders.View);
+
+        group.MapPost("{id:guid}/hold", async Task<IResult> (
+            Guid id,
+            [FromBody] HoldAdminOrderRequest request,
+            ISender sender) =>
+            MapResult(await sender.Send(new HoldAdminOrderCommand(id, request.Reason ?? string.Empty))))
+        .WithName("HoldAdminOrder")
+        .RequirePermission(PermissionConstants.Orders.Edit);
+
+        group.MapPost("{id:guid}/hold/release", async Task<IResult> (
+            Guid id,
+            [FromBody] ReleaseAdminOrderHoldRequest? request,
+            ISender sender) =>
+            MapResult(await sender.Send(new ReleaseAdminOrderHoldCommand(id, request?.Note))))
+        .WithName("ReleaseAdminOrderHold")
+        .RequirePermission(PermissionConstants.Orders.Edit);
+
         group.MapPost("{id:guid}/manual-code", async Task<IResult> (
             Guid id,
             [FromBody] AssignAdminOrderManualCodeRequest request,
@@ -180,3 +210,7 @@ internal static class OrderManagementEndpoints
 }
 
 internal sealed record RevealAdminLicenseKeyRequest(string? Reason);
+
+internal sealed record HoldAdminOrderRequest(string? Reason);
+
+internal sealed record ReleaseAdminOrderHoldRequest(string? Note);

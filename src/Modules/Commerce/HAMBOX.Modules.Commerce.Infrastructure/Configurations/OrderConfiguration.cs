@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -43,6 +44,18 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(o => o.PaymentProvider)
             .HasMaxLength(50);
+
+        builder.Property(o => o.HoldKind)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(OrderHoldKind.None);
+
+        builder.Property(o => o.HoldReason)
+            .HasMaxLength(500);
+
+        builder.Property(o => o.HoldReleasedByUserId)
+            .HasMaxLength(450);
 
         builder.Property(o => o.PaymentTransactionId)
             .HasMaxLength(100);
