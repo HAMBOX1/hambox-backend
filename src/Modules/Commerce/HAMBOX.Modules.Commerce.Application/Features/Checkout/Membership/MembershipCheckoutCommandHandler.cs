@@ -234,7 +234,7 @@ internal sealed class MembershipCheckoutCommandHandler
         return Result.Success(CommerceMapper.ToOrderDto(createdOrder));
     }
 
-    private static Result ValidateAction(
+    internal static Result ValidateAction(
         MembershipCheckoutAction action,
         MembershipPlan plan,
         MembershipSubscription? activeSubscription) =>

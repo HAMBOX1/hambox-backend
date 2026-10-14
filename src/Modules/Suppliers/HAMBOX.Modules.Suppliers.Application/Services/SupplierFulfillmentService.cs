@@ -217,6 +217,8 @@ internal sealed class SupplierFulfillmentService(
         SupplierPurchaseResult result;
         try
         {
+            using var callScope = SupplierCallScope.Begin(new SupplierCallInfo(
+                fulfillment.Id, fulfillment.HamboxReferenceId, fulfillment.SupplierId, fulfillment.OrderId, fulfillment.Attempts));
             result = await provider.PurchaseAsync(purchaseRequest, context, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -275,6 +277,8 @@ internal sealed class SupplierFulfillmentService(
         SupplierOrderStatusResult result;
         try
         {
+            using var callScope = SupplierCallScope.Begin(new SupplierCallInfo(
+                fulfillment.Id, fulfillment.HamboxReferenceId, fulfillment.SupplierId, fulfillment.OrderId, fulfillment.Attempts));
             result = await providerResolution.Value.GetOrderStatusAsync(query, context, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)

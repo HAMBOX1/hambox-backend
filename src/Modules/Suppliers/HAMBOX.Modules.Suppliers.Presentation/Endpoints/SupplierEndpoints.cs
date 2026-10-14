@@ -28,6 +28,13 @@ internal static class SupplierEndpoints
             MapResult(await sender.Send(new GetSuppliersQuery(search, status, page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize))))
             .RequirePermission(PermissionConstants.Suppliers.View);
 
+        // The supplier-dispute trail (audit R40): every outbound call with redacted bodies, status and timing.
+        group.MapGet("api-logs", async Task<IResult> (
+                [FromQuery] Guid? supplierId, [FromQuery] Guid? orderId, [FromQuery] Guid? fulfillmentId,
+                [FromQuery] bool? failedOnly, [FromQuery] int? take, ISender sender) =>
+            MapResult(await sender.Send(new GetSupplierApiCallLogsQuery(supplierId, orderId, fulfillmentId, failedOnly, take ?? 100))))
+            .RequirePermission(PermissionConstants.Suppliers.View);
+
         group.MapGet("provider-types", async Task<IResult> (ISender sender) =>
             MapResult(await sender.Send(new GetSupplierProviderTypesQuery())))
             .RequirePermission(PermissionConstants.Suppliers.View);

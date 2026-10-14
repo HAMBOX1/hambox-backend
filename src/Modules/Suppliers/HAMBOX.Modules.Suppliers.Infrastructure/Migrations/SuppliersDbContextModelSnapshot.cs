@@ -23,6 +23,90 @@ namespace HAMBOX.Modules.Suppliers.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Fulfillments.SupplierApiCallLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("FulfillmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("HamboxReferenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProviderKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("RequestBody")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("ResponseBody")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("ResponseSummary")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedOnUtc")
+                        .HasDatabaseName("IX_SupplierApiCallLogs_CreatedOnUtc");
+
+                    b.HasIndex("FulfillmentId")
+                        .HasDatabaseName("IX_SupplierApiCallLogs_FulfillmentId");
+
+                    b.HasIndex("HamboxReferenceId")
+                        .HasDatabaseName("IX_SupplierApiCallLogs_HamboxReferenceId");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("IX_SupplierApiCallLogs_OrderId");
+
+                    b.HasIndex("SupplierId", "CreatedOnUtc")
+                        .HasDatabaseName("IX_SupplierApiCallLogs_SupplierId_CreatedOnUtc");
+
+                    b.ToTable("SupplierApiCallLogs", "suppliers");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Suppliers.Domain.Fulfillments.SupplierFulfillment", b =>
                 {
                     b.Property<Guid>("Id")

@@ -44,6 +44,17 @@ public static class OperationalJobTypes
     public const string ReconcileCryptomusPayments = "ReconcileCryptomusPayments";
     public const string ReconcileOxaPayPayments = "ReconcileOxaPayPayments";
     public const string RecomputeSupplierDerivedPricing = "RecomputeSupplierDerivedPricing";
+
+    /// <summary>
+    /// Job types that are per-order work: enqueueing one while another for the same entity is still queued or
+    /// waiting to retry returns the existing job instead of creating a second.
+    /// </summary>
+    public static readonly IReadOnlySet<string> DeduplicatedWhileQueued = new HashSet<string>(StringComparer.Ordinal)
+    {
+        ExecuteOrderFulfillment,
+        RetryOrderFulfillment,
+        RetryDelivery,
+    };
 }
 
 /// <summary>

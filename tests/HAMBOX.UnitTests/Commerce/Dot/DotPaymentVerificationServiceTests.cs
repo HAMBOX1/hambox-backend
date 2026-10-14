@@ -38,12 +38,15 @@ public sealed class DotPaymentVerificationServiceTests
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal("Dot", order.PaymentProvider);
 
-        // A single-call full delivery completes the order in that same call (existing keys + the ones
-        // just delivered are counted, not a stale database query), so there is nothing left for a
-        // fulfillment job to do.
-        Assert.Equal(OrderStatus.Completed, order.Status);
-        Assert.DoesNotContain(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        // The callback only confirms payment and queues the execution job — nothing is delivered inline.
+        Assert.Equal(OrderStatus.Processing, order.Status);
+        Assert.Contains(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
 
+        // The job (what the worker runs) is what delivers the code and completes the order.
+        await harness.RunFulfillmentJobAsync(orderId);
+        await harness.CommerceDb.Entry(order).ReloadAsync();
+        Assert.Equal(OrderStatus.Completed, order.Status);
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);
         Assert.Single(harness.Communication.SentRequests);
         Assert.Equal("OrderConfirmation", harness.Communication.SentRequests[0].TemplateKey);
@@ -135,6 +138,8 @@ public sealed class DotPaymentVerificationServiceTests
 
         var first = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
         var second = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
+        await harness.RunFulfillmentJobAsync(orderId);
+        await harness.RunFulfillmentJobAsync(orderId); // a duplicate job must not deliver twice either
 
         Assert.Equal(DotVerificationOutcome.Succeeded, first.Outcome);
         Assert.Equal(DotVerificationOutcome.Succeeded, second.Outcome);

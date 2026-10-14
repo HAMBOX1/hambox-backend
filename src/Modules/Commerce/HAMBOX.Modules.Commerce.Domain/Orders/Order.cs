@@ -125,6 +125,51 @@ public sealed class Order : AggregateRoot
 
     public bool IsOnHold => HoldKind != OrderHoldKind.None;
 
+    public RefundSettlementStatus RefundSettlement { get; private set; }
+
+    /// <summary>The gateway / wallet reference of the money actually returned to the customer.</summary>
+    public string? RefundGatewayReference { get; private set; }
+
+    public string? RefundSettlementNote { get; private set; }
+
+    public string? RefundSettledByUserId { get; private set; }
+
+    public DateTimeOffset? RefundSettledOnUtc { get; private set; }
+
+    private static readonly string[] NonGatewayProviders = ["Development", "Immediate"];
+
+    /// <summary>True when the customer paid through a real gateway, so cancelling or refunding means money must go back.</summary>
+    public bool PaidThroughGateway =>
+        PaymentStatus is Enums.PaymentStatus.Paid or Enums.PaymentStatus.Refunded
+        && !string.IsNullOrWhiteSpace(PaymentProvider)
+        && !NonGatewayProviders.Contains(PaymentProvider, StringComparer.OrdinalIgnoreCase)
+        && TotalAmount > 0m;
+
+    private void FlagRefundOwed()
+    {
+        if (PaidThroughGateway && RefundSettlement == RefundSettlementStatus.None)
+        {
+            RefundSettlement = RefundSettlementStatus.AwaitingGatewayRefund;
+        }
+    }
+
+    /// <summary>Records that the money was actually returned. Idempotent per reference: settling twice just updates the note.</summary>
+    public void SettleRefund(string gatewayReference, string? note, string settledByUserId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(gatewayReference);
+
+        if (RefundSettlement == RefundSettlementStatus.None)
+        {
+            throw new InvalidOperationException("This order has no refund to settle.");
+        }
+
+        RefundSettlement = RefundSettlementStatus.Settled;
+        RefundGatewayReference = gatewayReference.Trim();
+        RefundSettlementNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        RefundSettledByUserId = settledByUserId;
+        RefundSettledOnUtc = DateTimeOffset.UtcNow;
+    }
+
     public void PlaceOnHold(OrderHoldKind kind, string reason)
     {
         if (kind == OrderHoldKind.None)
@@ -367,6 +412,7 @@ public sealed class Order : AggregateRoot
 
         PaymentStatus = Enums.PaymentStatus.Refunded;
         Status = OrderStatus.Refunded;
+        FlagRefundOwed();
     }
 
     /// <summary>
@@ -401,6 +447,7 @@ public sealed class Order : AggregateRoot
                 break;
             case OrderStatus.Cancelled:
                 Cancel();
+                FlagRefundOwed();
                 break;
             case OrderStatus.Refunded:
                 Refund();

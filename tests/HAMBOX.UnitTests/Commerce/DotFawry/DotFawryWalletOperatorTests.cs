@@ -181,11 +181,12 @@ public sealed class DotFawryWalletOperatorTests
     [InlineData("VodafoneCash")]
     public async Task VerifyAndFinalizeAsync_CalledTwiceAfterSuccess_IsIdempotentForNonFawryWallets(string wallet)
     {
-        var (harness, attemptId, _) = await InitiateAsync(wallet);
+        var (harness, attemptId, orderId) = await InitiateAsync(wallet);
         harness.Gateway.StatusResult = new("0", "found", "0", "Successfully charged", "dot-trans-1");
 
         var first = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
         var second = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
+        await harness.RunFulfillmentJobAsync(orderId);
 
         Assert.Equal(DotFawryVerificationOutcome.Succeeded, first.Outcome);
         Assert.Equal(DotFawryVerificationOutcome.Succeeded, second.Outcome);
@@ -220,6 +221,9 @@ public sealed class DotFawryWalletOperatorTests
         var result = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
 
         Assert.Equal(DotFawryVerificationOutcome.Succeeded, result.Outcome);
+        Assert.Empty(harness.CommerceDb.OrderLicenseKeys); // delivery belongs to the execution job, not the callback
+
+        await harness.RunFulfillmentJobAsync(initiation.Value.OrderId);
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);
     }
 

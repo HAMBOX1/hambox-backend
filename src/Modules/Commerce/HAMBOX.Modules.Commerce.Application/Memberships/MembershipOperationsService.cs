@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Application.Memberships;
 
-internal sealed class MembershipOperationsService
+public sealed class MembershipOperationsService
 {
     private readonly ICommerceDbContext _dbContext;
 

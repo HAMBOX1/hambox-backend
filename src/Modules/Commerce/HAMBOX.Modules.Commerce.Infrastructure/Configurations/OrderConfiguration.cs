@@ -54,6 +54,16 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.HoldReason)
             .HasMaxLength(500);
 
+        builder.Property(o => o.RefundSettlement)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .HasDefaultValue(RefundSettlementStatus.None);
+
+        builder.Property(o => o.RefundGatewayReference).HasMaxLength(200);
+        builder.Property(o => o.RefundSettlementNote).HasMaxLength(500);
+        builder.Property(o => o.RefundSettledByUserId).HasMaxLength(450);
+
         builder.Property(o => o.HoldReleasedByUserId)
             .HasMaxLength(450);
 

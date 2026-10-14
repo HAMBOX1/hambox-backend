@@ -38,12 +38,14 @@ public sealed class DotFawryPaymentVerificationServiceTests
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal("DotFawry", order.PaymentProvider);
 
-        // A single-call full delivery completes the order in that same call (existing keys + the ones
-        // just delivered are counted, not a stale database query), so there is nothing left for a
-        // fulfillment job to do.
-        Assert.Equal(OrderStatus.Completed, order.Status);
-        Assert.DoesNotContain(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        // The callback only confirms payment and queues the execution job — nothing is delivered inline.
+        Assert.Equal(OrderStatus.Processing, order.Status);
+        Assert.Contains(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
 
+        await harness.RunFulfillmentJobAsync(orderId);
+        await harness.CommerceDb.Entry(order).ReloadAsync();
+        Assert.Equal(OrderStatus.Completed, order.Status);
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);
         Assert.Single(harness.Communication.SentRequests);
 
@@ -117,11 +119,13 @@ public sealed class DotFawryPaymentVerificationServiceTests
     [Fact]
     public async Task VerifyAndFinalizeAsync_CalledTwiceAfterSuccess_IsIdempotentAndDoesNotDoubleFulfillOrNotify()
     {
-        var (harness, attemptId, _) = await InitiateAsync(stock: 5, price: 10m);
+        var (harness, attemptId, orderId) = await InitiateAsync(stock: 5, price: 10m);
         harness.Gateway.StatusResult = new("0", "found", "0", "Successfully charged", "dot-trans-1");
 
         var first = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
         var second = await harness.VerificationService.VerifyAndFinalizeAsync(attemptId, CancellationToken.None);
+        await harness.RunFulfillmentJobAsync(orderId);
+        await harness.RunFulfillmentJobAsync(orderId);
 
         Assert.Equal(DotFawryVerificationOutcome.Succeeded, first.Outcome);
         Assert.Equal(DotFawryVerificationOutcome.Succeeded, second.Outcome);

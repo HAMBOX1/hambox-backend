@@ -1286,6 +1286,28 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("RefundGatewayReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RefundSettledByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("RefundSettledOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RefundSettlement")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("None");
+
+                    b.Property<string>("RefundSettlementNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)

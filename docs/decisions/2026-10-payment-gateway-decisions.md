@@ -65,3 +65,32 @@ additional international gateway / per-market configuration that is required.
 | Name / role | |
 | Date | |
 | Signature or reference to approving e-mail | |
+
+---
+
+## D-3 — Queue system: database-backed queue instead of Redis Queue
+
+**Contract reference:** the stack lists "Queue System: Redis Queue"; the scope accepts a persistent queue with an
+independent worker.
+
+**What is built**
+
+- A persistent, SQL-backed job queue (`OperationalJobs`): jobs survive restarts, are claimed with optimistic
+  concurrency (two workers can never run the same job), retried on a schedule (default 0 / 2 / 5 / 15 minutes with
+  jitter), dead-lettered after the threshold, and visible/retryable from the admin Operations screens.
+- Redis is used only as an optional low-latency "wake the worker" signal; the SQL row is always the source of truth.
+- Per-order jobs are enqueued at most once while one is waiting (idempotent enqueue), and every handler is itself
+  idempotent (supplier purchase claim, unique manual code).
+
+**Known limits**
+
+- The worker runs inside the API process, so an API restart pauses it until the API is back (queued jobs are not lost).
+- Moving to Redis Queue / Hangfire, or to a separately deployed worker service, is a change to the stack the contract
+  names and needs the client's written approval.
+
+| | |
+|---|---|
+| Decision | ☐ DB-backed queue accepted   ☐ Redis Queue required (separate estimate)   ☐ Separate worker service required |
+| Name / role | |
+| Date | |
+| Signature or reference to approving e-mail | |

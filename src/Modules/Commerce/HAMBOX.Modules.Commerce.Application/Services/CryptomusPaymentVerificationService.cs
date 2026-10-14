@@ -40,7 +40,8 @@ public sealed class CryptomusPaymentVerificationService(
     ICommunicationService communicationService,
     IOperationalJobQueue jobQueue,
     ILogger<CryptomusPaymentVerificationService> logger,
-    OrderStockHoldService? stockHold = null)
+    OrderStockHoldService? stockHold = null,
+    HAMBOX.Modules.Commerce.Application.Memberships.MembershipOperationsService? membershipOperations = null)
 {
     private const decimal AmountToleranceUsd = 0.01m;
 
@@ -120,6 +121,8 @@ public sealed class CryptomusPaymentVerificationService(
             {
                 await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
             }
+
+            await MembershipHostedFinalizer.OnPaymentFailedAsync(commerceDbContext, order, cancellationToken);
             RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.Status);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new CryptomusVerificationResult(CryptomusVerificationOutcome.Failed, order.Id, status.Status);
@@ -141,18 +144,29 @@ public sealed class CryptomusPaymentVerificationService(
             {
                 await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
             }
+
+            await MembershipHostedFinalizer.OnPaymentFailedAsync(commerceDbContext, order, cancellationToken);
             RecordAudit(order.Id, "VerificationFailed", "AmountMismatch", attempt, "Verified amount mismatch.");
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new CryptomusVerificationResult(CryptomusVerificationOutcome.Failed, order.Id, "Payment verification failed.");
         }
 
-        OrderFulfillmentResult? fulfillmentResult = null;
         await transactionService.ExecuteAsync(async ct =>
         {
             var providerTransactionId = string.IsNullOrWhiteSpace(status.Uuid) ? attempt.PartnerTxId : status.Uuid;
             attempt.MarkSucceeded(providerTransactionId, verifiedAmount, "USD");
             order.RecordPayment("Cryptomus", providerTransactionId);
             RecordAudit(order.Id, "VerificationSucceeded", "Paid", attempt, status.Status);
+
+            // A membership purchase has no cart, promotions or stock: paying it activates the subscription.
+            if (await MembershipHostedFinalizer.TryActivateAsync(
+                    commerceDbContext, membershipOperations, order, providerTransactionId, ct))
+            {
+                await referralLifecycle.ProcessOrderCompletedAsync(order, ct);
+                await commerceDbContext.SaveChangesAsync(ct);
+                return;
+            }
+
 
             var cart = await commerceDbContext.ShoppingCarts
                 .Include(c => c.Items)
@@ -170,24 +184,14 @@ public sealed class CryptomusPaymentVerificationService(
 
             await referralLifecycle.ProcessOrderCompletedAsync(order, ct);
 
-            try
-            {
-                fulfillmentResult = await fulfillmentService.FulfillMissingAsync(order, ct);
-            }
-            catch (InvalidOperationException ex)
-            {
-                logger.LogError(
-                    ex, "Cryptomus payment attempt {PaymentAttemptId} succeeded but fulfillment failed; will retry.", attempt.Id);
-            }
+            // No inline delivery in the payment callback (Scope §12.3 / §14.4 / §25): the callback only confirms the
+            // payment and queues the execution job below, which delivers manual stock, tops up from suppliers and
+            // opens delivery tickets. A slow or failing delivery can therefore never hold up — or undo — a payment.
+            order.MarkProcessing();
 
             await commerceDbContext.SaveChangesAsync(ct);
             await catalogDbContext.SaveChangesAsync(ct);
         }, cancellationToken);
-
-        if (fulfillmentResult?.PendingChatDeliveryTickets.Count > 0)
-        {
-            await fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order, fulfillmentResult.PendingChatDeliveryTickets, cancellationToken);
-        }
 
         if (order.Status != OrderStatus.Completed)
         {

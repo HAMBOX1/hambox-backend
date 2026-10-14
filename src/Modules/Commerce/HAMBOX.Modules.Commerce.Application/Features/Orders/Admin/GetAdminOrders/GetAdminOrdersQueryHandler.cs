@@ -190,6 +190,8 @@ internal sealed class GetAdminOrdersQueryHandler
             "cancelled" => query.Where(o => o.Status == OrderStatus.Cancelled),
             "refunded" => query.Where(o => o.Status == OrderStatus.Refunded || o.PaymentStatus == PaymentStatus.Refunded),
             "failed" => query.Where(o => o.Status == OrderStatus.Failed || o.PaymentStatus == PaymentStatus.Failed),
+            "refund-pending" => query.Where(o => o.RefundSettlement == RefundSettlementStatus.AwaitingGatewayRefund),
+            "review" => query.Where(o => o.HoldKind != OrderHoldKind.None),
             _ => query,
         };
     }

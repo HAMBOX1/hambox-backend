@@ -175,18 +175,9 @@ internal sealed class GetSupplierMappingsQueryHandler(
         // SupplierRoutingEngine, instead of the raw supplier-currency amount leaking into SellingPrice.
         var currencySettings = await platformSettings.GetCurrencyAsync(cancellationToken);
         var fetchedRates = await exchangeRateProvider.GetRatesAsync(cancellationToken);
-        var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var code in currencySettings.SupportedCurrencies)
-        {
-            if (fetchedRates.TryGetValue(code, out var rate) && rate > 0)
-            {
-                rates[code] = rate;
-            }
-            else if (currencySettings.StaticRates.TryGetValue(code, out var fallbackRate) && fallbackRate > 0)
-            {
-                rates[code] = fallbackRate;
-            }
-        }
+        // One shared precedence rule (admin override, else live, else static fallback) — the same one checkout uses.
+        var rates = HAMBOX.Application.Abstractions.ExchangeRatePrecedence.Resolve(
+            currencySettings.SupportedCurrencies, fetchedRates, currencySettings.StaticRates);
         rates.TryAdd(currencySettings.BaseCurrency, 1m);
         var currencyConversion = new CurrencyConversion(currencySettings.BaseCurrency, rates);
 

@@ -219,6 +219,9 @@ internal sealed class GetAdminOrderByIdQueryHandler
             supplierRouting,
             order.IsOnHold ? order.HoldKind.ToString() : null,
             order.IsOnHold ? order.HoldReason : null,
-            order.IsOnHold ? order.HeldOnUtc : null));
+            order.IsOnHold ? order.HeldOnUtc : null,
+            order.RefundSettlement == RefundSettlementStatus.None ? null : order.RefundSettlement.ToString(),
+            order.RefundGatewayReference,
+            order.RefundSettledOnUtc));
     }
 }

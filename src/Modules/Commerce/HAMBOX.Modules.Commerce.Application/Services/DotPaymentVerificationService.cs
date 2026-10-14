@@ -169,7 +169,6 @@ public sealed class DotPaymentVerificationService(
             return new DotVerificationResult(DotVerificationOutcome.Failed, order.Id, "Payment verification failed.");
         }
 
-        OrderFulfillmentResult? fulfillmentResult = null;
         await transactionService.ExecuteAsync(async ct =>
         {
             var providerTransactionId = attempt.ProviderTransactionId ?? attempt.PartnerTxId;
@@ -197,32 +196,14 @@ public sealed class DotPaymentVerificationService(
             // other completed order goes through.
             await referralLifecycle.ProcessOrderCompletedAsync(order, ct);
 
-            // Only now — after authoritative, amount-validated confirmation — does inventory ever
-            // get reserved and committed for this order. Digital codes were never touched while the
-            // customer was off completing OTP with DOT.
-            try
-            {
-                fulfillmentResult = await fulfillmentService.FulfillMissingAsync(order, ct);
-            }
-            catch (InvalidOperationException ex)
-            {
-                // The captured payment must never be undone by a delivery-side problem (e.g. a
-                // genuine stock race). Leave the order for the retry job enqueued below instead of
-                // letting this escape and strand the payment attempt mid-transaction.
-                logger.LogError(
-                    ex, "DOT payment attempt {PaymentAttemptId} succeeded but fulfillment failed; will retry.", attempt.Id);
-            }
+            // No inline delivery in the payment callback (Scope §12.3 / §14.4 / §25): the callback only confirms the
+            // payment and queues the execution job below, which delivers manual stock, tops up from suppliers and
+            // opens delivery tickets. A slow or failing delivery can therefore never hold up — or undo — a payment.
+            order.MarkProcessing();
 
             await commerceDbContext.SaveChangesAsync(ct);
             await catalogDbContext.SaveChangesAsync(ct);
         }, cancellationToken);
-
-        if (fulfillmentResult?.PendingChatDeliveryTickets.Count > 0)
-        {
-            // Strictly after the transaction above has committed — see ChatDeliveryPendingTicket's doc
-            // comment for why a Support-schema ticket write must never share that transaction.
-            await fulfillmentService.CreatePendingChatDeliveryTicketsAsync(order, fulfillmentResult.PendingChatDeliveryTickets, cancellationToken);
-        }
 
         if (order.Status != OrderStatus.Completed)
         {

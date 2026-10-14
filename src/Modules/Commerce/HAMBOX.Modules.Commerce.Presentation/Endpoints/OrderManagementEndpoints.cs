@@ -9,6 +9,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RefundAdminOrder
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.ResendAdminOrderCodes;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetPaymentWebhookLogs;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.OrderHold;
+using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.SettleOrderRefund;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RetryAdminOrderFulfillment;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RevealAdminOrderLicenseKey;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.UpdateAdminOrderStatus;
@@ -159,6 +160,14 @@ internal static class OrderManagementEndpoints
         .WithName("GetPaymentWebhookLogs")
         .RequirePermission(PermissionConstants.Orders.View);
 
+        group.MapPost("{id:guid}/refund/settle", async Task<IResult> (
+            Guid id,
+            [FromBody] SettleOrderRefundRequest request,
+            ISender sender) =>
+            MapResult(await sender.Send(new SettleOrderRefundCommand(id, request.GatewayReference ?? string.Empty, request.Note))))
+        .WithName("SettleOrderRefund")
+        .RequirePermission(PermissionConstants.Orders.Refund);
+
         group.MapPost("{id:guid}/hold", async Task<IResult> (
             Guid id,
             [FromBody] HoldAdminOrderRequest request,
@@ -214,3 +223,5 @@ internal sealed record RevealAdminLicenseKeyRequest(string? Reason);
 internal sealed record HoldAdminOrderRequest(string? Reason);
 
 internal sealed record ReleaseAdminOrderHoldRequest(string? Note);
+
+internal sealed record SettleOrderRefundRequest(string? GatewayReference, string? Note);

@@ -61,21 +61,9 @@ public sealed class CurrencyExchangeRateService(
     {
         var normalized = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var code in settings.SupportedCurrencies)
+        foreach (var (code, rate) in ExchangeRatePrecedence.Resolve(settings.SupportedCurrencies, fetched, settings.StaticRates))
         {
-            // A row in StaticRates is a deliberate admin override and always wins, regardless of
-            // Provider — leaving a currency out of the table means "use the live/auto rate";
-            // adding a row overrides just that currency without switching the whole store to manual.
-            if (settings.StaticRates.TryGetValue(code, out var overrideRate) && overrideRate > 0)
-            {
-                normalized[code] = overrideRate;
-                continue;
-            }
-
-            if (fetched.TryGetValue(code, out var rate) && rate > 0)
-            {
-                normalized[code] = rate;
-            }
+            normalized[code] = rate;
         }
 
         // Auto rates for currencies outside the storefront list (supplier cost currencies); an admin

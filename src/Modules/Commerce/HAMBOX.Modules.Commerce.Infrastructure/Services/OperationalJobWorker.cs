@@ -205,17 +205,63 @@ internal sealed class OperationalJobWorker(
         await commerceDb.SaveChangesAsync(cancellationToken);
     }
 
-    private static TimeSpan ComputeRetryDelay(RetryPoliciesSettingsPayload retrySettings, int attempts)
+    /// <summary>
+    /// Delay before the next attempt, after <paramref name="attempts"/> attempts have run. A configured
+    /// <see cref="RetryPoliciesSettingsPayload.RetryScheduleSeconds"/> ("0,120,300,900" = immediate, then 2 / 5 / 15 min)
+    /// wins; otherwise the fixed or exponential delay is used. Up to ±20 % jitter is applied so a batch of failures
+    /// caused by one outage does not retry in lock-step against the same supplier.
+    /// </summary>
+    internal static TimeSpan ComputeRetryDelay(
+        RetryPoliciesSettingsPayload retrySettings, int attempts, Func<double>? random = null)
     {
-        var baseDelaySeconds = Math.Max(1, retrySettings.RetryDelaySeconds);
-        if (!retrySettings.UseExponentialBackoff)
+        var seconds = ScheduledDelaySeconds(retrySettings.RetryScheduleSeconds, attempts);
+
+        if (seconds is null)
         {
-            return TimeSpan.FromSeconds(baseDelaySeconds);
+            var baseDelaySeconds = Math.Max(1, retrySettings.RetryDelaySeconds);
+            if (!retrySettings.UseExponentialBackoff)
+            {
+                seconds = baseDelaySeconds;
+            }
+            else
+            {
+                var exponentialSeconds = baseDelaySeconds * Math.Pow(2, Math.Max(0, attempts - 1));
+                seconds = Math.Min(exponentialSeconds, Math.Max(baseDelaySeconds, retrySettings.TimeoutSeconds));
+            }
         }
 
-        var exponentialSeconds = baseDelaySeconds * Math.Pow(2, Math.Max(0, attempts - 1));
-        var cappedSeconds = Math.Min(exponentialSeconds, Math.Max(baseDelaySeconds, retrySettings.TimeoutSeconds));
-        return TimeSpan.FromSeconds(cappedSeconds);
+        if (retrySettings.UseJitter && seconds.Value > 0)
+        {
+            var sample = (random ?? Random.Shared.NextDouble)();
+            seconds *= 0.8 + (sample * 0.4);
+        }
+
+        return TimeSpan.FromSeconds(Math.Max(0, seconds.Value));
+    }
+
+    private static double? ScheduledDelaySeconds(string? schedule, int attempts)
+    {
+        if (string.IsNullOrWhiteSpace(schedule))
+        {
+            return null;
+        }
+
+        var steps = schedule
+            .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) && value >= 0
+                ? value
+                : (double?)null)
+            .Where(value => value is not null)
+            .Select(value => value!.Value)
+            .ToList();
+
+        if (steps.Count == 0)
+        {
+            return null;
+        }
+
+        // attempts = how many have run; the delay before attempt (attempts + 1) is steps[attempts].
+        return steps[Math.Min(Math.Max(attempts, 0), steps.Count - 1)];
     }
 
     /// <summary>

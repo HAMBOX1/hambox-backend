@@ -296,7 +296,9 @@ internal static class PlatformSettingsDefaultsFactory
         new(30, 25, 4, 300);
 
     private static RetryPoliciesSettingsPayload CreateRetryPolicies() =>
-        new(3, 30, 120, 5, UseExponentialBackoff: false);
+        // Scope §13 default: first attempt immediately, then retries after 2, 5 and 15 minutes (4 attempts in all),
+        // with jitter so one outage does not make every failed job retry in the same second.
+        new(4, 30, 900, 5, UseExponentialBackoff: false, RetryScheduleSeconds: "0,120,300,900", UseJitter: true);
 
     private static NotificationsSettingsPayload CreateNotifications() =>
         new(true, false, false, true, true, true);

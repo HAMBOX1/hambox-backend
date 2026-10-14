@@ -58,7 +58,10 @@ public sealed record AdminOrderDetailDto(
     IReadOnlyList<AdminOrderSupplierRoutingDto> SupplierRouting,
     string? HoldKind = null,
     string? HoldReason = null,
-    DateTimeOffset? HeldOnUtc = null);
+    DateTimeOffset? HeldOnUtc = null,
+    string? RefundSettlement = null,
+    string? RefundGatewayReference = null,
+    DateTimeOffset? RefundSettledOnUtc = null);
 
 /// <summary>
 /// One automated-supplier routing decision for one order item, admin-visible only — see

@@ -328,6 +328,40 @@ internal static class CartEndpoints
         .RequireAuthorization()
         .RequireCustomerContext();
 
+        // Membership paid through a hosted crypto gateway (audit R32): creates the pending order + invoice and
+        // returns the gateway's payment page URL; the gateway verification activates the subscription.
+        group.MapPost("checkout/membership/hosted", async Task<Results<Ok<MembershipHostedCheckoutInitiationDto>, BadRequest<ProblemDetails>>> (
+            [FromBody] MembershipHostedCheckoutRequest request,
+            HttpContext httpContext,
+            ISender sender) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() is { Length: > 0 } ua ? ua : "unknown";
+            var language = httpContext.Request.Headers["Accept-Language"].ToString() is { Length: > 0 } acceptLanguage
+                ? acceptLanguage.Split(',')[0].Split(';')[0].Trim()
+                : "en";
+
+            var result = await sender.Send(new InitiateMembershipHostedCheckoutCommand(
+                request.PlanId, request.Action, request.Gateway, request.Email, request.Country, ipAddress, userAgent, language));
+
+            if (result.IsSuccess)
+            {
+                return TypedResults.Ok(result.Value);
+            }
+
+            return TypedResults.BadRequest(new ProblemDetails
+            {
+                Title = "Bad Request",
+                Detail = result.Error.Description,
+                Type = result.Error.Code,
+                Status = StatusCodes.Status400BadRequest
+            });
+        })
+        .WithName("MembershipHostedCheckout")
+        .RequireAuthorization()
+        .RequireCustomerContext()
+        .RequireRateLimiting(CommerceRateLimitPolicies.CheckoutInitiation);
+
         group.MapPost("checkout/membership", async Task<Results<Ok<OrderDto>, BadRequest<ProblemDetails>>> (
             [FromBody] MembershipCheckoutRequest request,
             ISender sender) =>
@@ -399,3 +433,5 @@ internal sealed record UpdateCartItemRequest(int Quantity);
 internal sealed record MergeCartRequest(string GuestSessionId);
 internal sealed record ApplyCartCouponRequest(string CouponCode, string? Country);
 internal sealed record CheckoutRequest(string Email, string Country, string PaymentMethod);
+
+internal sealed record MembershipHostedCheckoutRequest(Guid PlanId, string Action, string Gateway, string Email, string Country);

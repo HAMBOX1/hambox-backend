@@ -145,6 +145,8 @@ public sealed class DotCallbackAndNotificationTests
         await harness.NotificationHandler.Handle(notification, CancellationToken.None);
         await harness.NotificationHandler.Handle(notification, CancellationToken.None);
         await harness.NotificationHandler.Handle(notification, CancellationToken.None);
+        await harness.RunFulfillmentJobAsync(orderId);
+        await harness.RunFulfillmentJobAsync(orderId);
 
         Assert.Single(harness.Gateway.StatusCheckCalls);
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);

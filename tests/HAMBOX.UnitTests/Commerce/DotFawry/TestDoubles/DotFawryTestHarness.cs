@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Infrastructure.BackgroundJobs.Handlers;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
@@ -33,6 +34,8 @@ internal sealed class DotFawryTestHarness
     public required FakeDotFawryChargeAmountResolver ChargeAmountResolver { get; init; }
     public required FakeCommunicationService Communication { get; init; }
     public required FakeOperationalJobQueue JobQueue { get; init; }
+    public required OrderFulfillmentService FulfillmentService { get; init; }
+    public required ReferralLifecycleService ReferralLifecycle { get; init; }
     public required DotFawrySettings Settings { get; init; }
     public required InitiateDotFawryCheckoutCommandHandler InitiateHandler { get; init; }
     public required DotFawryPaymentVerificationService VerificationService { get; init; }
@@ -122,12 +125,27 @@ internal sealed class DotFawryTestHarness
             ChargeAmountResolver = chargeAmountResolver,
             Communication = communication,
             JobQueue = jobQueue,
+            FulfillmentService = fulfillmentService,
+            ReferralLifecycle = referralLifecycle,
             Settings = settings,
             InitiateHandler = initiateHandler,
             VerificationService = verificationService,
             NotificationHandler = notificationHandler,
             StatusQueryHandler = statusQueryHandler,
         };
+    }
+
+    /// <summary>
+    /// Runs the post-payment execution job for an order — the payment callback no longer delivers inline, so a test
+    /// that wants the keys delivered runs the same job handler the worker runs.
+    /// </summary>
+    public async Task RunFulfillmentJobAsync(Guid orderId)
+    {
+        var handler = new ExecuteOrderFulfillmentJobHandler(null!, CommerceDb, FulfillmentService, ReferralLifecycle);
+        await handler.HandleAsync(
+            null,
+            new FakeBackgroundJobContext { RelatedEntityType = "Order", RelatedEntityId = orderId.ToString() },
+            CancellationToken.None);
     }
 
     public async Task<(Product Product, ProductVariant Variant)> SeedProductAsync(int stock, decimal price = 19.99m)

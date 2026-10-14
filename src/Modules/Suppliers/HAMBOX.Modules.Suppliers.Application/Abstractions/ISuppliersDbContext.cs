@@ -13,6 +13,7 @@ public interface ISuppliersDbContext
     DbSet<SupplierProductAvailability> SupplierProductAvailabilities { get; }
     DbSet<SupplierRoutingAuditLog> SupplierRoutingAuditLogs { get; }
     DbSet<SupplierDerivedPrice> SupplierDerivedPrices { get; }
+    DbSet<SupplierApiCallLog> SupplierApiCallLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

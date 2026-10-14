@@ -74,7 +74,9 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                 _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
                     order.Id,
                     "RefundIssued",
-                    "Order was refunded by an administrator.",
+                    order.RefundSettlement == RefundSettlementStatus.AwaitingGatewayRefund
+                        ? $"Order was refunded by an administrator. The money still has to be returned to the customer through {order.PaymentProvider} (transaction {order.PaymentTransactionId}); record the reference once it is done."
+                        : "Order was refunded by an administrator.",
                     actorId,
                     actorName));
                 order.RecordAdminEdit(actorId, actorName);

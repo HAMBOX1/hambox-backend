@@ -203,6 +203,14 @@ public static class CommerceErrors
         "Checkout.PurchaseLimitPerDayExceeded",
         $"You can buy at most {limit} of \"{productName}\" every 24 hours (you already bought {alreadyBought}).");
 
+    public static readonly Error RefundReferenceRequired = new(
+        "Commerce.RefundReferenceRequired",
+        "Enter the gateway / wallet reference of the refund you made.");
+
+    public static readonly Error OrderHasNoRefundToSettle = new(
+        "Commerce.OrderHasNoRefundToSettle",
+        "This order has no outstanding refund.");
+
     public static readonly Error OrderNotOnHold = new(
         "Commerce.OrderNotOnHold",
         "This order is not on hold.");

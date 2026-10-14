@@ -1,3 +1,5 @@
+using HAMBOX.Modules.Suppliers.Infrastructure.Providers;
+using Microsoft.Extensions.Logging;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
@@ -54,6 +56,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(bambooOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = bambooOptions.MaxResponseBytes;
             })
+            .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Bamboo", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         // Same non-secret-only shape as Bamboo above — Visoria's API key lives only in the encrypted
@@ -70,6 +73,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(visoriaOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = visoriaOptions.MaxResponseBytes;
             })
+            .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Visoria", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         // Same non-secret-only shape as Bamboo/Visoria above — GlobeTopper's key/secret pair lives only
@@ -86,6 +90,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(globeTopperOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = globeTopperOptions.MaxResponseBytes;
             })
+            .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("GlobeTopper", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         // Same non-secret-only shape as Bamboo/Visoria/GlobeTopper above — Eneba's Auth ID/Auth
@@ -104,6 +109,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(enebaOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = Math.Max(enebaOptions.MaxResponseBytes, enebaOptions.MaxArchiveBytes);
             })
+            .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Eneba", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         // Same non-secret-only shape as Bamboo/Visoria/GlobeTopper/Eneba above — CodesWholesale's Client
@@ -124,6 +130,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(cwOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = cwOptions.MaxResponseBytes;
             })
+            .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("CodesWholesale", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         // Reuses the shared background-job engine (HAMBOX.Application.BackgroundJobs) — the sweep is

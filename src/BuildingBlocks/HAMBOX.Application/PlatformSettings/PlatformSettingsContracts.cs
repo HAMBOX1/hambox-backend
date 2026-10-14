@@ -302,7 +302,9 @@ public sealed record RetryPoliciesSettingsPayload(
     int RetryDelaySeconds,
     int TimeoutSeconds,
     int DeadLetterThreshold,
-    bool UseExponentialBackoff = false);
+    bool UseExponentialBackoff = false,
+    string? RetryScheduleSeconds = null,
+    bool UseJitter = true);
 
 public sealed record NotificationsSettingsPayload(
     bool EmailEnabled,

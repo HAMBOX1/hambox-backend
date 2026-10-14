@@ -33,6 +33,28 @@ internal sealed class OperationalJobQueue(
         int? maxAttempts = null,
         CancellationToken cancellationToken = default)
     {
+        // Idempotent enqueue: per-order work (fulfillment, retries, delivery) is queued at most once while a job for
+        // the same entity is still waiting. A payment callback, a webhook, a reconcile sweep and an admin retry can
+        // all ask for the same order within seconds; they must collapse into one execution rather than rely on every
+        // downstream handler's claim to absorb the duplicates.
+        if (!string.IsNullOrWhiteSpace(relatedEntityId) && OperationalJobTypes.DeduplicatedWhileQueued.Contains(jobType))
+        {
+            var existing = await db.OperationalJobs
+                .Where(j => j.JobType == jobType
+                    && j.RelatedEntityId == relatedEntityId
+                    && (j.Status == OperationalJobStatus.Queued || j.Status == OperationalJobStatus.Retrying))
+                .OrderBy(j => j.CreatedOnUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existing is not null)
+            {
+                logger.LogInformation(
+                    "Job {JobType} for {EntityId} already queued as {JobId}; not enqueuing a duplicate.",
+                    jobType, relatedEntityId, existing.Id);
+                return existing;
+            }
+        }
+
         if (maxAttempts is null)
         {
             var retrySettings = await platformSettings.GetAsync<RetryPoliciesSettingsPayload>(
