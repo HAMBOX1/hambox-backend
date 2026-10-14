@@ -42,4 +42,8 @@
     <ProjectReference Include="..\..\Modules\Messaging\HAMBOX.Modules.Messaging.Presentation\HAMBOX.Modules.Messaging.Presentation.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

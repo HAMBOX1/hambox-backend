@@ -145,6 +145,8 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<IBackgroundJobHandler, PriceDropAlertJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotPaymentsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotFawryPaymentsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ReconcileCryptomusPaymentsJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, ReconcileOxaPayPaymentsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, RecomputeSupplierDerivedPricingJobHandler>();
 
         services.AddScoped<IOperationsMonitorService, OperationsMonitorService>();

@@ -37,15 +37,44 @@ internal static class CryptomusWebhookSignatureVerifier
             var claimedSign = signNode.GetValue<string>();
             node.Remove("sign");
 
-            var withoutSign = node.ToJsonString();
-            var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(withoutSign));
-            var expected = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(base64 + settings.ApiKey)));
+            // Cryptomus signs md5(base64(json) + apiKey) over the JSON its PHP backend produced. System.Text.Json's
+            // default encoder escapes characters PHP leaves alone (ampersand, plus, apostrophe, non-ASCII) and does not escape '/',
+            // which PHP does — so the same payload has several byte-for-byte spellings. Accept any of the plausible
+            // canonical forms; the key is secret, so a match on any of them still proves the sender knows it.
+            foreach (var candidate in CanonicalForms(node))
+            {
+                var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(candidate));
+                var expected = Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(base64 + settings.ApiKey)));
 
-            return string.Equals(expected, claimedSign, StringComparison.OrdinalIgnoreCase);
+                if (CryptographicOperations.FixedTimeEquals(
+                        Encoding.UTF8.GetBytes(expected),
+                        Encoding.UTF8.GetBytes((claimedSign ?? string.Empty).Trim().ToLowerInvariant())))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions RelaxedOptions = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    private static IEnumerable<string> CanonicalForms(JsonObject node)
+    {
+        var standard = node.ToJsonString();
+        var relaxed = node.ToJsonString(RelaxedOptions);
+
+        yield return standard;
+        yield return relaxed;
+        yield return relaxed.Replace("/", "\\/");
+        yield return standard.Replace("/", "\\/");
     }
 }

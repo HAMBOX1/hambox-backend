@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\HAMBOX.Modules.Commerce.Application\HAMBOX.Modules.Commerce.Application.csproj" />
     <ProjectReference Include="..\..\Identity\HAMBOX.Modules.Identity.Presentation\HAMBOX.Modules.Identity.Presentation.csproj" />
   </ItemGroup>

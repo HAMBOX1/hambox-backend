@@ -39,63 +39,59 @@ internal static class EncryptionHealthEndpoints
             ICodeProtector protector,
             [FromQuery] int? sample,
             CancellationToken cancellationToken) =>
-        {
-            var results = new List<object>();
-            var anyUnreadable = false;
-
-            foreach (var source in Sources)
-            {
-                var db = source.Context(services);
-                var sql = $"SELECT [{source.Column}] AS [Value] FROM [{source.Schema}].[{source.Table}] WHERE [{source.Column}] IS NOT NULL";
-                if (sample is > 0)
-                {
-                    sql = $"SELECT TOP ({sample}) [{source.Column}] AS [Value] FROM [{source.Schema}].[{source.Table}] WHERE [{source.Column}] IS NOT NULL";
-                }
-
-                var values = await db.Database.SqlQueryRaw<string>(sql).ToListAsync(cancellationToken);
-
-                int readable = 0, unreadable = 0, plaintext = 0;
-                foreach (var value in values)
-                {
-                    if (!ProtectedValueFormat.LooksAlreadyProtected(value))
-                    {
-                        plaintext++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        protector.Unprotect(value);
-                        readable++;
-                    }
-                    catch (Exception)
-                    {
-                        unreadable++;
-                    }
-                }
-
-                anyUnreadable |= unreadable > 0;
-                results.Add(new
-                {
-                    source = source.Name,
-                    checkedRows = values.Count,
-                    readable,
-                    unreadable,
-                    storedAsPlaintext = plaintext,
-                });
-            }
-
-            return Results.Ok(new
-            {
-                status = anyUnreadable ? "Degraded" : "Healthy",
-                checkedAtUtc = DateTimeOffset.UtcNow,
-                sampled = sample is > 0,
-                sources = results,
-            });
-        })
+            Results.Ok(await ProbeAsync(services, protector, sample, cancellationToken)))
         .WithName("GetEncryptionHealth")
         .RequirePermission(PermissionConstants.Security.View);
 
         return app;
+    }
+
+    public sealed record SourceReport(string Source, int CheckedRows, int Readable, int Unreadable, int StoredAsPlaintext);
+
+    public sealed record Report(string Status, DateTimeOffset CheckedAtUtc, bool Sampled, IReadOnlyList<SourceReport> Sources);
+
+    /// <summary>Reads the raw stored value of every protected column and classifies it. Never returns a secret.</summary>
+    internal static async Task<Report> ProbeAsync(
+        IServiceProvider services, ICodeProtector protector, int? sample, CancellationToken cancellationToken)
+    {
+        var results = new List<SourceReport>();
+        var anyUnreadable = false;
+
+        foreach (var source in Sources)
+        {
+            var db = source.Context(services);
+            var sql = $"SELECT [{source.Column}] AS [Value] FROM [{source.Schema}].[{source.Table}] WHERE [{source.Column}] IS NOT NULL";
+            if (sample is > 0)
+            {
+                sql = $"SELECT TOP ({sample}) [{source.Column}] AS [Value] FROM [{source.Schema}].[{source.Table}] WHERE [{source.Column}] IS NOT NULL";
+            }
+
+            var values = await db.Database.SqlQueryRaw<string>(sql).ToListAsync(cancellationToken);
+
+            int readable = 0, unreadable = 0, plaintext = 0;
+            foreach (var value in values)
+            {
+                if (!ProtectedValueFormat.LooksAlreadyProtected(value))
+                {
+                    plaintext++;
+                    continue;
+                }
+
+                try
+                {
+                    protector.Unprotect(value);
+                    readable++;
+                }
+                catch (Exception)
+                {
+                    unreadable++;
+                }
+            }
+
+            anyUnreadable |= unreadable > 0;
+            results.Add(new SourceReport(source.Name, values.Count, readable, unreadable, plaintext));
+        }
+
+        return new Report(anyUnreadable ? "Degraded" : "Healthy", DateTimeOffset.UtcNow, sample is > 0, results);
     }
 }
