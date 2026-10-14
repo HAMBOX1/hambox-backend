@@ -3,6 +3,7 @@ using System.Text.Json;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.Membership;
 using HAMBOX.Application.PlatformSettings;
+using HAMBOX.Application.Security;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
@@ -35,6 +36,7 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
     IDotFawryPaymentGateway dotFawryGateway,
     IOptions<DotFawrySettings> dotFawryOptions,
     IPlatformSettingsProvider platformSettings,
+    IPhoneBlocklist phoneBlocklist,
     DotFawryPaymentVerificationService verificationService,
     ILogger<InitiateDotFawryCheckoutCommandHandler> logger)
     : IRequestHandler<InitiateDotFawryCheckoutCommand, Result<DotFawryCheckoutInitiationDto>>
@@ -45,6 +47,11 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
         if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
         {
             return Result.Failure<DotFawryCheckoutInitiationDto>(CommerceErrors.AuthenticationRequired);
+        }
+
+        if (await phoneBlocklist.IsPhoneBlockedAsync(request.PhoneNumber, cancellationToken))
+        {
+            return Result.Failure<DotFawryCheckoutInitiationDto>(CommerceErrors.PhoneNumberNotAllowed);
         }
 
         var cart = await commerceDbContext.ShoppingCarts

@@ -63,6 +63,26 @@ internal sealed class LoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        if (!string.IsNullOrWhiteSpace(user.PhoneNumber)
+            && await blocklistService.IsPhoneBlockedAsync(user.PhoneNumber, cancellationToken))
+        {
+            var phoneBlockedFailure = LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, "Phone number is blocked", context, SecurityEventSeverity.High);
+            dbContext.LoginHistory.Add(phoneBlockedFailure);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await securityEventLogger.LogAsync(
+                SecurityEventType.BlockedLogin,
+                SecurityEventSeverity.High,
+                $"Login rejected for {user.Email}: phone number is blocked.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
+                cancellationToken: cancellationToken);
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+        }
+
         if (await trustedDeviceService.IsDeviceBlockedAsync(user.Id, fingerprint, cancellationToken))
         {
             var deviceBlockedFailure = LoginHistory.RecordFailure(

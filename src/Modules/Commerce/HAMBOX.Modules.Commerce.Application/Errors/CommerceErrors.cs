@@ -24,6 +24,10 @@ public static class CommerceErrors
     /// <summary>
     /// Gets the error for when the cart is empty.
     /// </summary>
+    public static readonly Error PhoneNumberNotAllowed = new(
+        "Commerce.PhoneNumberNotAllowed",
+        "This phone number cannot be used for payment.");
+
     public static readonly Error CartEmpty = new(
         "Cart.Empty",
         "The shopping cart is empty.");

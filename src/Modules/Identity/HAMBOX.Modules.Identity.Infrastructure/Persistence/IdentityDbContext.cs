@@ -107,6 +107,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// Gets or sets the Security Center blocked emails/domains table.
     /// </summary>
     public DbSet<BlockedEmail> BlockedEmails => Set<BlockedEmail>();
+    public DbSet<BlockedPhone> BlockedPhones => Set<BlockedPhone>();
 
     /// <summary>
     /// Gets or sets the Security Center blocked IP addresses/ranges table.

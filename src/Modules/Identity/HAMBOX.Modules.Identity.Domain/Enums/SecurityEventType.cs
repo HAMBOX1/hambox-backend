@@ -38,5 +38,8 @@ public enum SecurityEventType
     /// <summary>Every session for a user was revoked in one action — either self-service ("sign out
     /// all other sessions", which preserves the caller's own session) or an admin revoking all of a
     /// target user's sessions.</summary>
-    SignOutAllDevices = 15
+    SignOutAllDevices = 15,
+
+    /// <summary>An administrator blocked a phone number in the Security Center.</summary>
+    PhoneBlock = 16
 }

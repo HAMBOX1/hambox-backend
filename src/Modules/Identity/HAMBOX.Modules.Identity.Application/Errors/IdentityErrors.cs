@@ -167,6 +167,18 @@ public static class IdentityErrors
         "Identity.BlockedEmailAlreadyExists",
         "This email address or domain pattern is already blocked.");
 
+    public static readonly Error PhoneNumberNotAllowed = new(
+        "Identity.PhoneNumberNotAllowed",
+        "This phone number cannot be used.");
+
+    public static readonly Error BlockedPhoneNotFound = new(
+        "Identity.BlockedPhoneNotFound",
+        "The blocked phone entry was not found.");
+
+    public static readonly Error BlockedPhoneAlreadyExists = new(
+        "Identity.BlockedPhoneAlreadyExists",
+        "This phone number is already blocked.");
+
     public static readonly Error BlockedIpAlreadyExists = new(
         "Identity.BlockedIpAlreadyExists",
         "This IP address or range is already blocked.");

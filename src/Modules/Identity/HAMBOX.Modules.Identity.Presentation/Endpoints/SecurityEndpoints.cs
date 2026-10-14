@@ -3,6 +3,7 @@ using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Errors;
 using HAMBOX.Modules.Identity.Application.Features.Security.BlockedEmails;
+using HAMBOX.Modules.Identity.Application.Features.Security.BlockedPhones;
 using HAMBOX.Modules.Identity.Application.Features.Security.BlockedIps;
 using HAMBOX.Modules.Identity.Application.Features.Security.BlockedUsers;
 using HAMBOX.Modules.Identity.Application.Features.Security.CountryRestrictions;
@@ -329,6 +330,45 @@ internal static class SecurityEndpoints
         .WithName("DeleteBlockedEmail")
         .RequirePermission(PermissionConstants.Security.ManageEmails);
 
+        // ──── Blocked Phones ─────────────────────────────────────────────
+        group.MapGet("phones", async Task<IResult> (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] string? searchTerm,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            pageNumber = pageNumber <= 0 ? 1 : pageNumber;
+            pageSize = pageSize <= 0 ? 10 : pageSize;
+
+            var result = await sender.Send(new GetBlockedPhonesQuery(pageNumber, pageSize, searchTerm), ct);
+            return MapResult(result);
+        })
+        .WithName("GetBlockedPhones")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        group.MapPost("phones", async Task<IResult> (
+            [FromBody] CreateBlockedPhoneRequest request,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            var command = new CreateBlockedPhoneCommand(
+                request.PhoneNumber, request.Reason, request.Notes, request.ExpiresOnUtc, GetIpAddress(httpContext));
+            var result = await sender.Send(command, ct);
+            return MapCreatedResult(result, "phones");
+        })
+        .WithName("CreateBlockedPhone")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        group.MapDelete("phones/{id:guid}", async Task<IResult> (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new DeleteBlockedPhoneCommand(id), ct);
+            return MapResult(result);
+        })
+        .WithName("DeleteBlockedPhone")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
         // ──── Blocked IPs ────────────────────────────────────────────────
         group.MapGet("ips", async Task<IResult> (
             [FromQuery] int pageNumber,
@@ -452,6 +492,7 @@ internal static class SecurityEndpoints
         _ when error == IdentityErrors.UserNotFound ||
                error == IdentityErrors.CountryRestrictionNotFound ||
                error == IdentityErrors.BlockedEmailNotFound ||
+               error == IdentityErrors.BlockedPhoneNotFound ||
                error == IdentityErrors.BlockedIpNotFound ||
                error == IdentityErrors.SessionNotFound ||
                error == IdentityErrors.TrustedDeviceNotFound ||

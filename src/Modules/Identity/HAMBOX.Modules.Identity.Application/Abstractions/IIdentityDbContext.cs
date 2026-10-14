@@ -104,6 +104,7 @@ public interface IIdentityDbContext
     /// Gets the Security Center blocked emails/domains database set.
     /// </summary>
     DbSet<BlockedEmail> BlockedEmails { get; }
+    DbSet<BlockedPhone> BlockedPhones { get; }
 
     /// <summary>
     /// Gets the Security Center blocked IP addresses/ranges database set.

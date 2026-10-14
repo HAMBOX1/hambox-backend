@@ -300,6 +300,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IUserAuthorizationInvalidationService, UserAuthorizationInvalidationService>();
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
         services.AddScoped<ISecurityBlocklistService, SecurityBlocklistService>();
+        services.AddScoped<HAMBOX.Application.Security.IPhoneBlocklist>(sp => sp.GetRequiredService<ISecurityBlocklistService>());
         services.AddSingleton<ILoginRiskScorer, LoginRiskScorer>();
         services.AddScoped<ITrustedDeviceService, TrustedDeviceService>();
         services.AddScoped<ISecurityAlertRecipientResolver, SecurityAlertRecipientResolver>();

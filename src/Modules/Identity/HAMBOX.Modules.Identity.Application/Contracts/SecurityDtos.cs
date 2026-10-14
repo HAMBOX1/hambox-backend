@@ -27,6 +27,17 @@ public sealed record BlockedEmailDto(
     DateTimeOffset CreatedOnUtc);
 
 /// <summary>
+/// A blocked phone number (digits only).
+/// </summary>
+public sealed record BlockedPhoneDto(
+    Guid Id,
+    string PhoneNumber,
+    string Reason,
+    string? Notes,
+    DateTimeOffset? ExpiresOnUtc,
+    DateTimeOffset CreatedOnUtc);
+
+/// <summary>
 /// The access status of a single ISO-3166 country, merging the enumerated country list with any
 /// administrator override.
 /// </summary>
@@ -126,6 +137,8 @@ public sealed record SuspendUserRequest(string Reason, string? Notes);
 public sealed record BanUserRequest(string Reason, string? Notes);
 
 public sealed record CreateBlockedEmailRequest(string Pattern, string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
+
+public sealed record CreateBlockedPhoneRequest(string PhoneNumber, string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
 
 public sealed record CreateBlockedIpRequest(string CidrOrAddress, string Reason, string? Notes, DateTimeOffset? ExpiresOnUtc);
 

@@ -16,6 +16,7 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Services;
 internal sealed class SecurityBlocklistService(IIdentityDbContext dbContext, IMemoryCache memoryCache) : ISecurityBlocklistService
 {
     private const string EmailsCacheKey = "security-blocklist:emails";
+    private const string PhonesCacheKey = "security-blocklist:phones";
     private const string IpsCacheKey = "security-blocklist:ips";
     private const string CountriesCacheKey = "security-blocklist:countries";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(2);
@@ -33,6 +34,18 @@ internal sealed class SecurityBlocklistService(IIdentityDbContext dbContext, IMe
         var patterns = await GetActiveEmailPatternsAsync(cancellationToken);
 
         return patterns.Contains(normalized) || patterns.Contains($"*@{domain}");
+    }
+
+    public async Task<bool> IsPhoneBlockedAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        var candidate = BlockedPhone.Normalize(phoneNumber ?? string.Empty);
+        if (candidate.Length == 0)
+        {
+            return false;
+        }
+
+        var patterns = await GetActivePhonePatternsAsync(cancellationToken);
+        return patterns.Any(pattern => BlockedPhone.Matches(pattern, candidate));
     }
 
     public async Task<bool> IsIpBlockedAsync(string ipAddress, CancellationToken cancellationToken = default)
@@ -58,6 +71,7 @@ internal sealed class SecurityBlocklistService(IIdentityDbContext dbContext, IMe
     public void InvalidateCache()
     {
         memoryCache.Remove(EmailsCacheKey);
+        memoryCache.Remove(PhonesCacheKey);
         memoryCache.Remove(IpsCacheKey);
         memoryCache.Remove(CountriesCacheKey);
     }
@@ -73,6 +87,18 @@ internal sealed class SecurityBlocklistService(IIdentityDbContext dbContext, IMe
                 .Select(b => b.Pattern)
                 .ToListAsync(cancellationToken);
             return patterns.ToHashSet();
+        })!;
+
+    private Task<List<string>> GetActivePhonePatternsAsync(CancellationToken cancellationToken) =>
+        memoryCache.GetOrCreateAsync(PhonesCacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+            var now = DateTimeOffset.UtcNow;
+            return await dbContext.BlockedPhones
+                .AsNoTracking()
+                .Where(b => b.ExpiresOnUtc == null || b.ExpiresOnUtc > now)
+                .Select(b => b.Pattern)
+                .ToListAsync(cancellationToken);
         })!;
 
     private Task<List<string>> GetActiveIpRangesAsync(CancellationToken cancellationToken) =>

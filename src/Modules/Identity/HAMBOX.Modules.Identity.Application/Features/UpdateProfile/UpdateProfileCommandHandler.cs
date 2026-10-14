@@ -14,7 +14,8 @@ namespace HAMBOX.Modules.Identity.Application.Features.UpdateProfile;
 internal sealed class UpdateProfileCommandHandler(
     IIdentityDbContext dbContext,
     ICurrentUserService currentUserService,
-    IPermissionResolver permissionResolver) : IRequestHandler<UpdateProfileCommand, Result<UserProfileDto>>
+    IPermissionResolver permissionResolver,
+    ISecurityBlocklistService blocklistService) : IRequestHandler<UpdateProfileCommand, Result<UserProfileDto>>
 {
     /// <inheritdoc />
     public async Task<Result<UserProfileDto>> Handle(UpdateProfileCommand request, CancellationToken cancellationToken)
@@ -35,6 +36,12 @@ internal sealed class UpdateProfileCommandHandler(
         if (user is null)
         {
             return Result.Failure<UserProfileDto>(IdentityErrors.UserNotFound);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber)
+            && await blocklistService.IsPhoneBlockedAsync(request.PhoneNumber, cancellationToken))
+        {
+            return Result.Failure<UserProfileDto>(IdentityErrors.PhoneNumberNotAllowed);
         }
 
         try

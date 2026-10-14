@@ -7,13 +7,19 @@ namespace HAMBOX.Modules.Identity.Application.Abstractions;
 /// countries). Backed by a short-lived in-memory cache so hot paths (login, every request) don't
 /// hit the database on every call — see the Infrastructure implementation for cache details.
 /// </summary>
-public interface ISecurityBlocklistService
+public interface ISecurityBlocklistService : HAMBOX.Application.Security.IPhoneBlocklist
 {
     /// <summary>
     /// Returns <see langword="true"/> when <paramref name="email"/> matches an active
     /// <c>BlockedEmail</c> entry, either exactly or via a <c>*@domain.com</c> wildcard.
     /// </summary>
     Task<bool> IsEmailBlockedAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="phoneNumber"/> matches an active
+    /// <c>BlockedPhone</c> entry (any formatting; compared by digits, see <c>BlockedPhone.Matches</c>).
+    /// </summary>
+    new Task<bool> IsPhoneBlockedAsync(string phoneNumber, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns <see langword="true"/> when <paramref name="ipAddress"/> falls within an active
