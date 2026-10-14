@@ -342,7 +342,7 @@ internal static class CartEndpoints
                 : "en";
 
             var result = await sender.Send(new InitiateMembershipHostedCheckoutCommand(
-                request.PlanId, request.Action, request.Gateway, request.Email, request.Country, ipAddress, userAgent, language));
+                request.PlanId, request.Action, request.Gateway, request.Email, request.Country, ipAddress, userAgent, language, request.Wallet));
 
             if (result.IsSuccess)
             {
@@ -434,4 +434,4 @@ internal sealed record MergeCartRequest(string GuestSessionId);
 internal sealed record ApplyCartCouponRequest(string CouponCode, string? Country);
 internal sealed record CheckoutRequest(string Email, string Country, string PaymentMethod);
 
-internal sealed record MembershipHostedCheckoutRequest(Guid PlanId, string Action, string Gateway, string Email, string Country);
+internal sealed record MembershipHostedCheckoutRequest(Guid PlanId, string Action, string Gateway, string Email, string Country, string? Wallet = null);

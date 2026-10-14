@@ -105,7 +105,9 @@ internal sealed class DotTestHarness
             referralLifecycle,
             communication,
             jobQueue,
-            NullLogger<DotPaymentVerificationService>.Instance);
+            NullLogger<DotPaymentVerificationService>.Instance,
+            stockHold: null,
+            membershipOperations: new HAMBOX.Modules.Commerce.Application.Memberships.MembershipOperationsService(commerceDb));
 
         var callbackHandler = new HandleDotRedirectCallbackCommandHandler(
             commerceDb, verificationService, NullLogger<HandleDotRedirectCallbackCommandHandler>.Instance);

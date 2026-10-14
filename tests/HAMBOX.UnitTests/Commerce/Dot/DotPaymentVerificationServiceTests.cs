@@ -267,4 +267,33 @@ public sealed class DotPaymentVerificationServiceTests
         var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == initiation.Value.PaymentAttemptId);
         Assert.Equal(PaymentAttemptStatus.Succeeded, attempt.Status);
     }
+
+    [Fact]
+    public async Task VerifyAndFinalizeAsync_MembershipOrder_ActivatesTheSubscription_AndNeverTouchesInventory()
+    {
+        var harness = DotTestHarness.Create();
+        var plan = HAMBOX.Modules.Commerce.Domain.Memberships.MembershipPlan.Create("Gold", "gold", null, 10m, 30, 1);
+        plan.Activate();
+        var subscription = HAMBOX.Modules.Commerce.Domain.Memberships.MembershipSubscription.CreatePendingPayment("user-1", plan.Id, true);
+        var order = Order.CreateForMembership(
+            "user-1", $"ORD-{Guid.NewGuid():N}", "buyer@example.com", "EG", "dot", 10m, plan.Id, plan.Name,
+            HAMBOX.Modules.Commerce.Domain.Enums.MembershipCheckoutAction.Subscribe, subscription.Id);
+        var attempt = PaymentAttempt.CreatePendingDot(
+            order.Id, $"partner-{Guid.NewGuid():N}", "117", "1", 10m, "USD", DateTimeOffset.UtcNow.AddMinutes(20), null);
+        harness.CommerceDb.MembershipPlans.Add(plan);
+        harness.CommerceDb.MembershipSubscriptions.Add(subscription);
+        harness.CommerceDb.Orders.Add(order);
+        harness.CommerceDb.PaymentAttempts.Add(attempt);
+        await harness.CommerceDb.SaveChangesAsync();
+        harness.Gateway.StatusResult = new(0, "successful transaction", DateTimeOffset.UtcNow, 10m, "USD");
+
+        var result = await harness.VerificationService.VerifyAndFinalizeAsync(attempt.Id, CancellationToken.None);
+
+        Assert.Equal(DotVerificationOutcome.Succeeded, result.Outcome);
+        await harness.CommerceDb.Entry(subscription).ReloadAsync();
+        Assert.Equal(HAMBOX.Modules.Commerce.Domain.Memberships.MembershipSubscriptionStatus.Active, subscription.Status);
+        await harness.CommerceDb.Entry(order).ReloadAsync();
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.DoesNotContain(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+    }
 }

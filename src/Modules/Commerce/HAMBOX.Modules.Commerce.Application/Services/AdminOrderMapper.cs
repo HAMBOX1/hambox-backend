@@ -33,6 +33,49 @@ public static class AdminOrderMapper
                 : char.ToUpperInvariant(p[0]) + p[1..].ToLowerInvariant()));
     }
 
+    /// <summary>
+    /// The scope's order lifecycle (Created, Payment Confirmed, Queued, API Retry, Pending Manual Review, On Hold,
+    /// Partially Delivered, Completed, ...) derived from the order, its keys and its execution job — shown next to the
+    /// stored status so support can see where an order really is without a new persisted state.
+    /// </summary>
+    public static string ResolveFulfillmentStage(
+        Order order, int deliveredKeys, bool hasQueuedJob, bool hasRetryingJob)
+    {
+        switch (order.Status)
+        {
+            case OrderStatus.Failed:
+                return "Failed";
+            case OrderStatus.Cancelled:
+                return "Cancelled";
+            case OrderStatus.Refunded:
+                return "Refunded";
+            case OrderStatus.Completed:
+                return "Completed";
+        }
+
+        if (order.PaymentStatus != PaymentStatus.Paid)
+        {
+            return order.PaymentStatus == PaymentStatus.Failed ? "Payment Failed" : "Created";
+        }
+
+        if (order.IsOnHold)
+        {
+            return order.HoldKind == OrderHoldKind.ManualReview ? "Pending Manual Review" : "On Hold";
+        }
+
+        if (hasRetryingJob)
+        {
+            return "API Retry";
+        }
+
+        if (hasQueuedJob)
+        {
+            return "Queued";
+        }
+
+        return deliveredKeys > 0 ? "Partially Delivered" : "Payment Confirmed";
+    }
+
     public static string ResolveOrderStatusLabel(Order order) =>
         order.IsOnHold && order.PaymentStatus == PaymentStatus.Paid
             && order.Status is OrderStatus.Pending or OrderStatus.Processing

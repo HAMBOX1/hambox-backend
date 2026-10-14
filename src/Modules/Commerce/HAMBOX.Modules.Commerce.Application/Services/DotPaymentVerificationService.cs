@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Application.Memberships;
 using System.Text.Json;
 using HAMBOX.Application.Communication;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
@@ -41,7 +42,8 @@ public sealed class DotPaymentVerificationService(
     ICommunicationService communicationService,
     IOperationalJobQueue jobQueue,
     ILogger<DotPaymentVerificationService> logger,
-    OrderStockHoldService? stockHold = null)
+    OrderStockHoldService? stockHold = null,
+    MembershipOperationsService? membershipOperations = null)
 {
     private const decimal AmountToleranceUsd = 0.01m;
 
@@ -141,6 +143,8 @@ public sealed class DotPaymentVerificationService(
             {
                 await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
             }
+
+            await MembershipHostedFinalizer.OnPaymentFailedAsync(commerceDbContext, order, cancellationToken);
             RecordAudit(order.Id, "VerificationFailed", "Failed", attempt, status.ResultDesc);
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new DotVerificationResult(DotVerificationOutcome.Failed, order.Id, status.ResultDesc);
@@ -164,6 +168,8 @@ public sealed class DotPaymentVerificationService(
             {
                 await stockHold.ReleaseAsync(order.Id, "Payment failed", cancellationToken);
             }
+
+            await MembershipHostedFinalizer.OnPaymentFailedAsync(commerceDbContext, order, cancellationToken);
             RecordAudit(order.Id, "VerificationFailed", "AmountMismatch", attempt, "Verified amount/currency mismatch.");
             await commerceDbContext.SaveChangesAsync(cancellationToken);
             return new DotVerificationResult(DotVerificationOutcome.Failed, order.Id, "Payment verification failed.");
@@ -175,6 +181,16 @@ public sealed class DotPaymentVerificationService(
             attempt.MarkSucceeded(providerTransactionId, verifiedAmount, verifiedCurrency);
             order.RecordPayment("Dot", providerTransactionId);
             RecordAudit(order.Id, "VerificationSucceeded", "Paid", attempt, status.ResultDesc);
+
+            // A membership purchase has no cart, promotions or stock: paying it activates the subscription.
+            if (await MembershipHostedFinalizer.TryActivateAsync(
+                    commerceDbContext, membershipOperations, order, providerTransactionId, ct))
+            {
+                await referralLifecycle.ProcessOrderCompletedAsync(order, ct);
+                await commerceDbContext.SaveChangesAsync(ct);
+                return;
+            }
+
 
             // Only clear the cart now that payment is authoritatively confirmed — see the matching
             // comment in InitiateDotCheckoutCommandHandler for why it isn't cleared at initiation.

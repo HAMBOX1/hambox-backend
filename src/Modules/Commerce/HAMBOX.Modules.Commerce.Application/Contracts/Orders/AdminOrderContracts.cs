@@ -61,7 +61,8 @@ public sealed record AdminOrderDetailDto(
     DateTimeOffset? HeldOnUtc = null,
     string? RefundSettlement = null,
     string? RefundGatewayReference = null,
-    DateTimeOffset? RefundSettledOnUtc = null);
+    DateTimeOffset? RefundSettledOnUtc = null,
+    string? FulfillmentStage = null);
 
 /// <summary>
 /// One automated-supplier routing decision for one order item, admin-visible only — see

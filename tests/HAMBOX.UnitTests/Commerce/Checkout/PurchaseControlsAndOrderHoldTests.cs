@@ -355,4 +355,31 @@ public sealed class PurchaseControlsAndOrderHoldTests
         Assert.Equal("203.0.113.9", row.SourceIp);
         Assert.Equal(PaymentWebhookLog.MaxRawPayloadLength, row.RawPayload.Length);
     }
+
+    // ─── R25: lifecycle stage ───────────────────────────────────────────
+
+    [Fact]
+    public void FulfillmentStage_FollowsTheScopeLifecycle()
+    {
+        var unpaid = NewOrder(paid: false);
+        Assert.Equal("Created", AdminOrderMapper.ResolveFulfillmentStage(unpaid, 0, false, false));
+
+        var paid = NewOrder();
+        Assert.Equal("Payment Confirmed", AdminOrderMapper.ResolveFulfillmentStage(paid, 0, false, false));
+        Assert.Equal("Queued", AdminOrderMapper.ResolveFulfillmentStage(paid, 0, hasQueuedJob: true, hasRetryingJob: false));
+        Assert.Equal("API Retry", AdminOrderMapper.ResolveFulfillmentStage(paid, 0, hasQueuedJob: false, hasRetryingJob: true));
+        Assert.Equal("Partially Delivered", AdminOrderMapper.ResolveFulfillmentStage(paid, 1, false, false));
+
+        var review = NewOrder();
+        review.PlaceOnHold(OrderHoldKind.ManualReview, "Sensitive product");
+        Assert.Equal("Pending Manual Review", AdminOrderMapper.ResolveFulfillmentStage(review, 0, true, false));
+
+        var held = NewOrder();
+        held.PlaceOnHold(OrderHoldKind.AdminHold, "Chargeback risk");
+        Assert.Equal("On Hold", AdminOrderMapper.ResolveFulfillmentStage(held, 0, false, false));
+
+        var done = NewOrder();
+        done.Complete();
+        Assert.Equal("Completed", AdminOrderMapper.ResolveFulfillmentStage(done, 1, false, false));
+    }
 }

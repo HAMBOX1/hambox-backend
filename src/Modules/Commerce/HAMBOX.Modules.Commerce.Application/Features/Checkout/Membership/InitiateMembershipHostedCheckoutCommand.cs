@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Application.Options;
 using System.Security.Cryptography;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.PlatformSettings;
@@ -20,7 +21,7 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Checkout.Membership;
 /// Buying a membership through a hosted gateway (audit R32). In production there is no synchronous card processor,
 /// so the plan is paid exactly like a cart order: a Pending membership order + payment attempt, a redirect to the
 /// gateway's hosted page, and — once the gateway confirms — the verification service activates the subscription.
-/// <paramref name="Gateway"/> is "cryptomus" or "oxapay".
+/// <paramref name="Gateway"/> is "cryptomus", "oxapay" or "dot" (DOT OTP wallets — <paramref name="Wallet"/> then names OrangeCash / VodafoneCash).
 /// </summary>
 public sealed record InitiateMembershipHostedCheckoutCommand(
     Guid PlanId,
@@ -30,7 +31,8 @@ public sealed record InitiateMembershipHostedCheckoutCommand(
     string Country,
     string IpAddress,
     string UserAgent,
-    string Language) : IRequest<Result<MembershipHostedCheckoutInitiationDto>>;
+    string Language,
+    string? Wallet = null) : IRequest<Result<MembershipHostedCheckoutInitiationDto>>;
 
 public sealed record MembershipHostedCheckoutInitiationDto(
     Guid PaymentAttemptId,
@@ -44,6 +46,8 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
     ICurrentUserService currentUser,
     ICryptomusPaymentGateway cryptomusGateway,
     IOxaPayPaymentGateway oxapayGateway,
+    IDotPaymentGateway dotGateway,
+    IDotPricePointResolver dotPricePointResolver,
     IPaymentGatewayConfigurationProvider gatewaySettings,
     IPlatformSettingsProvider platformSettings,
     ILogger<InitiateMembershipHostedCheckoutCommandHandler> logger)
@@ -59,7 +63,7 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
 
         var userId = currentUser.UserId;
         var gateway = request.Gateway.Trim().ToLowerInvariant();
-        if (gateway is not ("cryptomus" or "oxapay"))
+        if (gateway is not ("cryptomus" or "oxapay" or "dot"))
         {
             return Result.Failure<MembershipHostedCheckoutInitiationDto>(CommerceErrors.PaymentMethodNotSupported);
         }
@@ -91,6 +95,15 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
         }
 
         string frontendResultUrl;
+        HAMBOX.Modules.Commerce.Application.Options.DotSettings? dotSettings = null;
+
+        HAMBOX.Modules.Commerce.Application.Options.DotWalletOperator wallet = default;
+        if (gateway == "dot"
+            && !Enum.TryParse(request.Wallet, ignoreCase: true, out wallet))
+        {
+            return Result.Failure<MembershipHostedCheckoutInitiationDto>(CommerceErrors.PaymentMethodNotSupported);
+        }
+
         if (gateway == "cryptomus")
         {
             var settings = await gatewaySettings.GetCryptomusSettingsAsync(cancellationToken);
@@ -101,6 +114,19 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
                 return Result.Failure<MembershipHostedCheckoutInitiationDto>(CommerceErrors.CryptomusGatewayMisconfigured);
             }
 
+            frontendResultUrl = settings.FrontendResultUrl;
+        }
+        else if (gateway == "dot")
+        {
+            var settings = await gatewaySettings.GetDotSettingsAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(settings.PartnerId) || string.IsNullOrWhiteSpace(settings.ServiceId)
+                || string.IsNullOrWhiteSpace(settings.PublicRedirectUrl))
+            {
+                logger.LogError("DOT membership checkout attempted but DOT configuration is incomplete.");
+                return Result.Failure<MembershipHostedCheckoutInitiationDto>(CommerceErrors.DotGatewayMisconfigured);
+            }
+
+            dotSettings = settings;
             frontendResultUrl = settings.FrontendResultUrl;
         }
         else
@@ -143,7 +169,7 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
             OrderNumberGenerator.Generate(commerceSettings.InvoicePrefix),
             request.Email,
             request.Country,
-            gateway == "cryptomus" ? "crypto" : "oxapay",
+            gateway switch { "cryptomus" => "crypto", "dot" => "dot", _ => "oxapay" },
             totalAmount,
             plan.Id,
             plan.Name,
@@ -151,9 +177,28 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
             subscriptionId);
 
         var partnerTxId = RandomNumberGenerator.GetHexString(40, lowercase: true);
-        var attempt = gateway == "cryptomus"
-            ? PaymentAttempt.CreatePendingCryptomus(order.Id, partnerTxId, totalAmount, "USD", expiresOnUtc, null)
-            : PaymentAttempt.CreatePendingOxaPay(order.Id, partnerTxId, totalAmount, "USD", expiresOnUtc, null);
+        DotChargeAmount? dotCharge = null;
+        if (gateway == "dot")
+        {
+            var charge = await dotPricePointResolver.ResolveAsync(totalAmount, request.Country, cancellationToken);
+            if (charge.IsFailure)
+            {
+                pendingSubscription?.CancelPendingPayment();
+                await db.SaveChangesAsync(cancellationToken);
+                return Result.Failure<MembershipHostedCheckoutInitiationDto>(charge.Error);
+            }
+
+            dotCharge = charge.Value;
+        }
+
+        var attempt = gateway switch
+        {
+            "cryptomus" => PaymentAttempt.CreatePendingCryptomus(order.Id, partnerTxId, totalAmount, "USD", expiresOnUtc, null),
+            "dot" => PaymentAttempt.CreatePendingDot(
+                order.Id, partnerTxId, wallet.ToOperatorId(), dotSettings!.ServiceId,
+                dotCharge!.Amount, dotCharge.Currency, expiresOnUtc, null),
+            _ => PaymentAttempt.CreatePendingOxaPay(order.Id, partnerTxId, totalAmount, "USD", expiresOnUtc, null),
+        };
 
         db.Orders.Add(order);
         db.PaymentAttempts.Add(attempt);
@@ -177,6 +222,27 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
             paymentUrl = invoice.IsSuccess ? invoice.Value.Url : null;
             providerReference = invoice.IsSuccess ? invoice.Value.Uuid : null;
         }
+        else if (gateway == "dot")
+        {
+            var tokenRequest = new DotAccessTokenRequest(
+                partnerTxId,
+                wallet.ToOperatorId(),
+                dotCharge!.Amount,
+                dotSettings!.PublicRedirectUrl,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            var token = await dotGateway.GetAccessTokenAsync(tokenRequest, cancellationToken);
+            if (token.IsSuccess && token.Value.IsSuccess && !string.IsNullOrWhiteSpace(token.Value.Token))
+            {
+                paymentUrl = await dotGateway.BuildOtpLandingPageUrlAsync(token.Value.Token!, tokenRequest, cancellationToken);
+            }
+            else
+            {
+                paymentUrl = null;
+            }
+
+            providerReference = null;
+        }
         else
         {
             var invoice = await oxapayGateway.CreateInvoiceAsync(
@@ -192,8 +258,12 @@ internal sealed class InitiateMembershipHostedCheckoutCommandHandler(
             order.MarkFailed();
             await db.SaveChangesAsync(cancellationToken);
 
-            return Result.Failure<MembershipHostedCheckoutInitiationDto>(
-                gateway == "cryptomus" ? CommerceErrors.CryptomusProviderUnavailable : CommerceErrors.OxaPayProviderUnavailable);
+            return Result.Failure<MembershipHostedCheckoutInitiationDto>(gateway switch
+            {
+                "cryptomus" => CommerceErrors.CryptomusProviderUnavailable,
+                "dot" => CommerceErrors.DotProviderUnavailable,
+                _ => CommerceErrors.OxaPayProviderUnavailable,
+            });
         }
 
         if (!string.IsNullOrWhiteSpace(providerReference))

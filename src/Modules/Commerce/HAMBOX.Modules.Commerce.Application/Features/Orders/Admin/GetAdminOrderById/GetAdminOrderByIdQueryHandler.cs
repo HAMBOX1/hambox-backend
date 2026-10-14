@@ -1,3 +1,4 @@
+using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
@@ -113,6 +114,20 @@ internal sealed class GetAdminOrderByIdQueryHandler
                 r.CreatedOnUtc)).ToList()
             : [];
 
+        var orderKey = order.Id.ToString();
+        var openJobs = await _commerceDbContext.OperationalJobs
+            .AsNoTracking()
+            .Where(j => j.RelatedEntityId == orderKey
+                && (j.JobType == OperationalJobTypes.ExecuteOrderFulfillment || j.JobType == OperationalJobTypes.RetryOrderFulfillment)
+                && (j.Status == OperationalJobStatus.Queued || j.Status == OperationalJobStatus.Running || j.Status == OperationalJobStatus.Retrying))
+            .Select(j => j.Status)
+            .ToListAsync(cancellationToken);
+        var fulfillmentStage = AdminOrderMapper.ResolveFulfillmentStage(
+            order,
+            licenseKeys.Count,
+            hasQueuedJob: openJobs.Any(s => s is OperationalJobStatus.Queued or OperationalJobStatus.Running),
+            hasRetryingJob: openJobs.Any(s => s == OperationalJobStatus.Retrying));
+
         var membershipDiscount = AdminOrderMapper.ResolveMembershipDiscount(promotions);
         var coupon = promotions.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.CouponCode));
         var keysByItem = licenseKeys.GroupBy(k => k.OrderItemId).ToDictionary(g => g.Key, g => g.ToList());
@@ -222,6 +237,7 @@ internal sealed class GetAdminOrderByIdQueryHandler
             order.IsOnHold ? order.HeldOnUtc : null,
             order.RefundSettlement == RefundSettlementStatus.None ? null : order.RefundSettlement.ToString(),
             order.RefundGatewayReference,
-            order.RefundSettledOnUtc));
+            order.RefundSettledOnUtc,
+            fulfillmentStage));
     }
 }
