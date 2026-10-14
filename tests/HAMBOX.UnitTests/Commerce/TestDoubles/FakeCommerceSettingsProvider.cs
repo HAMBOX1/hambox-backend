@@ -46,7 +46,9 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
     public Task<BrandingSettingsPayload> GetBrandingAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<EmailSettingsPayload> GetEmailAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<AuthenticationSettingsPayload> GetAuthenticationAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
-    public Task<SecuritySettingsPayload> GetSecurityAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+    public SecuritySettingsPayload Security { get; set; } = new(5, 15, false, CustomerRevealOtpMode: "Off");
+
+    public Task<SecuritySettingsPayload> GetSecurityAsync(CancellationToken cancellationToken = default) => Task.FromResult(Security);
     public Task<OtpSettingsPayload> GetOtpAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public InventorySettingsPayload Inventory { get; set; } = new(5, 15, true, "Immediate");
 

@@ -28,6 +28,30 @@ public static class CommerceErrors
         "Commerce.PhoneNumberNotAllowed",
         "This phone number cannot be used for payment.");
 
+    public static readonly Error RevealOtpRequired = new(
+        "Commerce.RevealOtpRequired",
+        "Enter the code we e-mailed you to show this license key.");
+
+    public static readonly Error RevealOtpInvalid = new(
+        "Commerce.RevealOtpInvalid",
+        "That code is not correct.");
+
+    public static readonly Error RevealOtpExpired = new(
+        "Commerce.RevealOtpExpired",
+        "That code has expired. Request a new one.");
+
+    public static readonly Error RevealOtpLocked = new(
+        "Commerce.RevealOtpLocked",
+        "Too many wrong codes. Please wait a few minutes and request a new code.");
+
+    public static readonly Error RevealOtpCooldown = new(
+        "Commerce.RevealOtpCooldown",
+        "A code was sent a moment ago. Please wait before requesting another.");
+
+    public static readonly Error RevealOtpDeliveryFailed = new(
+        "Commerce.RevealOtpDeliveryFailed",
+        "We could not send the code right now. Please try again shortly.");
+
     public static readonly Error CartEmpty = new(
         "Cart.Empty",
         "The shopping cart is empty.");

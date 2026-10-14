@@ -49,7 +49,8 @@ public sealed class RevealCustomerLibraryKeyAuditTests
         var (order, key) = SeedOrderWithLicenseKey(commerceDb, "user-1");
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new RevealCustomerLibraryKeyQueryHandler(commerceDb, new FakeCurrentUserService("user-1"));
+        var handler = new RevealCustomerLibraryKeyQueryHandler(
+            commerceDb, new FakeCurrentUserService("user-1"), new FakeCommerceSettingsProvider(), new FakeCustomerActionOtpService());
         var result = await handler.Handle(new RevealCustomerLibraryKeyQuery(key.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -71,7 +72,8 @@ public sealed class RevealCustomerLibraryKeyAuditTests
         var (_, key) = SeedOrderWithLicenseKey(commerceDb, "owning-user");
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
-        var handler = new RevealCustomerLibraryKeyQueryHandler(commerceDb, new FakeCurrentUserService("someone-else"));
+        var handler = new RevealCustomerLibraryKeyQueryHandler(
+            commerceDb, new FakeCurrentUserService("someone-else"), new FakeCommerceSettingsProvider(), new FakeCustomerActionOtpService());
         var result = await handler.Handle(new RevealCustomerLibraryKeyQuery(key.Id), CancellationToken.None);
 
         Assert.False(result.IsSuccess);

@@ -3845,6 +3845,59 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.ToTable("AdminLoginChallenges", "identity");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Tokens.CustomerActionChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("LastSentOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LockedUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ScopeKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("UsedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Purpose", "ScopeKey")
+                        .HasDatabaseName("IX_CustomerActionChallenges_UserId_Purpose_ScopeKey");
+
+                    b.ToTable("CustomerActionChallenges", "identity");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Tokens.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4236,6 +4289,15 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Tokens.AdminLoginChallenge", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Tokens.CustomerActionChallenge", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
                         .WithMany()

@@ -301,6 +301,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<ISecurityEventLogger, SecurityEventLogger>();
         services.Configure<HAMBOX.Modules.Identity.Application.Options.AdminSecondFactorOptions>(
             configuration.GetSection(HAMBOX.Modules.Identity.Application.Options.AdminSecondFactorOptions.SectionName));
+        services.AddScoped<HAMBOX.Application.Security.ICustomerActionOtpService, HAMBOX.Modules.Identity.Application.Services.CustomerActionOtpService>();
         services.AddScoped<ISecurityBlocklistService, SecurityBlocklistService>();
         services.AddScoped<HAMBOX.Application.Security.IPhoneBlocklist>(sp => sp.GetRequiredService<ISecurityBlocklistService>());
         services.AddSingleton<ILoginRiskScorer, LoginRiskScorer>();

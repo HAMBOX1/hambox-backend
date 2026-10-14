@@ -232,7 +232,10 @@ public sealed record SecuritySettingsPayload(
     bool RequireEmailVerification,
     bool SecurityAlertsEnabled = true,
     string SecurityAlertMinSeverity = "High",
-    int SecurityAlertThrottleMinutes = 15);
+    int SecurityAlertThrottleMinutes = 15,
+    // When a customer must enter an e-mailed code before a purchased license key is shown in plaintext:
+    // "Off" (never), "FirstReveal" (once per key, then not again) or "EveryReveal" (each time).
+    string CustomerRevealOtpMode = "FirstReveal");
 
 public sealed record OtpSettingsPayload(
     int CodeLength,

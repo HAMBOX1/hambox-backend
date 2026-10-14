@@ -6,5 +6,6 @@ namespace HAMBOX.Modules.Identity.Domain.Enums;
 public enum CustomerOtpPurpose
 {
     EmailVerification = 0,
-    PasswordReset = 1
+    PasswordReset = 1,
+    LicenseKeyReveal = 2
 }

@@ -118,6 +118,19 @@ internal static class AccountEndpoints
             return ToResult(result);
         }).WithName("RevealCustomerLibraryKey");
 
+        // The code travels in the body (never the query string) so it is not written to request logs.
+        group.MapPost("library/{id:guid}/reveal", async (Guid id, RevealLicenseKeyRequest request, ISender sender) =>
+        {
+            var result = await sender.Send(new RevealCustomerLibraryKeyQuery(id, request.OtpCode));
+            return ToResult(result);
+        }).WithName("RevealCustomerLibraryKeyWithOtp");
+
+        group.MapPost("library/{id:guid}/reveal/otp", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new RequestLicenseKeyRevealOtpCommand(id));
+            return ToResult(result);
+        }).WithName("RequestLicenseKeyRevealOtp");
+
         group.MapGet("library/{orderItemId:guid}/instructions", async (Guid orderItemId, ISender sender) =>
         {
             var result = await sender.Send(new GetLibraryItemInstructionsQuery(orderItemId));
@@ -309,5 +322,6 @@ internal static class AccountEndpoints
 }
 
 internal sealed record WishlistItemRequest(Guid ProductId);
+internal sealed record RevealLicenseKeyRequest(string? OtpCode);
 internal sealed record CreateReviewRequest(Guid ProductId, Guid OrderId, int Rating, string Comment);
 internal sealed record UpdateReviewRequest(int Rating, string Comment);
