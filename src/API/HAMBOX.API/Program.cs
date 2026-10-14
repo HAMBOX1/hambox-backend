@@ -201,6 +201,14 @@ try
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
     };
     forwardedHeadersOptions.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("172.16.0.0/12"));
+    // Remember the real socket peer before the forwarded headers overwrite RemoteIpAddress, so IP blocking can
+    // also judge the connection itself (see SecurityEnforcementMiddleware.ConnectionPeerItemKey).
+    app.Use((context, nextMiddleware) =>
+    {
+        context.Items[HAMBOX.Modules.Identity.Infrastructure.Middleware.SecurityEnforcementMiddleware.ConnectionPeerItemKey] =
+            context.Connection.RemoteIpAddress?.ToString();
+        return nextMiddleware();
+    });
     app.UseForwardedHeaders(forwardedHeadersOptions);
 
     // ──── Database Migrations (Dev-Only) ──────────────────────

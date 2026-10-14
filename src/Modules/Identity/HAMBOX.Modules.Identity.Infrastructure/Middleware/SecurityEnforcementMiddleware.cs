@@ -16,6 +16,14 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Middleware;
 /// </summary>
 public sealed class SecurityEnforcementMiddleware(RequestDelegate next)
 {
+    /// <summary>
+    /// <see cref="HttpContext.Items"/> key holding the socket peer's address exactly as it was BEFORE
+    /// <c>UseForwardedHeaders</c> rewrote <c>RemoteIpAddress</c> from <c>X-Forwarded-For</c>. A connection
+    /// whose real peer is a blocked address must stay blocked even if it also sends a spoofed forwarded
+    /// header (possible when the peer is itself a trusted proxy source, e.g. loopback / Docker bridge).
+    /// </summary>
+    public const string ConnectionPeerItemKey = "HAMBOX.ConnectionPeerIp";
+
     public async Task InvokeAsync(HttpContext context, ISecurityBlocklistService blocklistService, ISecurityEventLogger securityEventLogger)
     {
         var path = context.Request.Path.Value ?? string.Empty;
@@ -27,10 +35,15 @@ public sealed class SecurityEnforcementMiddleware(RequestDelegate next)
         }
 
         var ipAddress = context.Connection.RemoteIpAddress?.ToString();
+        var peerAddress = context.Items.TryGetValue(ConnectionPeerItemKey, out var peerValue) ? peerValue as string : null;
         var correlationId = context.Items.TryGetValue("CorrelationId", out var value) ? value as string : null;
 
-        if (!string.IsNullOrEmpty(ipAddress) && await blocklistService.IsIpBlockedAsync(ipAddress, context.RequestAborted))
+        // The forwarded client address is what normal traffic is judged on; the raw socket peer is checked
+        // as well so a blocked peer cannot launder itself through a client-supplied header.
+        var blockedAddress = await FirstBlockedAsync(blocklistService, context.RequestAborted, ipAddress, peerAddress);
+        if (blockedAddress is not null)
         {
+            ipAddress = blockedAddress;
             await securityEventLogger.LogAsync(
                 SecurityEventType.IpBlock,
                 SecurityEventSeverity.High,
@@ -77,6 +90,20 @@ public sealed class SecurityEnforcementMiddleware(RequestDelegate next)
         }
 
         await next(context);
+    }
+
+    private static async Task<string?> FirstBlockedAsync(
+        ISecurityBlocklistService blocklistService, CancellationToken cancellationToken, params string?[] addresses)
+    {
+        foreach (var address in addresses.Where(a => !string.IsNullOrEmpty(a)).Distinct(StringComparer.Ordinal))
+        {
+            if (await blocklistService.IsIpBlockedAsync(address!, cancellationToken))
+            {
+                return address;
+            }
+        }
+
+        return null;
     }
 }
 
