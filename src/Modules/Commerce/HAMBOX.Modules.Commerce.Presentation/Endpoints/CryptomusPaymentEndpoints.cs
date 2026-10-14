@@ -105,7 +105,7 @@ internal static class CryptomusPaymentEndpoints
 
             if (!CryptomusWebhookSignatureVerifier.IsValid(rawBody, cryptomusSettings))
             {
-                await sender.Send(new RecordPaymentWebhookCommand(
+                await sender.TryRecordRejectedWebhookAsync(new RecordPaymentWebhookCommand(
                     "Cryptomus", "Invalid", "RejectedSignature", null, null, rawBody,
                     httpContext.Connection.RemoteIpAddress?.ToString()));
                 return Results.StatusCode(StatusCodes.Status403Forbidden);

@@ -105,7 +105,7 @@ internal static class OxaPayPaymentEndpoints
 
             if (!OxaPayWebhookSignatureVerifier.IsValid(rawBody, hmacHeader, settings.MerchantApiKey))
             {
-                await sender.Send(new RecordPaymentWebhookCommand(
+                await sender.TryRecordRejectedWebhookAsync(new RecordPaymentWebhookCommand(
                     "OxaPay", string.IsNullOrEmpty(hmacHeader) ? "Missing" : "Invalid", "RejectedSignature", null, null, rawBody,
                     httpContext.Connection.RemoteIpAddress?.ToString()));
                 return Results.StatusCode(StatusCodes.Status403Forbidden);

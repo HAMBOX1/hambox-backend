@@ -99,7 +99,7 @@ internal static class DotFawryPaymentEndpoints
         {
             if (!DotNotificationIpAllowlist.IsAllowed(httpContext))
             {
-                await sender.Send(new RecordPaymentWebhookCommand(
+                await sender.TryRecordRejectedWebhookAsync(new RecordPaymentWebhookCommand(
                     "DotFawry", "NotApplicable", "RejectedIp", request.DotTransId, request.PartnerTransId,
                     System.Text.Json.JsonSerializer.Serialize(new { request.DotTransId, request.PartnerTransId, request.ResultCode }),
                     httpContext.Connection.RemoteIpAddress?.ToString()));
