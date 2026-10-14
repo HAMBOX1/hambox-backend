@@ -15,6 +15,12 @@ public sealed class AdminOtpAuditLog : Entity
     public const string ActionResent = "Resent";
     public const string ActionBypassed = "Bypassed";
     public const string ActionDeliveryFailed = "DeliveryFailed";
+    public const string ActionTotpEnabled = "TotpEnabled";
+    public const string ActionTotpDisabled = "TotpDisabled";
+    public const string ActionTotpReset = "TotpReset";
+    public const string ActionTotpVerified = "TotpVerified";
+    public const string ActionRecoveryCodeUsed = "RecoveryCodeUsed";
+    public const string ActionRecoveryCodesRegenerated = "RecoveryCodesRegenerated";
 
     private AdminOtpAuditLog()
     {

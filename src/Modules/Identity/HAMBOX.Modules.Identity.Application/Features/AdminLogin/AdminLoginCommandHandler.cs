@@ -11,6 +11,7 @@ using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Identity.Application.Features.AdminLogin;
@@ -27,7 +28,9 @@ internal sealed class AdminLoginCommandHandler(
     ISecurityEventLogger securityEventLogger,
     IClientInfoParser clientInfoParser,
     ITrustedDeviceService trustedDeviceService,
-    ILoginRiskScorer riskScorer) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
+    ILoginRiskScorer riskScorer,
+    IHostEnvironment environment,
+    IOptions<AdminSecondFactorOptions> secondFactorOptions) : IRequestHandler<AdminLoginCommand, Result<AdminLoginChallengeResponse>>
 {
     public async Task<Result<AdminLoginChallengeResponse>> Handle(
         AdminLoginCommand request,
@@ -81,6 +84,26 @@ internal sealed class AdminLoginCommandHandler(
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
         }
 
+        // The credentials are judged FIRST (same policy as customer login): until the caller has proven the
+        // password every failure is the generic InvalidCredentials, so the admin form cannot be used to learn
+        // which addresses exist or what state they are in. Only the password holder is told why they are stopped.
+        var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
+        if (!passwordHasher.VerifyPassword(user.PasswordHash, request.Password))
+        {
+            if (!isLocked)
+            {
+                user.RecordAccessFailure(
+                    security.MaxFailedAccessAttempts,
+                    TimeSpan.FromMinutes(security.LockoutDurationMinutes));
+            }
+
+            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
+            await RecordFailureAsync(
+                user.Id, request, isLocked ? "Account locked" : "Invalid credentials", context, risk, cancellationToken);
+
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
+        }
+
         if (!user.EmailConfirmed)
         {
             await RecordFailureAsync(user.Id, request, "Email not confirmed", context, null, cancellationToken);
@@ -111,27 +134,10 @@ internal sealed class AdminLoginCommandHandler(
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AccountNotActive);
         }
 
-        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+        if (isLocked)
         {
             await RecordFailureAsync(user.Id, request, "Account locked", context, null, cancellationToken);
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AccountLocked);
-        }
-
-        if (!passwordHasher.VerifyPassword(user.PasswordHash, request.Password))
-        {
-            user.RecordAccessFailure(
-                security.MaxFailedAccessAttempts,
-                TimeSpan.FromMinutes(security.LockoutDurationMinutes));
-
-            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
-            await RecordFailureAsync(user.Id, request, "Invalid credentials", context, risk, cancellationToken);
-
-            if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
-            {
-                return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AccountLocked);
-            }
-
-            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (!await adminAccessResolver.HasAdminPortalAccessAsync(user.Id, cancellationToken))
@@ -147,14 +153,46 @@ internal sealed class AdminLoginCommandHandler(
         var isNewDevice = await trustedDeviceService.RecordLoginAsync(user.Id, fingerprint, context, request.IpAddress, cancellationToken);
         var successRisk = riskScorer.ScoreSuccessfulLogin(isNewDevice, isNewCountry);
 
-        var otpRequired = authentication.AdminOtpEnabled;
+        // An enrolled authenticator app is the admin's second factor and is always required — it is the
+        // factor that does not depend on an inbox, so it also stands in for the e-mailed code.
+        var hasTotp = await dbContext.AdminTotpCredentials.AnyAsync(
+            c => c.UserId == user.Id && c.IsConfirmed, cancellationToken);
+        if (hasTotp)
+        {
+            var activeTotp = await dbContext.AdminLoginChallenges
+                .Where(c => c.UserId == user.Id && c.UsedOnUtc == null && c.ExpiresOnUtc > DateTimeOffset.UtcNow)
+                .ToListAsync(cancellationToken);
+            foreach (var stale in activeTotp)
+            {
+                stale.MarkUsed();
+            }
+
+            var totpExpiresAt = DateTimeOffset.UtcNow.AddMinutes(otp.ExpirationMinutes);
+            var totpChallenge = AdminLoginChallenge.CreateTotp(user.Id, totpExpiresAt, request.IpAddress, request.UserAgent);
+            dbContext.AdminLoginChallenges.Add(totpChallenge);
+            dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
+                AdminOtpAuditLog.ActionGenerated, request.IpAddress, user.Id, totpChallenge.Id, "Authenticator challenge"));
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result.Success(new AdminLoginChallengeResponse(
+                totpChallenge.Id, totpExpiresAt, totpExpiresAt, MaskEmail(user.Email), Token: null, Method: "Totp"));
+        }
+
+        // Production never signs an admin in on a password alone: the floor below cannot be switched off from
+        // Platform Settings (a compromised Settings.Edit account must not be able to). The only way past it is
+        // the server-side AdminSecondFactor:AllowOtpBypassInProduction option — an explicit, operator-owned
+        // exception for an install whose e-mail delivery is not working yet — and every bypass is audited.
+        var floorApplies = environment.IsProduction() && !secondFactorOptions.Value.AllowOtpBypassInProduction;
+        var otpRequired = authentication.AdminOtpEnabled || floorApplies;
         if (!otpRequired)
         {
             dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
                 AdminOtpAuditLog.ActionBypassed,
                 request.IpAddress,
                 user.Id,
-                details: "Admin OTP disabled via Platform Settings (Authentication.AdminOtpEnabled=false)"));
+                details: environment.IsProduction()
+                    ? "Admin OTP bypassed: AdminSecondFactor:AllowOtpBypassInProduction is enabled on the server."
+                    : "Admin OTP disabled via Platform Settings (Authentication.AdminOtpEnabled=false)"));
             dbContext.LoginHistory.Add(LoginHistory.RecordSuccess(user.Id, request.IpAddress, request.UserAgent, context, successRisk));
             await dbContext.SaveChangesAsync(cancellationToken);
 

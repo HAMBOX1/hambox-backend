@@ -7,6 +7,7 @@ using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Audit;
 using HAMBOX.Modules.Identity.Domain.Enums;
 using HAMBOX.Modules.Identity.Domain.Sessions;
+using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,8 @@ namespace HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 internal sealed class VerifyAdminOtpCommandHandler(
     IIdentityDbContext dbContext,
     IAuthTokenIssuer authTokenIssuer,
-    IPlatformSettingsProvider platformSettings) : IRequestHandler<VerifyAdminOtpCommand, Result<AuthTokenResponse>>
+    IPlatformSettingsProvider platformSettings,
+    ICodeProtector codeProtector) : IRequestHandler<VerifyAdminOtpCommand, Result<AuthTokenResponse>>
 {
     public async Task<Result<AuthTokenResponse>> Handle(
         VerifyAdminOtpCommand request,
@@ -47,7 +49,11 @@ internal sealed class VerifyAdminOtpCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AdminOtpExpired);
         }
 
-        if (!challenge.VerifyCode(request.Code.Trim()))
+        var codeAccepted = challenge.Method == AdminSecondFactorMethod.Totp
+            ? await VerifyAuthenticatorAsync(challenge.UserId, request.Code.Trim(), cancellationToken)
+            : challenge.VerifyCode(request.Code.Trim());
+
+        if (!codeAccepted)
         {
             challenge.RecordFailedAttempt(otp.MaxAttempts, otp.LockoutMinutes);
             dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
@@ -81,7 +87,9 @@ internal sealed class VerifyAdminOtpCommandHandler(
 
         challenge.MarkUsed();
         dbContext.AdminOtpAuditLogs.Add(AdminOtpAuditLog.Record(
-            AdminOtpAuditLog.ActionVerified,
+            challenge.Method == AdminSecondFactorMethod.Totp
+                ? AdminOtpAuditLog.ActionTotpVerified
+                : AdminOtpAuditLog.ActionVerified,
             request.IpAddress,
             user.Id,
             challenge.Id));
@@ -100,5 +108,16 @@ internal sealed class VerifyAdminOtpCommandHandler(
             request.UserAgent,
             rememberMe: false,
             cancellationToken: cancellationToken);
+    }
+
+    /// <summary>An authenticator code (replay-protected) or one unused recovery code; spends whichever matched.</summary>
+    private async Task<bool> VerifyAuthenticatorAsync(Guid userId, string code, CancellationToken cancellationToken)
+    {
+        var credential = await dbContext.AdminTotpCredentials
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.IsConfirmed, cancellationToken);
+
+        return credential is not null
+            && await Features.AdminTotp.AdminTotpSupport.ConsumeSecondFactorAsync(
+                dbContext, codeProtector, credential, code, cancellationToken);
     }
 }

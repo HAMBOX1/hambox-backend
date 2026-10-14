@@ -77,6 +77,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     /// Gets or sets the admin login OTP challenges table.
     /// </summary>
     public DbSet<AdminLoginChallenge> AdminLoginChallenges => Set<AdminLoginChallenge>();
+    public DbSet<AdminTotpCredential> AdminTotpCredentials => Set<AdminTotpCredential>();
+    public DbSet<AdminRecoveryCode> AdminRecoveryCodes => Set<AdminRecoveryCode>();
 
     /// <summary>
     /// Gets or sets the admin OTP audit logs table.

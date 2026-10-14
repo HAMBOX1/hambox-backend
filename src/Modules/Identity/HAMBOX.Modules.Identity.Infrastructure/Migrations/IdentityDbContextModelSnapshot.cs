@@ -3099,6 +3099,75 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.AdminRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("UsedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CodeHash")
+                        .HasDatabaseName("IX_AdminRecoveryCodes_UserId_CodeHash");
+
+                    b.ToTable("AdminRecoveryCodes", "identity");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.AdminTotpCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ConfirmedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("LastUsedTimeStep")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProtectedSecret")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AdminTotpCredentials_UserId");
+
+                    b.ToTable("AdminTotpCredentials", "identity");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.BlockedDevice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3746,6 +3815,11 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LockedUntilUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("Method")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -4112,6 +4186,24 @@ namespace HAMBOX.Modules.Identity.Infrastructure.Migrations
                     b.HasOne("HAMBOX.Modules.Identity.Domain.Roles.ApplicationRole", null)
                         .WithMany("RolePermissions")
                         .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.AdminRecoveryCode", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Identity.Domain.Security.AdminTotpCredential", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Identity.Domain.Users.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

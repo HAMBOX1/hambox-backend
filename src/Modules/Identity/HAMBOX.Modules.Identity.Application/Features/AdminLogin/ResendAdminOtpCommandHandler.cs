@@ -5,6 +5,7 @@ using HAMBOX.Modules.Identity.Application.Errors;
 using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
 using HAMBOX.Modules.Identity.Application.Options;
 using HAMBOX.Modules.Identity.Domain.Audit;
+using HAMBOX.Modules.Identity.Domain.Tokens;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,11 @@ internal sealed class ResendAdminOtpCommandHandler(
         if (challenge is null || !challenge.IsActive)
         {
             return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AdminLoginChallengeNotFound);
+        }
+
+        if (challenge.Method == AdminSecondFactorMethod.Totp)
+        {
+            return Result.Failure<AdminLoginChallengeResponse>(IdentityErrors.AdminSecondFactorNotResendable);
         }
 
         if (challenge.LastResendOnUtc.HasValue)

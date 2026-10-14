@@ -79,6 +79,8 @@ public interface IIdentityDbContext
     /// Gets the admin login OTP challenges database set.
     /// </summary>
     DbSet<AdminLoginChallenge> AdminLoginChallenges { get; }
+    DbSet<AdminTotpCredential> AdminTotpCredentials { get; }
+    DbSet<AdminRecoveryCode> AdminRecoveryCodes { get; }
 
     /// <summary>
     /// Gets the admin OTP audit logs database set.

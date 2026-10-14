@@ -16,6 +16,7 @@ internal sealed class AdminLoginChallengeConfiguration : IEntityTypeConfiguratio
         builder.Property(c => c.UserId).IsRequired();
         builder.Property(c => c.CodeHash).IsRequired().HasMaxLength(128);
         builder.Property(c => c.ExpiresOnUtc).IsRequired();
+        builder.Property(c => c.Method).IsRequired().HasConversion<int>().HasDefaultValue(AdminSecondFactorMethod.Email);
         builder.Property(c => c.UsedOnUtc);
         builder.Property(c => c.AttemptCount).IsRequired();
         builder.Property(c => c.LastResendOnUtc);

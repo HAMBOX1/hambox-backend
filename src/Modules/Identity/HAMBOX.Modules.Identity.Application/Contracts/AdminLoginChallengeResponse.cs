@@ -16,4 +16,5 @@ public sealed record AdminLoginChallengeResponse(
     DateTimeOffset ExpiresAt,
     DateTimeOffset ResendAvailableAt,
     string MaskedEmail,
-    AuthTokenResponse? Token = null);
+    AuthTokenResponse? Token = null,
+    string Method = "Email");

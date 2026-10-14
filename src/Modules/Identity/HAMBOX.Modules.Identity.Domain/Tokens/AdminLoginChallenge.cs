@@ -48,6 +48,9 @@ public sealed class AdminLoginChallenge : Entity
 
     public string UserAgent { get; private set; } = string.Empty;
 
+    /// <summary>How this challenge is answered: an e-mailed code (default) or an authenticator-app/recovery code.</summary>
+    public AdminSecondFactorMethod Method { get; private set; } = AdminSecondFactorMethod.Email;
+
     public bool IsUsed => UsedOnUtc.HasValue;
 
     public bool IsExpired => DateTimeOffset.UtcNow >= ExpiresOnUtc;
@@ -84,6 +87,18 @@ public sealed class AdminLoginChallenge : Entity
             expiresOnUtc,
             ipAddress,
             userAgent);
+    }
+
+    /// <summary>
+    /// A challenge answered with the admin's authenticator app. There is no code to match against its hash — the
+    /// hash is of random, never-disclosed bytes — so <see cref="VerifyCode"/> can never succeed for it; the
+    /// verification handler checks the TOTP / recovery code itself.
+    /// </summary>
+    public static AdminLoginChallenge CreateTotp(Guid userId, DateTimeOffset expiresOnUtc, string ipAddress, string userAgent)
+    {
+        var challenge = Create(userId, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), expiresOnUtc, ipAddress, userAgent);
+        challenge.Method = AdminSecondFactorMethod.Totp;
+        return challenge;
     }
 
     public void RecordResend(string plaintextCode, DateTimeOffset expiresOnUtc)
@@ -142,4 +157,10 @@ public sealed class AdminLoginChallenge : Entity
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(plaintextCode));
         return Convert.ToHexString(hashBytes);
     }
+}
+
+public enum AdminSecondFactorMethod
+{
+    Email = 0,
+    Totp = 1,
 }

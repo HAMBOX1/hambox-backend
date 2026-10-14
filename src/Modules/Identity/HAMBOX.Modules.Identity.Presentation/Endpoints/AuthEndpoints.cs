@@ -2,6 +2,7 @@ using HAMBOX.Infrastructure.Localization;
 using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Application.Contracts;
 using HAMBOX.Modules.Identity.Application.Features.AdminLogin;
+using HAMBOX.Modules.Identity.Application.Features.AdminTotp;
 using HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 using HAMBOX.Modules.Identity.Application.Features.ForgotPassword;
 using HAMBOX.Modules.Identity.Application.Features.GetMe;
@@ -162,7 +163,8 @@ public static class AuthEndpoints
             }
 
             return Results.Ok(new AdminLoginChallengeResponseDto(
-                challenge.ChallengeId, challenge.ExpiresAt, challenge.ResendAvailableAt, challenge.MaskedEmail, tokenDto));
+                challenge.ChallengeId, challenge.ExpiresAt, challenge.ResendAvailableAt, challenge.MaskedEmail, tokenDto,
+                challenge.Method));
         }).RequireRateLimiting(RateLimitPolicies.Login);
 
         group.MapPost("admin/verify-otp", async (
@@ -198,6 +200,43 @@ public static class AuthEndpoints
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
         });
+
+        // ──── Admin authenticator app (TOTP) ─────────────────────────────────
+        group.MapGet("admin/totp", async (HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(new GetAdminTotpStatusQuery(), ct)))
+            .RequireAuthorization();
+
+        group.MapPost("admin/totp/enroll", async (HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(new BeginAdminTotpEnrollmentCommand(), ct)))
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimitPolicies.AccountActions);
+
+        group.MapPost("admin/totp/confirm", async (
+            [FromBody] AdminTotpCodeRequest request, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(
+                new ConfirmAdminTotpEnrollmentCommand(request.Code, httpContext.Connection.RemoteIpAddress?.ToString()), ct)))
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimitPolicies.AccountActions);
+
+        group.MapPost("admin/totp/disable", async (
+            [FromBody] AdminTotpProofRequest request, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(
+                new DisableAdminTotpCommand(request.Password, request.Code, httpContext.Connection.RemoteIpAddress?.ToString()), ct)))
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimitPolicies.AccountActions);
+
+        group.MapPost("admin/totp/recovery-codes", async (
+            [FromBody] AdminTotpProofRequest request, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(
+                new RegenerateAdminRecoveryCodesCommand(request.Password, request.Code, httpContext.Connection.RemoteIpAddress?.ToString()), ct)))
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimitPolicies.AccountActions);
+
+        group.MapDelete("admin/totp/{userId:guid}", async (
+            Guid userId, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+            LocalizedEndpointResults.FromResult(httpContext, await sender.Send(
+                new ResetAdminTotpCommand(userId, httpContext.Connection.RemoteIpAddress?.ToString()), ct)))
+            .RequireAuthorization();
 
         group.MapPost("maintenance-bypass", async (
             [FromBody] MaintenanceBypassRequest request,
@@ -526,6 +565,12 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 /// </summary>
 public sealed record VerifyAdminOtpRequest(Guid ChallengeId, string Code);
 
+/// <summary>An authenticator code (confirming enrolment).</summary>
+public sealed record AdminTotpCodeRequest(string Code);
+
+/// <summary>Re-authentication for a sensitive change: the admin's password plus an authenticator or recovery code.</summary>
+public sealed record AdminTotpProofRequest(string Password, string Code);
+
 /// <summary>
 /// Represents an admin OTP resend request.
 /// </summary>
@@ -546,4 +591,5 @@ public sealed record AdminLoginChallengeResponseDto(
     DateTimeOffset ExpiresAt,
     DateTimeOffset ResendAvailableAt,
     string MaskedEmail,
-    AccessTokenResponseDto? Token = null);
+    AccessTokenResponseDto? Token = null,
+    string Method = "Email");

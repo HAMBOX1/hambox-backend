@@ -171,6 +171,26 @@ public static class IdentityErrors
         "Identity.PhoneNumberNotAllowed",
         "This phone number cannot be used.");
 
+    public static readonly Error TotpAlreadyEnabled = new(
+        "Identity.TotpAlreadyEnabled",
+        "An authenticator app is already set up for this account.");
+
+    public static readonly Error TotpNotEnabled = new(
+        "Identity.TotpNotEnabled",
+        "No authenticator app is set up for this account.");
+
+    public static readonly Error TotpEnrollmentNotStarted = new(
+        "Identity.TotpEnrollmentNotStarted",
+        "Start the authenticator setup first.");
+
+    public static readonly Error TotpCodeInvalid = new(
+        "Identity.TotpCodeInvalid",
+        "The authenticator or recovery code is incorrect.");
+
+    public static readonly Error AdminSecondFactorNotResendable = new(
+        "Identity.AdminSecondFactorNotResendable",
+        "This sign-in uses an authenticator app; there is no code to resend.");
+
     public static readonly Error BlockedPhoneNotFound = new(
         "Identity.BlockedPhoneNotFound",
         "The blocked phone entry was not found.");
