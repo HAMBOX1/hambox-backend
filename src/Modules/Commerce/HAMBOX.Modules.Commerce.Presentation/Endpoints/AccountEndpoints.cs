@@ -112,16 +112,18 @@ internal static class AccountEndpoints
             return ToResult(result);
         }).WithName("GetCustomerLibrary");
 
-        group.MapGet("library/{id:guid}/reveal", async (Guid id, ISender sender) =>
+        group.MapGet("library/{id:guid}/reveal", async (Guid id, HttpContext httpContext, ISender sender) =>
         {
-            var result = await sender.Send(new RevealCustomerLibraryKeyQuery(id));
+            var result = await sender.Send(new RevealCustomerLibraryKeyQuery(
+                id, null, httpContext.Connection.RemoteIpAddress?.ToString(), httpContext.Request.Headers["User-Agent"].ToString()));
             return ToResult(result);
         }).WithName("RevealCustomerLibraryKey");
 
         // The code travels in the body (never the query string) so it is not written to request logs.
-        group.MapPost("library/{id:guid}/reveal", async (Guid id, RevealLicenseKeyRequest request, ISender sender) =>
+        group.MapPost("library/{id:guid}/reveal", async (Guid id, RevealLicenseKeyRequest request, HttpContext httpContext, ISender sender) =>
         {
-            var result = await sender.Send(new RevealCustomerLibraryKeyQuery(id, request.OtpCode));
+            var result = await sender.Send(new RevealCustomerLibraryKeyQuery(
+                id, request.OtpCode, httpContext.Connection.RemoteIpAddress?.ToString(), httpContext.Request.Headers["User-Agent"].ToString()));
             return ToResult(result);
         }).WithName("RevealCustomerLibraryKeyWithOtp");
 

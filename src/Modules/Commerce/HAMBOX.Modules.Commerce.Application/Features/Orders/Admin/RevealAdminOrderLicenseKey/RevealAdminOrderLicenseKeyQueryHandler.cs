@@ -9,7 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RevealAdminOrderLicenseKey;
 
-public sealed record RevealAdminOrderLicenseKeyQuery(Guid OrderId, Guid LicenseKeyId)
+/// <param name="Reason">Why the admin needs the plaintext — required, stored on the audit row.</param>
+public sealed record RevealAdminOrderLicenseKeyQuery(
+    Guid OrderId, Guid LicenseKeyId, string Reason, string? IpAddress = null, string? UserAgent = null)
     : IRequest<Result<RevealAdminOrderLicenseKeyDto>>;
 
 internal sealed class RevealAdminOrderLicenseKeyQueryHandler
@@ -30,6 +32,11 @@ internal sealed class RevealAdminOrderLicenseKeyQueryHandler
         RevealAdminOrderLicenseKeyQuery request,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < 3)
+        {
+            return Result.Failure<RevealAdminOrderLicenseKeyDto>(CommerceErrors.RevealReasonRequired);
+        }
+
         var key = await _dbContext.OrderLicenseKeys
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -46,9 +53,12 @@ internal sealed class RevealAdminOrderLicenseKeyQueryHandler
         _dbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
             request.OrderId,
             "LicenseKeyRevealed",
-            "An administrator revealed a license key.",
+            $"An administrator revealed license key {key.Id}.",
             actorId,
-            actorName));
+            actorName,
+            reason: request.Reason.Trim(),
+            ipAddress: request.IpAddress,
+            userAgent: request.UserAgent));
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

@@ -167,6 +167,8 @@ internal sealed class DigitalInventoryCodeConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.PurchaseCost).HasColumnType("decimal(18,2)");
         builder.Property(x => x.SellingPriceOverride).HasColumnType("decimal(18,2)");
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(x => x.FailureReason).HasMaxLength(500);
+        builder.Property(x => x.SoldToUserId).HasMaxLength(64);
         builder.HasIndex(x => x.CodeHash).IsUnique();
         builder.HasIndex(x => new { x.VariantId, x.Status });
         builder.HasIndex(x => x.BatchId);
@@ -227,6 +229,7 @@ internal sealed class InventoryAuditLogConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.Details).HasMaxLength(2000);
         builder.Property(x => x.IpAddress).HasMaxLength(64);
         builder.Property(x => x.UserAgent).HasMaxLength(500);
+        builder.Property(x => x.Reason).HasMaxLength(500);
         builder.HasIndex(x => x.OccurredOnUtc);
         builder.HasIndex(x => x.VariantId);
         builder.HasIndex(x => x.OrderId);

@@ -346,13 +346,19 @@ internal static class InventoryEndpoints
             await SendEmpty(sender, new DeleteInventoryCodeCommand(codeId)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
-        group.MapPost("/codes/{codeId:guid}/reveal", async (Guid codeId, HttpContext httpContext, ISender sender) =>
+        group.MapPost("/codes/{codeId:guid}/reveal", async (
+            Guid codeId, RevealInventoryCodeRequest request, HttpContext httpContext, ISender sender) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
-            return await Send(sender, new RevealInventoryCodeCommand(codeId, ipAddress, userAgent));
+            return await Send(sender, new RevealInventoryCodeCommand(codeId, request.Reason ?? string.Empty, ipAddress, userAgent));
         })
         .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
+
+        group.MapPost("/codes/{codeId:guid}/mark-failed", async (
+            Guid codeId, MarkInventoryCodeFailedRequest request, ISender sender) =>
+            await SendEmpty(sender, new MarkInventoryCodeFailedCommand(codeId, request.Reason ?? string.Empty)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapPost("/variants/{variantId:guid}/codes/bulk-disable", async (
             Guid variantId,
@@ -519,3 +525,7 @@ internal sealed record UpdateOptionRequest(string Label, int SortOrder, string? 
 internal sealed record ReorderIdsRequest(IReadOnlyList<Guid> OrderedIds);
 internal sealed record BulkCodeIdsRequest(IReadOnlyList<Guid> CodeIds);
 internal sealed record BulkVariantIdsRequest(IReadOnlyList<Guid> VariantIds);
+
+internal sealed record RevealInventoryCodeRequest(string? Reason);
+
+internal sealed record MarkInventoryCodeFailedRequest(string? Reason);

@@ -67,7 +67,15 @@ internal sealed class FulfillmentRouter(
         var manualModeVariants = variantRows
             .Where(v => v.FulfillmentMode is FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)
             .ToList();
-        var routedVariants = variantRows.Where(v => v.FulfillmentMode is not (FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)).ToList();
+        var routedVariants = variantRows
+            .Where(v => v.FulfillmentMode is not (FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery or FulfillmentMode.Disabled))
+            .ToList();
+
+        // Disabled: no manual stock and no supplier, ever — and no Suppliers-schema query to find out.
+        foreach (var variant in variantRows.Where(v => v.FulfillmentMode == FulfillmentMode.Disabled))
+        {
+            result[variant.Id] = new FulfillmentReadiness(FulfillmentMode.Disabled, false, null);
+        }
 
         foreach (var variant in manualModeVariants)
         {

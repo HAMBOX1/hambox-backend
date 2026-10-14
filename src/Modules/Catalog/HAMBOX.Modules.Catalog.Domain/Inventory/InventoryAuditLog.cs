@@ -21,7 +21,8 @@ public sealed class InventoryAuditLog : Entity
         string? details,
         Guid? orderId,
         string? ipAddress,
-        string? userAgent)
+        string? userAgent,
+        string? reason)
         : base(id)
     {
         Action = action;
@@ -35,6 +36,7 @@ public sealed class InventoryAuditLog : Entity
         OrderId = orderId;
         IpAddress = ipAddress;
         UserAgent = userAgent;
+        Reason = reason;
         OccurredOnUtc = DateTimeOffset.UtcNow;
     }
 
@@ -53,6 +55,9 @@ public sealed class InventoryAuditLog : Entity
     public string? IpAddress { get; private set; }
     public string? UserAgent { get; private set; }
 
+    /// <summary>The justification the actor gave for a sensitive action (for example revealing a code).</summary>
+    public string? Reason { get; private set; }
+
     public static InventoryAuditLog Create(
         InventoryAuditAction action,
         Guid? productId = null,
@@ -64,6 +69,7 @@ public sealed class InventoryAuditLog : Entity
         string? details = null,
         Guid? orderId = null,
         string? ipAddress = null,
-        string? userAgent = null) =>
-        new(Guid.NewGuid(), action, productId, variantId, batchId, codeId, supplierId, performedByUserId, details, orderId, ipAddress, userAgent);
+        string? userAgent = null,
+        string? reason = null) =>
+        new(Guid.NewGuid(), action, productId, variantId, batchId, codeId, supplierId, performedByUserId, details, orderId, ipAddress, userAgent, reason);
 }

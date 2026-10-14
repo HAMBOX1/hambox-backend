@@ -4,7 +4,7 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Inventory;
 /// Masks digital inventory codes/serials for any surface other than the dedicated reveal endpoint
 /// (grids, search results, CSV exports). Keeps the last 4 characters visible, e.g. "************ABCD".
 /// </summary>
-internal static class InventoryCodeMasking
+public static class InventoryCodeMasking
 {
     private const int VisibleSuffixLength = 4;
 

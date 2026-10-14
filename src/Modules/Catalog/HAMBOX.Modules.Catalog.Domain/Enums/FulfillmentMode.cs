@@ -35,4 +35,11 @@ public enum FulfillmentMode
     /// <see cref="Inventory.ProductVariant.ManualDeliveryCapacity"/> instead of code count.
     /// </summary>
     ChatDelivery = 4,
+
+    /// <summary>
+    /// Sourcing switched off: the variant can be configured and kept, but it can never be sold — no manual
+    /// inventory is reserved and no automated supplier is contacted. Reads as out of stock on the storefront and is
+    /// refused at checkout, without touching the variant's status or deleting its stock.
+    /// </summary>
+    Disabled = 5,
 }

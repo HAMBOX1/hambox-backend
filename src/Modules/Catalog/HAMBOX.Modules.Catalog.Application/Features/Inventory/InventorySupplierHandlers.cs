@@ -172,12 +172,18 @@ public sealed record ImportInventoryCodesCommand(
 
 public sealed record ImportCodeDuplicateDto(string Code, string ProductName, string VariantName, string? BatchName);
 
+/// <param name="Position">1-based line number in what was submitted.</param>
+/// <param name="MaskedCode">The code with its middle hidden — enough to recognise it, never the secret.</param>
+/// <param name="Reason">Machine-readable: <c>Empty</c>, <c>TooLong</c> or <c>Duplicate</c>.</param>
+public sealed record ImportCodeRejectionDto(int Position, string MaskedCode, string Reason, string Detail);
+
 public sealed record ImportCodesResultDto(
     int TotalSubmitted,
     int ImportedCount,
     int DuplicateCount,
     int InvalidCount,
-    IReadOnlyList<ImportCodeDuplicateDto> Duplicates);
+    IReadOnlyList<ImportCodeDuplicateDto> Duplicates,
+    IReadOnlyList<ImportCodeRejectionDto>? Rejected = null);
 
 internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<ImportInventoryCodesCommand, Result<ImportCodesResultDto>>
 {
@@ -209,8 +215,12 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
                 .Select(d => new ImportCodeDuplicateDto(d.Code, d.ProductName, d.VariantSku, d.BatchName))
                 .ToList();
 
+            var rejected = (result.Rejections ?? [])
+                .Select(r => new ImportCodeRejectionDto(r.Position, r.MaskedCode, r.Reason, r.Detail))
+                .ToList();
+
             return Result.Success(new ImportCodesResultDto(
-                result.TotalSubmitted, result.Imported, result.Duplicates, result.Invalid, duplicates));
+                result.TotalSubmitted, result.Imported, result.Duplicates, result.Invalid, duplicates, rejected));
         }
         catch (InvalidOperationException ex) when (ex.Message == "Batch not found.")
         {
@@ -261,7 +271,8 @@ internal sealed class GetInventoryCodesQueryHandler : IRequestHandler<GetInvento
             .Select(c => new DigitalInventoryCodeDto(
                 c.Id, c.VariantId, c.BatchId, c.SupplierId, c.DigitalCode, c.SerialNumber,
                 c.Status.ToString(), c.PurchaseCost, c.SellingPriceOverride, c.Currency,
-                c.ExpirationDate, c.ReservedOnUtc, c.SoldOnUtc))
+                c.ExpirationDate, c.ReservedOnUtc, c.SoldOnUtc,
+                c.LastStatusChangedOnUtc, c.FailureReason, c.SoldToUserId))
             .ToListAsync(cancellationToken);
 
         // Grid never exposes plaintext — only the dedicated reveal endpoint may.
@@ -294,7 +305,8 @@ internal sealed class GetInventoryAuditLogsQueryHandler : IRequestHandler<GetInv
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(l => new InventoryAuditLogDto(
-                l.Id, l.Action.ToString(), l.ProductId, l.VariantId, l.BatchId, l.CodeId, l.PerformedByUserId, l.Details, l.OccurredOnUtc))
+                l.Id, l.Action.ToString(), l.ProductId, l.VariantId, l.BatchId, l.CodeId, l.PerformedByUserId, l.Details,
+                l.OccurredOnUtc, l.Reason, l.IpAddress, l.UserAgent))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<InventoryAuditLogDto>>(items);

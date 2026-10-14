@@ -42,6 +42,8 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
 
         builder.Property(i => i.VariantSku).HasMaxLength(100);
 
+        builder.Property(i => i.FulfillmentModeSnapshot).HasMaxLength(32);
+
         builder.Property(i => i.CreatedOnUtc)
             .IsRequired();
 

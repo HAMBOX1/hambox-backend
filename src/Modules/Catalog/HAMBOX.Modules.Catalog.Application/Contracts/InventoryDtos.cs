@@ -100,7 +100,10 @@ public sealed record DigitalInventoryCodeDto(
     string Currency,
     DateTimeOffset? ExpirationDate,
     DateTimeOffset? ReservedOnUtc,
-    DateTimeOffset? SoldOnUtc);
+    DateTimeOffset? SoldOnUtc,
+    DateTimeOffset? LastStatusChangedOnUtc = null,
+    string? FailureReason = null,
+    string? SoldToUserId = null);
 
 public sealed record InventoryAuditLogDto(
     Guid Id,
@@ -111,7 +114,10 @@ public sealed record InventoryAuditLogDto(
     Guid? CodeId,
     string? PerformedByUserId,
     string? Details,
-    DateTimeOffset OccurredOnUtc);
+    DateTimeOffset OccurredOnUtc,
+    string? Reason = null,
+    string? IpAddress = null,
+    string? UserAgent = null);
 
 public sealed record InventoryStatisticsDto(
     int Available,

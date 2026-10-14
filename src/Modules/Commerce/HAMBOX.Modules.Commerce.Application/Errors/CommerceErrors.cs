@@ -28,6 +28,10 @@ public static class CommerceErrors
         "Commerce.PhoneNumberNotAllowed",
         "This phone number cannot be used for payment.");
 
+    public static readonly Error RevealReasonRequired = new(
+        "Commerce.RevealReasonRequired",
+        "Enter a reason (at least 3 characters) to reveal this license key.");
+
     public static readonly Error RevealOtpRequired = new(
         "Commerce.RevealOtpRequired",
         "Enter the code we e-mailed you to show this license key.");

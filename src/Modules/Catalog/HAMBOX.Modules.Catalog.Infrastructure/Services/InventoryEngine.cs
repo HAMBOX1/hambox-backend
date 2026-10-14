@@ -246,10 +246,10 @@ internal sealed class InventoryEngine : IInventoryEngine
         {
             var code = await FindTrackedCodeAsync(codeId, cancellationToken);
             var previous = code.Status;
-            code.MarkSold(orderId, orderItemId);
 
             var reservation = await _db.InventoryReservations
                 .FirstOrDefaultAsync(r => r.CodeId == codeId && r.IsActive, cancellationToken);
+            code.MarkSold(orderId, orderItemId, reservation?.UserId);
             reservation?.Complete();
 
             var batch = await _db.InventoryBatches.FirstAsync(b => b.Id == code.BatchId, cancellationToken);
@@ -472,14 +472,30 @@ internal sealed class InventoryEngine : IInventoryEngine
         var imported = 0;
         var invalid = 0;
         var duplicateDetails = new List<ImportCodeDuplicate>();
+        var rejections = new List<ImportCodeRejection>();
+        var position = 0;
 
         foreach (var (item, hash) in normalized)
         {
+            position++;
+
             // A code can be a whole multi-line account block (email, security email, 2FA codes, ...), but it is
             // stored encrypted in a fixed-width column, so anything beyond this is rejected rather than truncated.
-            if (hash is null || item.DigitalCode.Trim().Length > MaxCodeLength)
+            if (hash is null)
             {
                 invalid++;
+                rejections.Add(new ImportCodeRejection(position, string.Empty, ImportRejectionReasons.Empty, "The line is empty."));
+                continue;
+            }
+
+            if (item.DigitalCode.Trim().Length > MaxCodeLength)
+            {
+                invalid++;
+                rejections.Add(new ImportCodeRejection(
+                    position,
+                    MaskedPreview(item.DigitalCode.Trim()),
+                    ImportRejectionReasons.TooLong,
+                    $"Longer than {MaxCodeLength} characters."));
                 continue;
             }
 
@@ -487,6 +503,11 @@ internal sealed class InventoryEngine : IInventoryEngine
             {
                 var (productName, variantSku, batchName) = ResolveLocation(location.VariantId, location.BatchId);
                 duplicateDetails.Add(new ImportCodeDuplicate(item.DigitalCode.Trim(), productName, variantSku, batchName));
+                rejections.Add(new ImportCodeRejection(
+                    position,
+                    MaskedPreview(item.DigitalCode.Trim()),
+                    ImportRejectionReasons.Duplicate,
+                    $"Already in stock: {productName} / {variantSku}{(batchName is null ? string.Empty : " (batch " + batchName + ")")}."));
                 continue;
             }
 
@@ -524,7 +545,14 @@ internal sealed class InventoryEngine : IInventoryEngine
         }
 
         await _db.SaveChangesAsync(cancellationToken);
-        return new ImportCodesResult(totalSubmitted, imported, duplicates, invalid, duplicateDetails);
+        return new ImportCodesResult(totalSubmitted, imported, duplicates, invalid, duplicateDetails, rejections);
+    }
+
+    /// <summary>Masked, and capped so one pasted wall of text cannot bloat the rejection report.</summary>
+    private static string MaskedPreview(string code)
+    {
+        var masked = InventoryCodeMasking.Mask(code);
+        return masked.Length > 40 ? "…" + masked[^40..] : masked;
     }
 
     public async Task<VariantCleanupResult> CleanupVariantAsync(Guid variantId, CancellationToken cancellationToken = default)

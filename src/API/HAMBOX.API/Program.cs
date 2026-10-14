@@ -325,6 +325,7 @@ try
     app.MapMessagingEndpoints();
     app.MapNotificationHub();
     app.MapLocalizationEndpoints();
+    app.MapEncryptionHealthEndpoints();
     app.MapHealthChecks("/health");
 
     app.Run();

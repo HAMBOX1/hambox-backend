@@ -114,11 +114,20 @@ internal static class OrderManagementEndpoints
         .WithName("UpdateAdminOrderNote")
         .RequirePermission(PermissionConstants.Orders.Edit);
 
-        group.MapGet("{id:guid}/license-keys/{licenseKeyId:guid}/reveal", async Task<IResult> (
+        // POST (not GET): the reveal needs a justification in the body, and a plaintext secret must never be
+        // something a link, prefetch or cache can trigger.
+        group.MapPost("{id:guid}/license-keys/{licenseKeyId:guid}/reveal", async Task<IResult> (
             Guid id,
             Guid licenseKeyId,
+            [FromBody] RevealAdminLicenseKeyRequest request,
+            HttpContext httpContext,
             ISender sender) =>
-            MapResult(await sender.Send(new RevealAdminOrderLicenseKeyQuery(id, licenseKeyId))))
+            MapResult(await sender.Send(new RevealAdminOrderLicenseKeyQuery(
+                id,
+                licenseKeyId,
+                request.Reason ?? string.Empty,
+                httpContext.Connection.RemoteIpAddress?.ToString(),
+                httpContext.Request.Headers["User-Agent"].ToString()))))
         .WithName("RevealAdminOrderLicenseKey")
         .RequirePermission(PermissionConstants.Orders.RevealLicenseKeys);
 
@@ -169,3 +178,5 @@ internal static class OrderManagementEndpoints
                 Status = StatusCodes.Status400BadRequest,
             });
 }
+
+internal sealed record RevealAdminLicenseKeyRequest(string? Reason);

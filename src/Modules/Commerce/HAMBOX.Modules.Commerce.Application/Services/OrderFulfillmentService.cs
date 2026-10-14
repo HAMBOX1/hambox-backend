@@ -108,6 +108,7 @@ public sealed class OrderFulfillmentService
             if (item.ProductVariantId is Guid variantId)
             {
                 var readiness = await _router.GetReadinessAsync(variantId, cancellationToken);
+                item.RecordFulfillmentMode(readiness.Mode.ToString());
 
                 if (readiness.Mode == FulfillmentMode.ChatDelivery)
                 {
@@ -383,6 +384,7 @@ public sealed class OrderFulfillmentService
             }
 
             var readiness = await _router.GetReadinessAsync(variantId, cancellationToken);
+            item.RecordFulfillmentMode(readiness.Mode.ToString());
             if (readiness.Mode is FulfillmentMode.ManualOnly or FulfillmentMode.ChatDelivery)
             {
                 // Never even resolves a supplier candidate for these modes — a ManualOnly shortfall is

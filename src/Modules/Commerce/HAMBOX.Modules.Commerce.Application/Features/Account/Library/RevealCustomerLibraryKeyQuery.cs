@@ -14,7 +14,8 @@ namespace HAMBOX.Modules.Commerce.Application.Features.Account.Library;
 /// Shows a purchased license key in plaintext to its owner. Depending on Platform Settings → Security →
 /// <c>CustomerRevealOtpMode</c> the customer first has to enter an e-mailed code (once per key, or every time).
 /// </summary>
-public sealed record RevealCustomerLibraryKeyQuery(Guid LibraryItemId, string? OtpCode = null)
+public sealed record RevealCustomerLibraryKeyQuery(
+    Guid LibraryItemId, string? OtpCode = null, string? IpAddress = null, string? UserAgent = null)
     : IRequest<Result<RevealCustomerLibraryKeyDto>>;
 
 /// <summary>E-mails the customer a one-time code that unlocks revealing one specific license key.</summary>
@@ -27,6 +28,7 @@ internal static class LicenseKeyRevealPolicy
 {
     public const string Purpose = "LicenseKeyReveal";
     public const string EventRevealed = "LicenseKeyRevealed";
+    public const string EventOtpVerified = "LicenseKeyRevealOtpVerified";
 
     public static bool IsOff(string? mode) => string.Equals(mode, "Off", StringComparison.OrdinalIgnoreCase);
 
@@ -104,6 +106,14 @@ internal sealed class RevealCustomerLibraryKeyQueryHandler
                 switch (verification)
                 {
                     case CustomerActionOtpVerifyStatus.Verified:
+                        _commerceDbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
+                            key.OrderId,
+                            LicenseKeyRevealPolicy.EventOtpVerified,
+                            $"The customer verified the e-mailed code to show license key {key.Id}.",
+                            userId,
+                            _currentUserService.DisplayName ?? userId,
+                            ipAddress: request.IpAddress,
+                            userAgent: request.UserAgent));
                         break;
                     case CustomerActionOtpVerifyStatus.Expired:
                         return Result.Failure<RevealCustomerLibraryKeyDto>(CommerceErrors.RevealOtpExpired);
@@ -123,7 +133,9 @@ internal sealed class RevealCustomerLibraryKeyQueryHandler
             LicenseKeyRevealPolicy.EventRevealed,
             $"The customer revealed license key {key.Id}.",
             userId,
-            _currentUserService.DisplayName ?? userId));
+            _currentUserService.DisplayName ?? userId,
+            ipAddress: request.IpAddress,
+            userAgent: request.UserAgent));
         await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RevealCustomerLibraryKeyDto(key.LicenseKey));

@@ -66,6 +66,14 @@ public static class CatalogErrors
         "Products.InvalidPriceAdjustment",
         "The price adjustment would result in a negative price.");
 
+    public static readonly Error RevealReasonRequired = new(
+        "Inventory.RevealReasonRequired",
+        "Enter a reason (at least 3 characters) to reveal this code.");
+
+    public static readonly Error FailureReasonRequired = new(
+        "Inventory.FailureReasonRequired",
+        "Enter the reason this code failed.");
+
     public static readonly Error ProductMergeRequiresAtLeastTwo = new(
         "Products.MergeRequiresAtLeastTwo",
         "Select at least two products to merge.");

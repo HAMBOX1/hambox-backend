@@ -56,6 +56,16 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
     public DateTimeOffset? SoldOnUtc { get; private set; }
     public Guid? OrderId { get; private set; }
     public Guid? OrderItemId { get; private set; }
+
+    /// <summary>When <see cref="Status"/> last changed (reserve, release, sale, disable, failure...).</summary>
+    public DateTimeOffset? LastStatusChangedOnUtc { get; private set; }
+
+    /// <summary>Why the code is <see cref="InventoryCodeStatus.Failed"/>; null in every other state.</summary>
+    public string? FailureReason { get; private set; }
+
+    /// <summary>The customer the code was reserved for / sold to (the Identity user id), once it has been.</summary>
+    public string? SoldToUserId { get; private set; }
+
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
 
@@ -103,6 +113,7 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
 
         Status = InventoryCodeStatus.Reserved;
         ReservedOnUtc = DateTimeOffset.UtcNow;
+        LastStatusChangedOnUtc = ReservedOnUtc;
     }
 
     public void Release()
@@ -114,9 +125,10 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
 
         Status = InventoryCodeStatus.Available;
         ReservedOnUtc = null;
+        LastStatusChangedOnUtc = DateTimeOffset.UtcNow;
     }
 
-    public void MarkSold(Guid orderId, Guid orderItemId)
+    public void MarkSold(Guid orderId, Guid orderItemId, string? soldToUserId = null)
     {
         if (Status != InventoryCodeStatus.Reserved)
         {
@@ -125,8 +137,10 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
 
         Status = InventoryCodeStatus.Sold;
         SoldOnUtc = DateTimeOffset.UtcNow;
+        LastStatusChangedOnUtc = SoldOnUtc;
         OrderId = orderId;
         OrderItemId = orderItemId;
+        SoldToUserId = soldToUserId;
     }
 
     /// <summary>
@@ -143,19 +157,38 @@ public sealed class DigitalInventoryCode : AggregateRoot, IAuditable
         SoldOnUtc = null;
         OrderId = null;
         OrderItemId = null;
+        SoldToUserId = null;
+        LastStatusChangedOnUtc = DateTimeOffset.UtcNow;
     }
 
     public void Disable()
     {
         Status = InventoryCodeStatus.Disabled;
+        LastStatusChangedOnUtc = DateTimeOffset.UtcNow;
     }
 
     public void Enable()
     {
-        if (Status == InventoryCodeStatus.Disabled)
+        if (Status is InventoryCodeStatus.Disabled or InventoryCodeStatus.Failed)
         {
             Status = InventoryCodeStatus.Available;
+            FailureReason = null;
+            LastStatusChangedOnUtc = DateTimeOffset.UtcNow;
         }
+    }
+
+    /// <summary>
+    /// Records that using this code failed (the platform rejected it, the key was already redeemed, delivery
+    /// to the customer errored...). A failed code is no longer sellable; the reason is kept for the support
+    /// follow-up and it can be re-enabled by an admin once resolved.
+    /// </summary>
+    public void MarkFailed(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        Status = InventoryCodeStatus.Failed;
+        FailureReason = reason.Trim();
+        LastStatusChangedOnUtc = DateTimeOffset.UtcNow;
     }
 
     public void MoveToBatch(Guid batchId) => BatchId = batchId;

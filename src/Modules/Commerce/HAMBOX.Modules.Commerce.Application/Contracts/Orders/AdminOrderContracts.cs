@@ -93,7 +93,8 @@ public sealed record AdminOrderItemDto(
     decimal Discount,
     decimal Subtotal,
     int DeliveredCodesCount,
-    string DeliveryStatus);
+    string DeliveryStatus,
+    string? FulfillmentMode = null);
 
 public sealed record AdminOrderTimelineEventDto(
     string EventType,
@@ -122,7 +123,10 @@ public sealed record AdminOrderAuditEntryDto(
     string EventType,
     string Description,
     string? ActorDisplayName,
-    DateTimeOffset OccurredOnUtc);
+    DateTimeOffset OccurredOnUtc,
+    string? Reason = null,
+    string? IpAddress = null,
+    string? UserAgent = null);
 
 public sealed record UpdateAdminOrderStatusRequest(string Status);
 

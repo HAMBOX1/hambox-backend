@@ -127,12 +127,26 @@ public sealed record ImportCodeItem(
 /// <summary>Where a submitted code was already found — global across the whole catalog, not just the target variant/batch.</summary>
 public sealed record ImportCodeDuplicate(string Code, string ProductName, string VariantSku, string? BatchName);
 
+/// <summary>
+/// One submitted line that was NOT imported. <paramref name="Position"/> is 1-based, in the order submitted, so the
+/// admin can find the line in their file; the code itself is returned masked, never in plaintext.
+/// </summary>
+public sealed record ImportCodeRejection(int Position, string MaskedCode, string Reason, string Detail);
+
+public static class ImportRejectionReasons
+{
+    public const string Empty = "Empty";
+    public const string TooLong = "TooLong";
+    public const string Duplicate = "Duplicate";
+}
+
 public sealed record ImportCodesResult(
     int TotalSubmitted,
     int Imported,
     int Duplicates,
     int Invalid,
-    IReadOnlyList<ImportCodeDuplicate> DuplicateDetails);
+    IReadOnlyList<ImportCodeDuplicate> DuplicateDetails,
+    IReadOnlyList<ImportCodeRejection>? Rejections = null);
 
 public sealed record VariantCleanupResult(int ReservationsReleased, int CodesRemoved);
 

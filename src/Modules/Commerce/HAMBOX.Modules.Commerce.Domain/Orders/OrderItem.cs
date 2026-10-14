@@ -96,6 +96,20 @@ public sealed class OrderItem : Entity
     /// </summary>
     public Guid? SelectedSupplierId { get; private set; }
 
+    /// <summary>
+    /// The variant's source mode (ManualOnly / ManualFirst / SupplierFirst / SupplierOnly / ChatDelivery) in force when
+    /// this line was first processed for fulfillment — a later edit of the variant never rewrites how this order was
+    /// sourced. Recorded once; null for membership lines and for orders that predate the snapshot.
+    /// </summary>
+    public string? FulfillmentModeSnapshot { get; private set; }
+
+    /// <summary>Records the source mode this line was fulfilled under. First write wins; later calls are ignored.</summary>
+    public void RecordFulfillmentMode(string mode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mode);
+        FulfillmentModeSnapshot ??= mode.Trim();
+    }
+
     public Guid? SelectedSupplierProductMappingId { get; private set; }
 
     /// <summary>The supplier's <c>BuyingPrice</c> (in the platform base currency) at the moment this order was created — see <see cref="SelectedSupplierId"/>.</summary>

@@ -648,6 +648,13 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ExpirationDate")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("LastStatusChangedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("ModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -682,6 +689,10 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("SoldOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SoldToUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -748,6 +759,10 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<Guid?>("ProductId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uniqueidentifier");

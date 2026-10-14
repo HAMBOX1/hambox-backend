@@ -64,8 +64,12 @@ public sealed record ReorderProductOptionsCommand(Guid GroupId, IReadOnlyList<Gu
 public sealed record DisableInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
 public sealed record EnableInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
 public sealed record DeleteInventoryCodeCommand(Guid CodeId) : IRequest<Result>;
-public sealed record RevealInventoryCodeCommand(Guid CodeId, string IpAddress, string UserAgent)
+/// <param name="Reason">Why the admin needs the plaintext — required, stored on the audit row.</param>
+public sealed record RevealInventoryCodeCommand(Guid CodeId, string Reason, string IpAddress, string UserAgent)
     : IRequest<Result<RevealInventoryCodeDto>>;
+
+/// <summary>Marks a code as failed (rejected / already redeemed / delivery error) with the reason kept for follow-up.</summary>
+public sealed record MarkInventoryCodeFailedCommand(Guid CodeId, string Reason) : IRequest<Result>;
 public sealed record BulkDisableInventoryCodesCommand(Guid VariantId, IReadOnlyList<Guid> CodeIds) : IRequest<Result<int>>;
 public sealed record BulkDeleteInventoryCodesCommand(Guid VariantId, IReadOnlyList<Guid> CodeIds) : IRequest<Result<int>>;
 
@@ -799,6 +803,11 @@ internal sealed class RevealInventoryCodeCommandHandler : IRequestHandler<Reveal
     {
         // Permission is enforced at the endpoint layer (RequirePermission). Audit is written and
         // persisted before plaintext is ever returned to the caller.
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < 3)
+        {
+            return Result.Failure<RevealInventoryCodeDto>(CatalogErrors.RevealReasonRequired);
+        }
+
         var code = await _db.DigitalInventoryCodes
             .FirstOrDefaultAsync(c => c.Id == request.CodeId, cancellationToken);
 
@@ -821,11 +830,63 @@ internal sealed class RevealInventoryCodeCommandHandler : IRequestHandler<Reveal
             details: "Administrator revealed a digital inventory code.",
             orderId: code.OrderId,
             ipAddress: request.IpAddress,
-            userAgent: request.UserAgent));
+            userAgent: request.UserAgent,
+            reason: request.Reason.Trim()));
 
         await _db.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RevealInventoryCodeDto(code.DigitalCode));
+    }
+}
+
+internal sealed class MarkInventoryCodeFailedCommandHandler : IRequestHandler<MarkInventoryCodeFailedCommand, Result>
+{
+    private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+
+    public MarkInventoryCodeFailedCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result> Handle(MarkInventoryCodeFailedCommand request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return Result.Failure(CatalogErrors.FailureReasonRequired);
+        }
+
+        var code = await _db.DigitalInventoryCodes.FirstOrDefaultAsync(c => c.Id == request.CodeId, cancellationToken);
+        if (code is null)
+        {
+            return Result.Failure(CatalogErrors.CodeNotFound);
+        }
+
+        if (code.Status == InventoryCodeStatus.Reserved)
+        {
+            // A reserved code belongs to a live cart/order; releasing it is the reservation's own flow.
+            return Result.Failure(CatalogErrors.InvalidCodeStatus);
+        }
+
+        var previous = code.Status;
+        code.MarkFailed(request.Reason);
+
+        var batch = await _db.InventoryBatches.FirstOrDefaultAsync(b => b.Id == code.BatchId, cancellationToken);
+        batch?.OnCodeStatusChanged(previous, InventoryCodeStatus.Failed);
+
+        _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
+            InventoryAuditAction.CodeMarkedFailed,
+            variantId: code.VariantId,
+            batchId: code.BatchId,
+            codeId: code.Id,
+            performedByUserId: _currentUser.UserId,
+            details: $"Code marked failed (was {previous})",
+            orderId: code.OrderId,
+            reason: request.Reason.Trim()));
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }
 

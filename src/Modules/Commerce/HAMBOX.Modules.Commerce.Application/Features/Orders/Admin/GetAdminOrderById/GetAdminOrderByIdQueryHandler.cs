@@ -133,7 +133,8 @@ internal sealed class GetAdminOrderByIdQueryHandler
                 0m,
                 item.LineTotal,
                 delivered,
-                AdminOrderMapper.ResolveItemDeliveryStatus(item.Quantity, delivered));
+                AdminOrderMapper.ResolveItemDeliveryStatus(item.Quantity, delivered),
+                item.FulfillmentModeSnapshot);
         }).ToList();
 
         var maskedKeys = licenseKeys.Select(key =>
@@ -183,7 +184,10 @@ internal sealed class GetAdminOrderByIdQueryHandler
                 e.EventType,
                 e.Description,
                 e.ActorDisplayName,
-                e.OccurredOnUtc)).ToList(),
+                e.OccurredOnUtc,
+                e.Reason,
+                e.IpAddress,
+                e.UserAgent)).ToList(),
             paymentCallbacks.Select(c => new AdminOrderPaymentCallbackDto(
                 c.Id,
                 c.Provider,
