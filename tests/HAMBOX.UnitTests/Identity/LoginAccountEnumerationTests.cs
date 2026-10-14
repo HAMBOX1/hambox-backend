@@ -14,15 +14,15 @@ using Microsoft.EntityFrameworkCore;
 namespace HAMBOX.UnitTests.Identity;
 
 /// <summary>
-/// Proves <see cref="LoginCommandHandler"/> returns the exact same <see cref="Error"/>
-/// (<see cref="IdentityErrors.InvalidCredentials"/>) for every pre-token-issuance failure branch —
-/// nonexistent email, unconfirmed email, inactive account, pre-locked account, wrong password, and
-/// wrong password that itself triggers lockout — so nothing externally observable (HTTP status,
-/// error code, or localized message, since <c>LocalizedEndpointResults.FromResult</c> maps 1:1 from
-/// <see cref="Result.Error"/>) lets a caller distinguish "this email isn't registered" from "this
-/// email is registered but something else is wrong", closing the account-enumeration gap. Internal
-/// logging (LoginHistory, SecurityEventLogger) is intentionally left untouched by this fix and not
-/// re-asserted here — only the caller-visible Result is in scope.
+/// Proves <see cref="LoginCommandHandler"/> never lets a caller who has NOT proven the password tell
+/// accounts apart: a nonexistent email, an unconfirmed one, an inactive or pre-locked one, a wrong
+/// password and a wrong password that itself triggers lockout all return the exact same
+/// <see cref="Error"/> (<see cref="IdentityErrors.InvalidCredentials"/>) — nothing externally observable
+/// (HTTP status, error code, localized message) distinguishes "not registered" from "registered but
+/// something else is wrong". Once the password IS correct the caller is told the real reason
+/// (e-mail not confirmed, account not active, locked) — see the last three tests and
+/// <c>RequireEmailVerificationLoginTests</c>. Internal logging (LoginHistory, SecurityEventLogger) is
+/// not re-asserted here — only the caller-visible Result is in scope.
 /// </summary>
 public sealed class LoginAccountEnumerationTests
 {
@@ -81,7 +81,7 @@ public sealed class LoginAccountEnumerationTests
     {
         await using var db = CreateDbContext();
         var user = await SeedUserAsync(db); // Create() leaves EmailConfirmed = false
-        var handler = CreateHandler(db, passwordMatches: true);
+        var handler = CreateHandler(db, passwordMatches: false);
 
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
@@ -93,7 +93,7 @@ public sealed class LoginAccountEnumerationTests
     {
         await using var db = CreateDbContext();
         var user = await SeedUserAsync(db, u => u.ConfirmEmail()); // confirmed but still Pending (not Active)
-        var handler = CreateHandler(db, passwordMatches: true);
+        var handler = CreateHandler(db, passwordMatches: false);
 
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
@@ -110,7 +110,7 @@ public sealed class LoginAccountEnumerationTests
             u.Activate();
             u.RecordAccessFailure(maxFailedAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(15));
         });
-        var handler = CreateHandler(db, passwordMatches: true);
+        var handler = CreateHandler(db, passwordMatches: false);
 
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
@@ -149,6 +149,76 @@ public sealed class LoginAccountEnumerationTests
         var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
 
         AssertGenericInvalidCredentials(result);
+    }
+
+    [Fact]
+    public async Task CorrectPassword_UnconfirmedEmail_IsToldTheEmailNeedsConfirming()
+    {
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db); // Pending, EmailConfirmed = false
+        var handler = CreateHandler(db, passwordMatches: true);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(IdentityErrors.EmailNotConfirmed.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CorrectPassword_InactiveAccount_IsToldTheAccountIsNotActive()
+    {
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db, u =>
+        {
+            u.ConfirmEmail();
+            u.Activate();
+            u.Suspend("policy violation");
+        });
+        var handler = CreateHandler(db, passwordMatches: true);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(IdentityErrors.AccountNotActive.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task CorrectPassword_LockedAccount_IsToldTheAccountIsLocked()
+    {
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db, u =>
+        {
+            u.ConfirmEmail();
+            u.Activate();
+            u.RecordAccessFailure(maxFailedAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(15));
+        });
+        var handler = CreateHandler(db, passwordMatches: true);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(IdentityErrors.AccountLocked.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task WrongPassword_OnAnAlreadyLockedAccount_DoesNotReArmTheLockout()
+    {
+        await using var db = CreateDbContext();
+        var user = await SeedUserAsync(db, u =>
+        {
+            u.ConfirmEmail();
+            u.Activate();
+            u.RecordAccessFailure(maxFailedAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(15));
+        });
+        var lockedUntil = user.LockoutEnd;
+        var failuresBefore = user.AccessFailedCount;
+        var handler = CreateHandler(db, passwordMatches: false);
+
+        var result = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+
+        AssertGenericInvalidCredentials(result);
+        Assert.Equal(lockedUntil, user.LockoutEnd);
+        Assert.Equal(failuresBefore, user.AccessFailedCount);
     }
 
     private sealed class FakePasswordHasher(bool matches) : IPasswordHasher
@@ -202,6 +272,7 @@ public sealed class LoginAccountEnumerationTests
     {
         public Task<bool> IsEmailBlockedAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<bool> IsIpBlockedAsync(string ipAddress, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<bool> IsPhoneBlockedAsync(string phoneNumber, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<CountryRestrictionStatus> GetCountryStatusAsync(string countryCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(CountryRestrictionStatus.Allowed);
         public void InvalidateCache()

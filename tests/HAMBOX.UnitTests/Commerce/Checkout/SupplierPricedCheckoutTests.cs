@@ -114,7 +114,8 @@ public sealed class SupplierPricedCheckoutTests
         var inventoryEngine = new FakeInventoryEngine(catalogDb);
         var cartLineValidator = new CartLineValidator(inventoryEngine, fulfillmentRouter, pricingEngine);
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(
             commerceDb, settingsProvider, referralRewardService, new FakeCommunicationService(),

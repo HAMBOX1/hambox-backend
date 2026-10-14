@@ -56,20 +56,12 @@ public sealed class LocalFileStorage : IFileStorage
             throw new InvalidOperationException($"File exceeds the maximum size of {MaxFileSizeBytes} bytes.");
         }
 
-        var extension = Path.GetExtension(fileName);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = contentType switch
-            {
-                "image/jpeg" => ".jpg",
-                "image/png" => ".png",
-                "image/webp" => ".webp",
-                "image/gif" => ".gif",
-                _ => ".bin"
-            };
-        }
+        // The on-disk extension is what static-file middleware serves (and what a browser executes) by, so it
+        // comes from the validated content type only — never from the client-supplied file name. A content
+        // type with no known mapping falls back to an inert ".bin" rather than trusting the name.
+        var extension = ExtensionForContentType(contentType);
 
-        var storageKey = $"{folder.Trim('/')}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var storageKey = $"{folder.Trim('/')}/{Guid.NewGuid():N}{extension}";
         var absolutePath = Path.Combine(_rootPath, storageKey.Replace('/', Path.DirectorySeparatorChar));
         var directory = Path.GetDirectoryName(absolutePath);
 
@@ -98,6 +90,20 @@ public sealed class LocalFileStorage : IFileStorage
 
         return new StoredFileResult(storageKey, publicUrl, fileName, contentType, fileSize);
     }
+
+    private static string ExtensionForContentType(string contentType) =>
+        contentType.Trim().ToLowerInvariant() switch
+        {
+            "image/jpeg" => ".jpg",
+            "image/png" => ".png",
+            "image/webp" => ".webp",
+            "image/gif" => ".gif",
+            "application/zip" or "application/x-zip-compressed" => ".zip",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
+            "text/csv" => ".csv",
+            "application/pdf" => ".pdf",
+            _ => ".bin",
+        };
 
     /// <inheritdoc />
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)

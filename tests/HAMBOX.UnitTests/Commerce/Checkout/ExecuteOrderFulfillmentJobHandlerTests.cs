@@ -111,7 +111,8 @@ public sealed class ExecuteOrderFulfillmentJobHandlerTests
             routingEngine, new FakeCommerceSettingsProvider { Commerce = new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 0m) });
 
         var fulfillmentService = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, supplierFulfillmentService, router, pricingEngine, suppliersDb, NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, supplierFulfillmentService, router, pricingEngine, suppliersDb, new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
 
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(

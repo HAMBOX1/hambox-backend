@@ -347,7 +347,7 @@ public sealed class CodesWholesaleSupplierProviderTests
         var codeEndpointCalled = false;
         var (provider, _, _) = CreateProvider(apiResponder: (req, body, ct) =>
         {
-            if (req.RequestUri!.AbsolutePath.Contains("/v2/codes/"))
+            if (req.RequestUri!.AbsolutePath.Contains("/v3/codes/"))
             {
                 codeEndpointCalled = true;
                 return Task.FromResult(JsonResponse(HttpStatusCode.OK, new { codeId = "code-1", status = CodesWholesaleProviderConstants.CodeStatusText, code = "FETCHED-CODE" }));
@@ -551,7 +551,7 @@ public sealed class CodesWholesaleSupplierProviderTests
         var referenceId = Guid.NewGuid();
         var (provider, _, _) = CreateProvider(apiResponder: (req, body, ct) =>
         {
-            Assert.Contains("/v2/orders?startFrom=", req.RequestUri!.PathAndQuery);
+            Assert.Contains("/v3/orders?startFrom=", req.RequestUri!.PathAndQuery);
             return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
             {
                 items = new[]

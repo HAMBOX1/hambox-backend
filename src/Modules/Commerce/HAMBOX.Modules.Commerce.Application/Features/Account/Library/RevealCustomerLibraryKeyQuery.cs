@@ -2,6 +2,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,16 @@ internal sealed class RevealCustomerLibraryKeyQueryHandler
         {
             return Result.Failure<RevealCustomerLibraryKeyDto>(CommerceErrors.OrderLicenseKeyNotFound);
         }
+
+        // Every plaintext reveal is recorded on the order — who, which key, when — without the key itself.
+        var actorId = _currentUserService.UserId;
+        _commerceDbContext.OrderAuditEntries.Add(OrderAuditEntry.Create(
+            key.OrderId,
+            "LicenseKeyRevealed",
+            $"The customer revealed license key {key.Id}.",
+            actorId,
+            _currentUserService.DisplayName ?? actorId));
+        await _commerceDbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RevealCustomerLibraryKeyDto(key.LicenseKey));
     }

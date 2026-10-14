@@ -35,7 +35,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
         db.SupplierProductMappings.AddRange(productWideMapping, variantMapping);
         await db.SaveChangesAsync();
 
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrencyExchangeRateProvider());
         var result = await handler.Handle(new GetSupplierMappingsQuery(supplier.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -60,7 +60,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
         db.SupplierProductMappings.Add(mapping);
         await db.SaveChangesAsync();
 
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrencyExchangeRateProvider());
         var result = await handler.Handle(new GetSupplierMappingsQuery(supplier.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -74,7 +74,7 @@ public sealed class GetSupplierMappingsQueryHandlerTests
     {
         await using var db = SuppliersTestDbContextFactory.Create();
         var catalogDb = TestCatalogDbContextFactory.Create();
-        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider());
+        var handler = new GetSupplierMappingsQueryHandler(db, catalogDb, new FakeCommerceSettingsProvider(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrencyExchangeRateProvider());
 
         var result = await handler.Handle(new GetSupplierMappingsQuery(Guid.NewGuid()), CancellationToken.None);
 

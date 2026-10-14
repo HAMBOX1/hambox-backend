@@ -48,8 +48,14 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
     public Task<AuthenticationSettingsPayload> GetAuthenticationAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<SecuritySettingsPayload> GetSecurityAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<OtpSettingsPayload> GetOtpAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
-    public Task<InventorySettingsPayload> GetInventoryAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
-    public Task<CurrencySettingsPayload> GetCurrencyAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
+    public InventorySettingsPayload Inventory { get; set; } = new(5, 15, true, "Immediate");
+
+    public Task<InventorySettingsPayload> GetInventoryAsync(CancellationToken cancellationToken = default) => Task.FromResult(Inventory);
+    public CurrencySettingsPayload Currency { get; set; } = new(
+        "USD", ["USD", "EUR", "EGP"], 60, "Static", null,
+        new Dictionary<string, decimal> { ["USD"] = 1m, ["EUR"] = 0.92m, ["EGP"] = 48.5m });
+
+    public Task<CurrencySettingsPayload> GetCurrencyAsync(CancellationToken cancellationToken = default) => Task.FromResult(Currency);
     public Task<MediaSettingsPayload> GetMediaAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<MaintenanceSettingsPayload> GetMaintenanceAsync(CancellationToken cancellationToken = default) => throw NotNeeded();
     public Task<bool> VerifyMaintenanceBypassPasswordAsync(string password, CancellationToken cancellationToken = default) => throw NotNeeded();

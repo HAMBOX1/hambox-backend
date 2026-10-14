@@ -46,7 +46,8 @@ public sealed class AddCartItemCommandHandlerTests
         FakeFulfillmentRouter? fulfillmentRouter = null)
     {
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
 
         return new AddCartItemCommandHandler(
             commerceDb, catalogDb, currentUser, inventoryEngine, fulfillmentRouter ?? new FakeFulfillmentRouter(),
@@ -274,7 +275,8 @@ public sealed class AddCartItemCommandHandlerTests
             catalogDb, suppliersDb, new SupplierProviderRegistry([new FakeSupplierProvider("Fake")]),
             Options.Create(new SupplierAvailabilityOptions { StaleAfterMinutes = staleAfterMinutes }));
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         return new AddCartItemCommandHandler(
             commerceDb, catalogDb, currentUser, inventoryEngine, router, cartResponseBuilder, new FakeMembershipAccessProvider());
     }

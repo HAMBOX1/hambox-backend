@@ -61,7 +61,8 @@ internal sealed class DotFawryTestHarness
         var dotFawryOptions = Options.Create(settings);
 
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var fulfillmentRouter = new FakeFulfillmentRouter();
         var cartLineValidator = new CartLineValidator(inventoryEngine, fulfillmentRouter, new NullSupplierPricingEngine());
         var membershipAccess = new FakeMembershipAccessProvider();
@@ -70,7 +71,8 @@ internal sealed class DotFawryTestHarness
         var fulfillmentService = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), fulfillmentRouter,
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
         var promotionRedemptionService = new PromotionRedemptionService(commerceDb);
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(
@@ -101,6 +103,7 @@ internal sealed class DotFawryTestHarness
             gateway,
             dotFawryOptions,
             platformSettings,
+            new FakePhoneBlocklist(),
             verificationService,
             NullLogger<InitiateDotFawryCheckoutCommandHandler>.Instance);
 

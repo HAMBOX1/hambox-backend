@@ -37,13 +37,14 @@ public sealed class WhatsAppBotConfigurationTests
         var currentUser = new FakeCurrentUserService(userId: null);
 
         var cartResponseBuilder = new HAMBOX.Modules.Commerce.Application.Services.CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var sender = new MultiHandlerFakeSender(
             new HAMBOX.Modules.Catalog.Application.Features.Categories.GetCategoryTree.GetCategoryTreeQueryHandler(catalogDb),
             new HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts.GetProductsQueryHandler(
                 catalogDb, currentUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<HAMBOX.Modules.Catalog.Application.Features.Products.GetProducts.GetProductsQueryHandler>.Instance),
             new HAMBOX.Modules.Catalog.Application.Features.Products.GetProductById.GetProductByIdQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider()),
-            new HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration.GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
+            new HAMBOX.Modules.Catalog.Application.Features.Storefront.GetProductConfiguration.GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider()),
             new HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem.AddCartItemCommandHandler(
                 commerceDb, catalogDb, currentUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),
             new HAMBOX.Modules.Commerce.Application.Features.Cart.GetCart.GetCartQueryHandler(commerceDb, currentUser, cartResponseBuilder));

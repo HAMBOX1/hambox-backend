@@ -38,13 +38,11 @@ public sealed class DotPaymentVerificationServiceTests
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal("Dot", order.PaymentProvider);
 
-        // Pre-existing OrderFulfillmentService behavior (see OrderFulfillmentServiceTests): its
-        // "is the order now fully delivered" check queries OrderLicenseKeys before this call's own
-        // SaveChangesAsync, so a single-call full delivery is left Processing, not Completed, here
-        // — the enqueued RetryOrderFulfillment job (asserted below) picks it up and completes it.
-        // Not this task's bug to fix; the payment-capture/delivery split below is what matters.
-        Assert.Equal(OrderStatus.Processing, order.Status);
-        Assert.Contains(OperationalJobTypes.RetryOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        // A single-call full delivery completes the order in that same call (existing keys + the ones
+        // just delivered are counted, not a stale database query), so there is nothing left for a
+        // fulfillment job to do.
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.DoesNotContain(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
 
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);
         Assert.Single(harness.Communication.SentRequests);
@@ -259,7 +257,7 @@ public sealed class DotPaymentVerificationServiceTests
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.NotEqual(OrderStatus.Completed, order.Status);
         Assert.Empty(harness.CommerceDb.OrderLicenseKeys);
-        Assert.Contains(OperationalJobTypes.RetryOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        Assert.Contains(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
 
         var attempt = await harness.CommerceDb.PaymentAttempts.FirstAsync(p => p.Id == initiation.Value.PaymentAttemptId);
         Assert.Equal(PaymentAttemptStatus.Succeeded, attempt.Status);

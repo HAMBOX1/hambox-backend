@@ -79,7 +79,8 @@ public sealed class CheckoutCommandHandlerTests
         HAMBOX.Application.Fulfillment.IFulfillmentRouter? fulfillmentRouter = null)
     {
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var settingsProvider = new FakeCommerceSettingsProvider();
         var referralLifecycle = new ReferralLifecycleService(
@@ -203,7 +204,8 @@ public sealed class CheckoutCommandHandlerTests
         inventoryEngine.ThrowOnReserve = new DbUpdateConcurrencyException("Simulated concurrency conflict.");
 
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var settingsProvider = new FakeCommerceSettingsProvider();
         var referralLifecycle = new ReferralLifecycleService(

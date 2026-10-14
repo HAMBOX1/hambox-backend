@@ -104,6 +104,44 @@ internal sealed class LoginCommandHandler(
 
         var security = await platformSettings.GetSecurityAsync(cancellationToken);
 
+        // The credentials are judged FIRST. Until the caller has proven they hold the password, every failure
+        // looks identical (InvalidCredentials) — whether the address is unregistered, unconfirmed, suspended
+        // or locked — so the login form cannot be used to enumerate accounts or learn their state. Only a
+        // caller who supplied the correct password is told why they still cannot sign in.
+        var isLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
+        var isPasswordValid = passwordHasher.VerifyPassword(user.PasswordHash, request.Password);
+
+        if (!isPasswordValid)
+        {
+            // A locked account's counter is left alone: further guesses must not extend or re-arm the lockout.
+            if (!isLocked)
+            {
+                user.RecordAccessFailure(
+                    security.MaxFailedAccessAttempts,
+                    TimeSpan.FromMinutes(security.LockoutDurationMinutes));
+            }
+
+            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
+
+            var failure = LoginHistory.RecordFailure(
+                user.Id, request.IpAddress, request.UserAgent, isLocked ? "Account locked" : "Invalid credentials", context, risk);
+            dbContext.LoginHistory.Add(failure);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            await securityEventLogger.LogAsync(
+                SecurityEventType.FailedLogin,
+                risk,
+                $"Failed login attempt for {user.Email}: invalid credentials.",
+                targetUserId: user.Id,
+                ipAddress: request.IpAddress,
+                userAgent: request.UserAgent,
+                country: request.CountryCode,
+                city: request.City,
+                cancellationToken: cancellationToken);
+
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
+        }
+
         if (security.RequireEmailVerification && !user.EmailConfirmed)
         {
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Email not confirmed", context);
@@ -144,44 +182,12 @@ internal sealed class LoginCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountNotActive);
         }
 
-        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+        if (isLocked)
         {
             var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Account locked", context);
             dbContext.LoginHistory.Add(failure);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountLocked);
-        }
-
-        var isPasswordValid = passwordHasher.VerifyPassword(user.PasswordHash, request.Password);
-        if (!isPasswordValid)
-        {
-            user.RecordAccessFailure(
-                security.MaxFailedAccessAttempts,
-                TimeSpan.FromMinutes(security.LockoutDurationMinutes));
-
-            var risk = riskScorer.ScoreFailedPassword(user.AccessFailedCount, security.MaxFailedAccessAttempts);
-
-            var failure = LoginHistory.RecordFailure(user.Id, request.IpAddress, request.UserAgent, "Invalid credentials", context, risk);
-            dbContext.LoginHistory.Add(failure);
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            await securityEventLogger.LogAsync(
-                SecurityEventType.FailedLogin,
-                risk,
-                $"Failed login attempt for {user.Email}: invalid credentials.",
-                targetUserId: user.Id,
-                ipAddress: request.IpAddress,
-                userAgent: request.UserAgent,
-                country: request.CountryCode,
-                city: request.City,
-                cancellationToken: cancellationToken);
-
-            if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
-            {
-                return Result.Failure<AuthTokenResponse>(IdentityErrors.AccountLocked);
-            }
-
-            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidCredentials);
         }
 
         if (await adminAccessResolver.HasAdminPortalAccessAsync(user.Id, cancellationToken))

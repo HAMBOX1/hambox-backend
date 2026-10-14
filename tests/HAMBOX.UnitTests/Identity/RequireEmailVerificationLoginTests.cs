@@ -136,8 +136,15 @@ public sealed class RequireEmailVerificationLoginTests
 
         var result = await handler.Handle(CommandFor(user.Email, password: "wrong-password"), CancellationToken.None);
 
+        // The caller sees only the generic answer (a wrong password must never reveal that the account exists
+        // or got locked), but the lockout itself is recorded and enforced.
         Assert.False(result.IsSuccess);
-        Assert.Equal(IdentityErrors.AccountLocked.Code, result.Error.Code);
+        Assert.Equal(IdentityErrors.InvalidCredentials.Code, result.Error.Code);
+        Assert.True(user.LockoutEnd > DateTimeOffset.UtcNow);
+
+        // Now locked: even the correct password is told why.
+        var locked = await handler.Handle(CommandFor(user.Email), CancellationToken.None);
+        Assert.Equal(IdentityErrors.AccountLocked.Code, locked.Error.Code);
     }
 
     private sealed class FakePasswordHasher : IPasswordHasher
@@ -192,6 +199,7 @@ public sealed class RequireEmailVerificationLoginTests
     {
         public Task<bool> IsEmailBlockedAsync(string email, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<bool> IsIpBlockedAsync(string ipAddress, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<bool> IsPhoneBlockedAsync(string phoneNumber, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<CountryRestrictionStatus> GetCountryStatusAsync(string countryCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(CountryRestrictionStatus.Allowed);
         public void InvalidateCache()

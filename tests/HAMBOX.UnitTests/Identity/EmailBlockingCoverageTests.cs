@@ -140,6 +140,7 @@ public sealed class EmailBlockingCoverageTests
         public Task<bool> IsEmailBlockedAsync(string email, CancellationToken cancellationToken = default) =>
             Task.FromResult(email.Trim().ToLowerInvariant() == _blocked);
         public Task<bool> IsIpBlockedAsync(string ipAddress, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<bool> IsPhoneBlockedAsync(string phoneNumber, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<CountryRestrictionStatus> GetCountryStatusAsync(string countryCode, CancellationToken cancellationToken = default) =>
             Task.FromResult(CountryRestrictionStatus.Allowed);
         public void InvalidateCache() { }

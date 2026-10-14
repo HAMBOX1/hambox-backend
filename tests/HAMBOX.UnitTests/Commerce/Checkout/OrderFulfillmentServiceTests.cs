@@ -50,7 +50,8 @@ public sealed class OrderFulfillmentServiceTests
         var service = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -60,14 +61,10 @@ public sealed class OrderFulfillmentServiceTests
         Assert.Equal("REAL-GAME-KEY-0001", key.LicenseKey);
         Assert.NotNull(key.DigitalInventoryCodeId);
 
-        // Pre-existing behavior, unrelated to H1: FulfillMissingAsync's own "is the order now
-        // fully delivered" check queries OrderLicenseKeys from the db context *before* this
-        // call's own SaveChangesAsync (that only happens in the caller, after this method
-        // returns), so it never sees the key(s) it just added in the same call. A single-line
-        // order fully delivered in one retry call is therefore left Processing, not Completed,
-        // by this method — verified here, not fixed, since it's outside H1's scope.
-        Assert.False(result.OrderCompleted);
-        Assert.Equal(OrderStatus.Processing, order.Status);
+        // A single-line order fully delivered in one call completes in that same call: the check counts the
+        // keys already attached plus the ones just delivered (they are still unsaved), not a database query.
+        Assert.True(result.OrderCompleted);
+        Assert.Equal(OrderStatus.Completed, order.Status);
     }
 
     [Fact]
@@ -92,7 +89,8 @@ public sealed class OrderFulfillmentServiceTests
         var service = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
 
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
 
@@ -118,7 +116,8 @@ public sealed class OrderFulfillmentServiceTests
         var service = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
 
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
@@ -151,7 +150,8 @@ public sealed class OrderFulfillmentServiceTests
         var service = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
         var result = await service.FulfillMissingAsync(order, CancellationToken.None);
         await commerceDb.SaveChangesAsync(CancellationToken.None);
 
@@ -188,7 +188,8 @@ public sealed class OrderFulfillmentServiceTests
         var service = new OrderFulfillmentService(
             commerceDb, inventoryEngine, new NullSupplierFulfillmentService(), new FakeFulfillmentRouter(),
             new NullSupplierPricingEngine(), HAMBOX.UnitTests.Suppliers.TestDoubles.SuppliersTestDbContextFactory.Create(),
-            NullLogger<OrderFulfillmentService>.Instance);
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.FulfillMissingAsync(order, CancellationToken.None));

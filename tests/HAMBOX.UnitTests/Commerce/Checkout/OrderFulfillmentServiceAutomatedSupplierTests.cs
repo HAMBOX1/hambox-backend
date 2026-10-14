@@ -84,7 +84,8 @@ public sealed class OrderFulfillmentServiceAutomatedSupplierTests
         var pricingEngine = new SupplierPricingEngine(routingEngine, new FakeCommerceSettingsProvider { Commerce = new(0m, false, 15, 24, 14, "INV-", DefaultSupplierMarginPercent: 0m) });
 
         var service = new OrderFulfillmentService(
-            commerceDb, inventoryEngine, supplierFulfillmentService, router, pricingEngine, suppliersDb, NullLogger<OrderFulfillmentService>.Instance);
+            commerceDb, inventoryEngine, supplierFulfillmentService, router, pricingEngine, suppliersDb, new HAMBOX.UnitTests.Commerce.TestDoubles.FakeDeliveryTicketService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<HAMBOX.Modules.Commerce.Application.Services.OrderFulfillmentService>.Instance);
 
         return (service, provider, providers.ToDictionary(p => p.ProviderType), suppliersDb, commerceDb, catalogDb);
     }

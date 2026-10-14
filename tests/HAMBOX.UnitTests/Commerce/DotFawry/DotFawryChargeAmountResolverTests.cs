@@ -46,7 +46,9 @@ public sealed class DotFawryChargeAmountResolverTests
     [Fact]
     public async Task ResolveAsync_RoundsToTwoDecimalPlaces()
     {
-        var (resolver, rateProvider) = CreateResolver();
+        // An admin StaticRates row is a deliberate override that always wins over the live rate, so this
+        // case needs it empty to exercise the live (fetched) rate being rounded.
+        var (resolver, rateProvider) = CreateResolver(new CurrencySettings { StaticRates = new(StringComparer.OrdinalIgnoreCase) });
         rateProvider.Rates = new Dictionary<string, decimal> { ["USD"] = 1m, ["EGP"] = 48.567m };
 
         var result = await resolver.ResolveAsync(1m, "EG", CancellationToken.None);

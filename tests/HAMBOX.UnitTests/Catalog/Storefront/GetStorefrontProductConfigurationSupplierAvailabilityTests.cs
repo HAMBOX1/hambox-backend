@@ -148,7 +148,7 @@ public sealed class GetStorefrontProductConfigurationSupplierAvailabilityTests
         var inventory = new FakeInventoryEngine(catalogDb);
         var router = RouterWithReadiness(variant.Id, FulfillmentMode.SupplierOnly, supplierReady: true);
 
-        var handler = new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventory, router);
+        var handler = new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventory, router, new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider());
         var result = await handler.Handle(new GetStorefrontProductConfigurationsQuery([product.Id]), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -194,7 +194,7 @@ public sealed class GetStorefrontProductConfigurationSupplierAvailabilityTests
         Guid productId)
     {
         var handler = new GetStorefrontProductConfigurationQueryHandler(
-            catalogDb, inventory, router, new FakeCurrentUserService("customer-1"),
+            catalogDb, inventory, router, new FakeCurrentUserService("customer-1"), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider(),
             NullLogger<GetStorefrontProductConfigurationQueryHandler>.Instance);
 
         var result = await handler.Handle(new GetStorefrontProductConfigurationQuery(productId), CancellationToken.None);

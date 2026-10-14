@@ -30,13 +30,14 @@ public sealed class WhatsAppBotEngineHardeningTests
         FakeCurrentUserService currentUser)
     {
         var cartResponseBuilder = new CartResponseBuilder(
-            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser);
+            commerceDb, catalogDb, new FakePromotionEngine(), new FakeMembershipEngine(), currentUser,
+            new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
 
         return new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
             new GetProductsQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
             new GetProductByIdQueryHandler(catalogDb, currentUser, new FakeMembershipAccessProvider()),
-            new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter()),
+            new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, currentUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),
             new GetCartQueryHandler(commerceDb, currentUser, cartResponseBuilder));
     }

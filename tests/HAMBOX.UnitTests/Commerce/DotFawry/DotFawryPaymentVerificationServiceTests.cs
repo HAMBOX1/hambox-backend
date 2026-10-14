@@ -38,11 +38,11 @@ public sealed class DotFawryPaymentVerificationServiceTests
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal("DotFawry", order.PaymentProvider);
 
-        // Pre-existing OrderFulfillmentService behavior (see OrderFulfillmentServiceTests, and the
-        // identical note in DotPaymentVerificationServiceTests): a single-call full delivery is
-        // left Processing, not Completed — the enqueued RetryOrderFulfillment job picks it up.
-        Assert.Equal(OrderStatus.Processing, order.Status);
-        Assert.Contains(OperationalJobTypes.RetryOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
+        // A single-call full delivery completes the order in that same call (existing keys + the ones
+        // just delivered are counted, not a stale database query), so there is nothing left for a
+        // fulfillment job to do.
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.DoesNotContain(OperationalJobTypes.ExecuteOrderFulfillment, harness.JobQueue.EnqueuedJobTypes);
 
         Assert.Single(harness.CommerceDb.OrderLicenseKeys);
         Assert.Single(harness.Communication.SentRequests);

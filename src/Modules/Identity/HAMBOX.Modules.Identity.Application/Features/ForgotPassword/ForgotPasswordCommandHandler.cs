@@ -29,6 +29,22 @@ internal sealed class ForgotPasswordCommandHandler(
             return Result.Success();
         }
 
+        // A blocked e-mail (exact address or *@domain) gets the same silent success as an unknown one, but no
+        // token: blocking is documented to cover password reset, and a working reset link would otherwise
+        // hand a blocked account a way back in.
+        var email = user.Email.Trim().ToLowerInvariant();
+        var atIndex = email.IndexOf('@');
+        var wildcardDomain = atIndex >= 0 ? "*@" + email[(atIndex + 1)..] : email;
+        var now = DateTimeOffset.UtcNow;
+        var isBlocked = await dbContext.BlockedEmails.AnyAsync(
+            b => (b.Pattern == email || b.Pattern == wildcardDomain)
+                && (b.ExpiresOnUtc == null || b.ExpiresOnUtc > now),
+            cancellationToken);
+        if (isBlocked)
+        {
+            return Result.Success();
+        }
+
         var tokenValue = tokenGenerator.GenerateSecureToken();
         var resetToken = PasswordResetToken.Create(
             user.Id,

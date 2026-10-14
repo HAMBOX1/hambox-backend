@@ -36,6 +36,7 @@ internal sealed class UnusedIdentityDbContext : IIdentityDbContext
     public DbSet<PlatformSettingsCategory> PlatformSettingsCategories => throw NotNeeded();
     public DbSet<PlatformSettingsAuditLog> PlatformSettingsAuditLogs => throw NotNeeded();
     public DbSet<BlockedEmail> BlockedEmails => throw NotNeeded();
+    public DbSet<BlockedPhone> BlockedPhones => throw NotNeeded();
     public DbSet<BlockedIp> BlockedIps => throw NotNeeded();
     public DbSet<CountryRestriction> CountryRestrictions => throw NotNeeded();
     public DbSet<BlockedDevice> BlockedDevices => throw NotNeeded();
