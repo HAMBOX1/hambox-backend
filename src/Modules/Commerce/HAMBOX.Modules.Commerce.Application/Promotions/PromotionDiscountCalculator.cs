@@ -36,14 +36,30 @@ internal static class PromotionDiscountCalculator
         var productTargets = promotion.GetTargetIds(PromotionTargetType.Product);
         var categoryTargets = promotion.GetTargetIds(PromotionTargetType.Category);
 
-        return promotion.Type switch
+        // Targets narrow the discount base for every promotion kind, not only the Product/Category types: a coupon
+        // code (or automatic / flash-sale promotion) that names products or categories discounts just those lines —
+        // that is what makes a "per-product promo code" mean something.
+        if (productTargets.Count > 0)
         {
-            PromotionType.Product when productTargets.Count > 0 =>
-                lines.Where(l => productTargets.Contains(l.ProductId)).Sum(l => l.LineTotal),
-            PromotionType.Category when categoryTargets.Count > 0 =>
-                lines.Where(l => l.CategoryId.HasValue && categoryTargets.Contains(l.CategoryId.Value))
-                    .Sum(l => l.LineTotal),
-            _ => lines.Sum(l => l.LineTotal),
-        };
+            var targeted = lines.Where(l => productTargets.Contains(l.ProductId)).Sum(l => l.LineTotal);
+            if (categoryTargets.Count == 0)
+            {
+                return targeted;
+            }
+
+            return lines
+                .Where(l => productTargets.Contains(l.ProductId)
+                    || (l.CategoryId.HasValue && categoryTargets.Contains(l.CategoryId.Value)))
+                .Sum(l => l.LineTotal);
+        }
+
+        if (categoryTargets.Count > 0)
+        {
+            return lines
+                .Where(l => l.CategoryId.HasValue && categoryTargets.Contains(l.CategoryId.Value))
+                .Sum(l => l.LineTotal);
+        }
+
+        return lines.Sum(l => l.LineTotal);
     }
 }
