@@ -35,6 +35,9 @@ internal sealed class CryptomusPaymentGateway(
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Cryptomus returns amounts such as payment_amount_usd as JSON strings ("25.50"); reading them as numbers
+        // made every payment-info response unparseable, so no paid invoice could ever be verified.
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
     public string GatewayKey => "cryptomus";
