@@ -146,6 +146,43 @@ public static class PermissionSynchronizer
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // 4. Seed the preset staff roles (Orders Manager, Products Manager, Support Agent, Read-only Auditor).
+        //    Created only when a role with that name does not exist yet, as system roles (undeletable), and
+        //    never touched again — what an owner later grants them from the Roles page is theirs to decide.
+        var presetsCreated = 0;
+        var existingRoleNames = await db.Roles
+            .Select(r => r.NormalizedName)
+            .ToListAsync(cancellationToken);
+        var existingRoleSet = existingRoleNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var preset in PresetRoleDefinitions.All)
+        {
+            if (existingRoleSet.Contains(preset.Name.ToUpperInvariant()))
+            {
+                continue;
+            }
+
+            var role = ApplicationRole.Create(preset.Name, preset.Description, isDefault: false, isSystem: true, priorityLevel: 400);
+            db.Roles.Add(role);
+            await db.SaveChangesAsync(cancellationToken);
+
+            foreach (var permissionName in preset.Permissions.Distinct(StringComparer.Ordinal))
+            {
+                if (permissionIdByName.TryGetValue(permissionName, out var permissionId))
+                {
+                    db.RolePermissions.Add(RolePermission.Create(role.Id, permissionId));
+                }
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            presetsCreated++;
+        }
+
+        if (presetsCreated > 0)
+        {
+            logger.LogInformation("Permission sync seeded {Count} preset staff role(s).", presetsCreated);
+        }
+
         var report = new SyncReport(
             TotalRegisteredPermissions: registeredNames.Count,
             OwnerPermissionsBeforeSync: ownerPermissionsBefore.Count,

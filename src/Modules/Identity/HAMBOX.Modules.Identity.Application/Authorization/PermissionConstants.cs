@@ -61,6 +61,8 @@ public static class PermissionConstants
         public const string View = "Orders.View";
         public const string Edit = "Orders.Edit";
         public const string Refund = "Orders.Refund";
+        /// <summary>Reveal a purchased license key in plaintext — deliberately separate from <see cref="View"/>.</summary>
+        public const string RevealLicenseKeys = "Orders.RevealLicenseKeys";
     }
 
     public static class Customers

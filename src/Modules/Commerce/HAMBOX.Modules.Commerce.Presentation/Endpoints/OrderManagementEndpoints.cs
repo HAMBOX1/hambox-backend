@@ -120,7 +120,7 @@ internal static class OrderManagementEndpoints
             ISender sender) =>
             MapResult(await sender.Send(new RevealAdminOrderLicenseKeyQuery(id, licenseKeyId))))
         .WithName("RevealAdminOrderLicenseKey")
-        .RequirePermission(PermissionConstants.Orders.View);
+        .RequirePermission(PermissionConstants.Orders.RevealLicenseKeys);
 
         group.MapPost("bulk", async Task<IResult> (
             [FromBody] BulkAdminOrdersRequest request,
