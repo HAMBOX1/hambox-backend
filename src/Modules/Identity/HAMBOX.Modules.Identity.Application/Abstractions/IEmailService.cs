@@ -59,4 +59,19 @@ public interface IEmailService
         string htmlBody,
         string? correlationId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends an HTML e-mail with one file attached (scheduled reports, audit R58). Throws when the
+    /// configured delivery path cannot carry attachments — the caller decides how to report that.
+    /// </summary>
+    Task SendEmailWithAttachmentAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string attachmentFileName,
+        byte[] attachmentContent,
+        string attachmentContentType,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The configured e-mail delivery path cannot send attachments.");
 }

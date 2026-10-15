@@ -54,6 +54,22 @@ internal sealed class PlatformRoutingEmailService(
         await service.SendTemplatedEmailAsync(toEmail, subject, htmlBody, correlationId, cancellationToken);
     }
 
+    public async Task SendEmailWithAttachmentAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string attachmentFileName,
+        byte[] attachmentContent,
+        string attachmentContentType,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var service = await ResolveAsync(cancellationToken);
+        await service.SendEmailWithAttachmentAsync(
+            toEmail, subject, htmlBody, attachmentFileName, attachmentContent, attachmentContentType,
+            correlationId, cancellationToken);
+    }
+
     private async Task<IEmailService> ResolveAsync(CancellationToken cancellationToken)
     {
         var email = await platformSettings.GetEmailAsync(cancellationToken);

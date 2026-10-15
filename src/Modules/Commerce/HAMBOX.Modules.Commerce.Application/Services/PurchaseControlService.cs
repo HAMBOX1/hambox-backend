@@ -14,7 +14,9 @@ namespace HAMBOX.Modules.Commerce.Application.Services;
 /// system flags that park a paid order for an admin instead of delivering it automatically — sensitive products and
 /// suspicious activity (many orders or many failed payments in a short window).
 /// </summary>
-public sealed class PurchaseControlService(ICommerceDbContext commerceDb)
+public sealed class PurchaseControlService(
+    ICommerceDbContext commerceDb,
+    HAMBOX.Application.Abstractions.IPlatformSettingsProvider? platformSettings = null)
 {
     /// <summary>This many orders (any state but cancelled/failed) created in the last hour trips the velocity flag.</summary>
     public const int VelocityOrdersPerHour = 5;
@@ -117,7 +119,9 @@ public sealed class PurchaseControlService(ICommerceDbContext commerceDb)
                 && o.Status != OrderStatus.Failed,
             cancellationToken);
 
-        if (recentOrders + 1 >= VelocityOrdersPerHour)
+        var (velocityLimit, failedLimit) = await ResolveRiskLimitsAsync(cancellationToken);
+
+        if (recentOrders + 1 >= velocityLimit)
         {
             return $"Suspicious activity: {recentOrders + 1} orders in the last hour";
         }
@@ -129,7 +133,7 @@ public sealed class PurchaseControlService(ICommerceDbContext commerceDb)
                 && (o.Status == OrderStatus.Failed || o.PaymentStatus == PaymentStatus.Failed),
             cancellationToken);
 
-        if (failedPayments >= FailedPaymentsPerDay)
+        if (failedPayments >= failedLimit)
         {
             return $"Suspicious activity: {failedPayments} failed payments in the last 24 hours";
         }
@@ -150,5 +154,27 @@ public sealed class PurchaseControlService(ICommerceDbContext commerceDb)
         }
 
         return reason;
+    }
+
+    /// <summary>The risk thresholds are platform settings (Commerce → purchase limits); the constants are the fallback.</summary>
+    private async Task<(int VelocityPerHour, int FailedPerDay)> ResolveRiskLimitsAsync(CancellationToken cancellationToken)
+    {
+        if (platformSettings is null)
+        {
+            return (VelocityOrdersPerHour, FailedPaymentsPerDay);
+        }
+
+        try
+        {
+            var commerce = await platformSettings.GetAsync<HAMBOX.Application.PlatformSettings.CommerceSettingsPayload>(
+                HAMBOX.Application.PlatformSettings.PlatformSettingsCategoryKeys.Commerce, cancellationToken);
+            return (
+                commerce.VelocityOrdersPerHour > 0 ? commerce.VelocityOrdersPerHour : VelocityOrdersPerHour,
+                commerce.FailedPaymentsPerDay > 0 ? commerce.FailedPaymentsPerDay : FailedPaymentsPerDay);
+        }
+        catch (Exception)
+        {
+            return (VelocityOrdersPerHour, FailedPaymentsPerDay);
+        }
     }
 }

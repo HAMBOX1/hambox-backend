@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace HAMBOX.Modules.Suppliers.Infrastructure.Providers;
 
@@ -78,12 +80,30 @@ internal sealed class SupplierRateLimitOptions
 internal sealed class SupplierRateLimitHandler(
     string providerKey,
     SupplierRateLimitState state,
-    SupplierRateLimitOptions options,
-    ILogger<SupplierRateLimitHandler> logger) : DelegatingHandler
+    SupplierRateLimitOptions fallbackOptions,
+    ILogger<SupplierRateLimitHandler> logger,
+    Func<CancellationToken, Task<SupplierRateLimitOptions?>>? optionsSource = null) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        var options = fallbackOptions;
+        if (optionsSource is not null)
+        {
+            try
+            {
+                options = await optionsSource(cancellationToken) ?? fallbackOptions;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // Settings unavailable: keep the configured defaults rather than failing a supplier call.
+            }
+        }
+
         if (state.CooldownRemaining(providerKey) is { } remaining)
         {
             // Answer locally with the same 429 the supplier gave: every provider already maps it to
@@ -145,5 +165,35 @@ internal sealed class SupplierRateLimitHandler(
         };
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(seconds));
         return response;
+    }
+}
+
+/// <summary>Reads the admin-editable supplier throttling values (Platform settings → Retry policies) per call.</summary>
+internal static class SupplierRateLimitOptionsSource
+{
+    public static Func<CancellationToken, Task<SupplierRateLimitOptions?>> From(IServiceProvider services)
+    {
+        var scopes = services.GetRequiredService<IServiceScopeFactory>();
+        var configured = services.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value;
+
+        return async cancellationToken =>
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var settings = scope.ServiceProvider.GetService<HAMBOX.Application.Abstractions.IPlatformSettingsProvider>();
+            if (settings is null)
+            {
+                return null;
+            }
+
+            var payload = await settings.GetAsync<HAMBOX.Application.PlatformSettings.RetryPoliciesSettingsPayload>(
+                HAMBOX.Application.PlatformSettings.PlatformSettingsCategoryKeys.RetryPolicies, cancellationToken);
+
+            return new SupplierRateLimitOptions
+            {
+                MaxRequestsPerSecond = payload.SupplierMaxRequestsPerSecond >= 0 ? payload.SupplierMaxRequestsPerSecond : configured.MaxRequestsPerSecond,
+                DefaultCooldownSeconds = payload.SupplierDefaultCooldownSeconds > 0 ? payload.SupplierDefaultCooldownSeconds : configured.DefaultCooldownSeconds,
+                MaxCooldownSeconds = payload.SupplierMaxCooldownSeconds > 0 ? payload.SupplierMaxCooldownSeconds : configured.MaxCooldownSeconds,
+            };
+        };
     }
 }

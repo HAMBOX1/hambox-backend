@@ -58,6 +58,23 @@ public sealed class LegalSectionVersion : BaseEntity
         VersionNotes = versionNotes;
     }
 
+    /// <summary>
+    /// Adds an Arabic translation to a version that has none — allowed even when the version is published,
+    /// because it does not change the (English) policy text customers accepted. Never overwrites a translation.
+    /// </summary>
+    /// <returns><see langword="true"/> when the translation was added.</returns>
+    public bool AddMissingArabicTranslation(string titleAr, string contentAr)
+    {
+        if (!string.IsNullOrWhiteSpace(ContentAr))
+        {
+            return false;
+        }
+
+        TitleAr = string.IsNullOrWhiteSpace(TitleAr) ? titleAr : TitleAr;
+        ContentAr = contentAr;
+        return true;
+    }
+
     public void Publish(string? publishedBy = null)
     {
         IsPublished = true;

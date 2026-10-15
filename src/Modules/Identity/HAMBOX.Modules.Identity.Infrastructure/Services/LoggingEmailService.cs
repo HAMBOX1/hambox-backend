@@ -67,6 +67,26 @@ internal sealed class LoggingEmailService(
     }
 
     /// <inheritdoc />
+    public Task SendEmailWithAttachmentAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string attachmentFileName,
+        byte[] attachmentContent,
+        string attachmentContentType,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation(
+            "Email delivery disabled. Email '{Subject}' with attachment {FileName} ({Bytes} bytes) queued for {MaskedEmail}. CorrelationId={CorrelationId}",
+            subject,
+            attachmentFileName,
+            attachmentContent.Length,
+            EmailLogHelper.MaskEmail(toEmail),
+            correlationId);
+        return Task.CompletedTask;
+    }
+
     public Task SendTemplatedEmailAsync(
         string toEmail,
         string subject,

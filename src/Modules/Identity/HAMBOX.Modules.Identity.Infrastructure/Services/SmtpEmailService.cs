@@ -85,6 +85,27 @@ internal sealed class SmtpEmailService(
         }
     }
 
+    public async Task SendEmailWithAttachmentAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string attachmentFileName,
+        byte[] attachmentContent,
+        string attachmentContentType,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await platformSettings.GetEmailSettingsForLegacyAsync(cancellationToken);
+        var message = EmailMessageBuilder.BuildTemplatedMessageWithAttachment(
+            settings, toEmail, subject, htmlBody, attachmentFileName, attachmentContent, attachmentContentType);
+        var sent = await SendCoreAsync("TemplatedAttachment", null, toEmail, message, settings, correlationId, cancellationToken);
+
+        if (!sent)
+        {
+            throw new InvalidOperationException($"Failed to send e-mail with attachment to {EmailLogHelper.MaskEmail(toEmail)}.");
+        }
+    }
+
     private async Task<bool> SendAsync(
         string emailType,
         Guid userId,

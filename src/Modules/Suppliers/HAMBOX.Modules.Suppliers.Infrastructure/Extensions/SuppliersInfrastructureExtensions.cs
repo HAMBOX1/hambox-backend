@@ -59,7 +59,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(bambooOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = bambooOptions.MaxResponseBytes;
             })
-            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Bamboo", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>()))
+            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Bamboo", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>(), SupplierRateLimitOptionsSource.From(sp)))
             .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Bamboo", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
@@ -77,7 +77,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(visoriaOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = visoriaOptions.MaxResponseBytes;
             })
-            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Visoria", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>()))
+            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Visoria", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>(), SupplierRateLimitOptionsSource.From(sp)))
             .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Visoria", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
@@ -95,7 +95,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(globeTopperOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = globeTopperOptions.MaxResponseBytes;
             })
-            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("GlobeTopper", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>()))
+            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("GlobeTopper", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>(), SupplierRateLimitOptionsSource.From(sp)))
             .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("GlobeTopper", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
@@ -115,7 +115,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(enebaOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = Math.Max(enebaOptions.MaxResponseBytes, enebaOptions.MaxArchiveBytes);
             })
-            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Eneba", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>()))
+            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("Eneba", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>(), SupplierRateLimitOptionsSource.From(sp)))
             .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("Eneba", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
@@ -137,7 +137,7 @@ public static class SuppliersInfrastructureExtensions
                 client.Timeout = TimeSpan.FromSeconds(cwOptions.RequestTimeoutSeconds);
                 client.MaxResponseContentBufferSize = cwOptions.MaxResponseBytes;
             })
-            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("CodesWholesale", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>()))
+            .AddHttpMessageHandler(sp => new SupplierRateLimitHandler("CodesWholesale", sp.GetRequiredService<SupplierRateLimitState>(), sp.GetRequiredService<IOptions<SupplierRateLimitOptions>>().Value, sp.GetRequiredService<ILogger<SupplierRateLimitHandler>>(), SupplierRateLimitOptionsSource.From(sp)))
             .AddHttpMessageHandler(sp => new SupplierApiCallLoggingHandler("CodesWholesale", sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<ILogger<SupplierApiCallLoggingHandler>>()))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 

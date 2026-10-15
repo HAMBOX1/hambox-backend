@@ -11,7 +11,8 @@ internal sealed class ScheduledReportService(
     ICommerceDbContext db,
     IReportBuilderService reportBuilder,
     IReportDocumentGenerator documentGenerator,
-    ILogger<ScheduledReportService> logger) : IScheduledReportService
+    ILogger<ScheduledReportService> logger,
+    IReportEmailDelivery? emailDelivery = null) : IScheduledReportService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -168,16 +169,36 @@ internal sealed class ScheduledReportService(
             schedule.MarkRun(DateTimeOffset.UtcNow);
 
             var recipients = DeserializeRecipients(schedule.EmailRecipientsJson);
+            await db.SaveChangesAsync(cancellationToken);
+
             if (recipients.Count > 0)
             {
-                logger.LogInformation(
-                    "Scheduled report {ScheduleId} generated download {DownloadId}; email delivery is best-effort and not attached ({RecipientCount} recipients configured).",
-                    schedule.Id,
-                    download.Id,
-                    recipients.Count);
-            }
+                if (emailDelivery is null)
+                {
+                    logger.LogWarning(
+                        "Scheduled report {ScheduleId} has {RecipientCount} recipients but no e-mail delivery is registered.",
+                        schedule.Id,
+                        recipients.Count);
+                }
+                else
+                {
+                    // The report itself is already recorded as succeeded; a mail problem is reported, never fatal.
+                    var delivered = await emailDelivery.SendAsync(
+                        recipients,
+                        $"HAMBOX report: {schedule.ReportType}",
+                        $"<p>Your scheduled <strong>{System.Net.WebUtility.HtmlEncode(schedule.ReportType)}</strong> report is attached.</p>",
+                        document.FileName,
+                        document.Content,
+                        document.ContentType,
+                        cancellationToken);
 
-            await db.SaveChangesAsync(cancellationToken);
+                    logger.LogInformation(
+                        "Scheduled report {ScheduleId} e-mailed to {Delivered} of {RecipientCount} recipients.",
+                        schedule.Id,
+                        delivered,
+                        recipients.Count);
+                }
+            }
         }
         catch (Exception ex)
         {

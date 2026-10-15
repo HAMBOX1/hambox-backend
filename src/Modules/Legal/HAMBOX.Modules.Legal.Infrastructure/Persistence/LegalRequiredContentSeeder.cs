@@ -19,7 +19,25 @@ namespace HAMBOX.Modules.Legal.Infrastructure.Persistence;
 /// </summary>
 public static class LegalRequiredContentSeeder
 {
-    private static readonly string[] RequiredSlugs = ["terms", "privacy", "refund", "delivery"];
+    private static readonly string[] RequiredSlugs = ["terms", "privacy", "refund", "delivery", "support"];
+
+    /// <summary>The support policy is informational: customers read it, they are not asked to accept it.</summary>
+    private static bool RequiresAcceptance(string slug) => slug != "support";
+
+    private static readonly Dictionary<string, (string TitleAr, string ContentAr)> Arabic = new()
+    {
+        ["terms"] = (LegalArabicSeedContent.TitleAr_Terms, LegalArabicSeedContent.TermsAr),
+        ["privacy"] = (LegalArabicSeedContent.TitleAr_Privacy, LegalArabicSeedContent.PrivacyAr),
+        ["refund"] = (LegalArabicSeedContent.TitleAr_Refund, LegalArabicSeedContent.RefundAr),
+        ["delivery"] = (LegalArabicSeedContent.TitleAr_Delivery, LegalArabicSeedContent.DeliveryAr),
+        ["support"] = (LegalArabicSeedContent.TitleAr_Support, LegalArabicSeedContent.SupportAr),
+    };
+
+    /// <summary>The privacy text as first seeded (it said no analytics runs) and as it reads now (consent-gated).</summary>
+    private static readonly string PrivacyLegacyEn = Content.Privacy;
+
+    private static readonly string PrivacyCurrentEn =
+        LegalArabicSeedContent.LegacyAnalyticsParagraph.Replace(Content.Privacy, LegalArabicSeedContent.AnalyticsParagraphEn);
 
     private static readonly HashSet<string> KnownPlaceholderContent = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -37,15 +55,17 @@ public static class LegalRequiredContentSeeder
             .Where(s => RequiredSlugs.Contains(s.Slug))
             .ToDictionaryAsync(s => s.Slug);
 
-        foreach (var (slug, titleEn, contentEn, category, icon) in Content.All)
+        foreach (var (slug, titleEn, seedContentEn, category, icon) in Content.All)
         {
+            var contentEn = slug == "privacy" ? PrivacyCurrentEn : seedContentEn;
+            var (titleAr, contentAr) = Arabic[slug];
             if (existing.TryGetValue(slug, out var section))
             {
                 // A pre-existing row can predate the fix (documented in this audit's own Rev.4
                 // notes) that flipped the Digital Delivery Policy's seed default from false to
                 // true — correct it here too, independent of content/publish status, since a
                 // stale false silently excludes the section from LegalAcceptanceRecorder entirely.
-                if (!section.RequireAcceptance)
+                if (!section.RequireAcceptance && RequiresAcceptance(slug))
                 {
                     section.UpdateMetadata(
                         section.Slug,
@@ -67,6 +87,31 @@ public static class LegalRequiredContentSeeder
 
                 if (section.PublishedVersionId is not null && !isKnownPlaceholder)
                 {
+                    // Untouched seed text: complete it with the Arabic translation (and, for the privacy policy, the
+                    // corrected analytics wording). A policy an admin has edited is never touched.
+                    var publishedEn = publishedVersion?.ContentEn.Trim();
+                    var isUntouchedSeed = publishedEn is not null
+                        && (publishedEn == seedContentEn.Trim()
+                            || publishedEn == PrivacyLegacyEn.Trim()
+                            || publishedEn == contentEn.Trim());
+
+                    if (isUntouchedSeed && string.IsNullOrWhiteSpace(publishedVersion!.ContentAr))
+                    {
+                        if (slug == "privacy" && publishedEn == PrivacyLegacyEn.Trim())
+                        {
+                            // The English wording itself changes, so this is a genuine new version.
+                            var updated = section.CreateDraftVersion(
+                                titleEn, titleAr, contentEn, contentAr,
+                                "Adds the Arabic translation and describes consent-gated analytics.");
+                            db.LegalSectionVersions.Add(updated);
+                            section.PublishVersion(updated.Id, publishedBy: "system-seed");
+                        }
+                        else
+                        {
+                            publishedVersion.AddMissingArabicTranslation(titleAr, contentAr);
+                        }
+                    }
+
                     continue;
                 }
 
@@ -77,7 +122,7 @@ public static class LegalRequiredContentSeeder
                     // publishing an edit through the UI would produce. The one-word v1 stays in
                     // LegalSectionVersions/history, it just stops being the live one.
                     var replacement = section.CreateDraftVersion(
-                        titleEn, null, contentEn, null, "Replaces placeholder test content with initial real policy text.");
+                        titleEn, titleAr, contentEn, contentAr, "Replaces placeholder test content with initial real policy text.");
                     db.LegalSectionVersions.Add(replacement);
                     section.PublishVersion(replacement.Id, publishedBy: "system-seed");
                     continue;
@@ -86,11 +131,11 @@ public static class LegalRequiredContentSeeder
                 var draft = section.GetCurrentDraft();
                 if (draft is null)
                 {
-                    draft = section.CreateDraftVersion(titleEn, null, contentEn, null, "Initial published version.");
+                    draft = section.CreateDraftVersion(titleEn, titleAr, contentEn, contentAr, "Initial published version.");
                     db.LegalSectionVersions.Add(draft);
                 }
 
-                draft.UpdateContent(titleEn, null, contentEn, null, "Initial published version.");
+                draft.UpdateContent(titleEn, titleAr, contentEn, contentAr, "Initial published version.");
                 section.PublishVersion(draft.Id, publishedBy: "system-seed");
                 continue;
             }
@@ -108,8 +153,8 @@ public static class LegalRequiredContentSeeder
                 seoKeywords: null,
                 showInFooter: true,
                 showInNavigation: true,
-                requireAcceptance: true);
-            var version = section.CreateDraftVersion(titleEn, null, contentEn, null, "Initial published version.");
+                requireAcceptance: RequiresAcceptance(slug));
+            var version = section.CreateDraftVersion(titleEn, titleAr, contentEn, contentAr, "Initial published version.");
             db.LegalSections.Add(section);
             section.PublishVersion(version.Id, publishedBy: "system-seed");
         }
@@ -125,6 +170,7 @@ public static class LegalRequiredContentSeeder
             ("privacy", "Privacy Policy", Privacy, "Legal", "pi pi-shield"),
             ("refund", "Refund Policy", Refund, "Legal", "pi pi-replay"),
             ("delivery", "Digital Delivery Policy", Delivery, "Commerce", "pi pi-bolt"),
+            ("support", "Support Policy", LegalArabicSeedContent.SupportEn, "Support", "pi pi-headphones"),
         ];
 
         public const string Terms = """

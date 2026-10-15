@@ -258,7 +258,11 @@ public sealed record CommerceSettingsPayload(
     int OrderExpirationHours,
     int RefundWindowDays,
     string InvoicePrefix,
-    decimal DefaultSupplierMarginPercent = 20m);
+    decimal DefaultSupplierMarginPercent = 20m,
+    /// <summary>Orders one customer may place within an hour before the next one is held for review.</summary>
+    int VelocityOrdersPerHour = 5,
+    /// <summary>Failed payments by one customer within 24 hours before the next order is held for review.</summary>
+    int FailedPaymentsPerDay = 4);
 
 public sealed record CheckoutSettingsPayload(
     bool GuestCheckoutAllowed,
@@ -304,7 +308,13 @@ public sealed record RetryPoliciesSettingsPayload(
     int DeadLetterThreshold,
     bool UseExponentialBackoff = false,
     string? RetryScheduleSeconds = null,
-    bool UseJitter = true);
+    bool UseJitter = true,
+    /// <summary>Highest sustained request rate to any single supplier (0 = no spacing).</summary>
+    double SupplierMaxRequestsPerSecond = 5,
+    /// <summary>Pause after a supplier answers 429 without a usable Retry-After.</summary>
+    int SupplierDefaultCooldownSeconds = 60,
+    /// <summary>Longest pause a supplier's Retry-After can impose on us.</summary>
+    int SupplierMaxCooldownSeconds = 900);
 
 public sealed record NotificationsSettingsPayload(
     bool EmailEnabled,

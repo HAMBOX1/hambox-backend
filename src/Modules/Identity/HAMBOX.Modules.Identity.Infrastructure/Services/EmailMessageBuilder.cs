@@ -107,6 +107,33 @@ internal static class EmailMessageBuilder
         return message;
     }
 
+    public static MimeMessage BuildTemplatedMessageWithAttachment(
+        EmailSettings settings,
+        string recipientEmail,
+        string subject,
+        string htmlBody,
+        string attachmentFileName,
+        byte[] attachmentContent,
+        string attachmentContentType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipientEmail);
+        ArgumentException.ThrowIfNullOrWhiteSpace(subject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(attachmentFileName);
+
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(settings.FromName, settings.FromAddress));
+        message.To.Add(MailboxAddress.Parse(recipientEmail));
+        message.Subject = subject;
+
+        var body = new BodyBuilder { HtmlBody = htmlBody };
+        body.Attachments.Add(
+            attachmentFileName,
+            attachmentContent,
+            ContentType.TryParse(attachmentContentType, out var contentType) ? contentType : new ContentType("application", "octet-stream"));
+        message.Body = body.ToMessageBody();
+        return message;
+    }
+
     private static MimeMessage BuildMessage(
         EmailSettings settings,
         string recipientEmail,

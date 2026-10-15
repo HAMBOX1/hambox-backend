@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Features.Operations;
+using HAMBOX.Modules.Commerce.Application.Features.Operations.ActivityLog;
 using HAMBOX.Modules.Identity.Application.Authorization;
 using HAMBOX.Modules.Identity.Presentation.Extensions;
 using HAMBOX.SharedKernel.Results;
@@ -25,6 +26,61 @@ internal static class OperationsEndpoints
             MapResult(await sender.Send(new GetOperationsDashboardQuery())))
             .WithName("GetOperationsDashboard")
             .RequirePermission(PermissionConstants.Operations.View);
+
+        // One searchable log across the audit trails (audit R56). `entityId` narrows it to one order, etc.
+        group.MapGet("activity-log", async Task<IResult> (
+            [FromQuery] string? search,
+            [FromQuery] string? source,
+            [FromQuery] string? entityId,
+            [FromQuery] DateTimeOffset? dateFrom,
+            [FromQuery] DateTimeOffset? dateTo,
+            [FromQuery] int page,
+            [FromQuery] int pageSize,
+            ISender sender) =>
+            MapResult(await sender.Send(new GetActivityLogQuery(
+                search, source, entityId, dateFrom, dateTo, page, pageSize))))
+            .WithName("GetActivityLog")
+            .RequirePermission(PermissionConstants.Operations.View);
+
+        group.MapGet("activity-log/export", async Task<IResult> (
+            [FromQuery] string? search,
+            [FromQuery] string? source,
+            [FromQuery] string? entityId,
+            [FromQuery] DateTimeOffset? dateFrom,
+            [FromQuery] DateTimeOffset? dateTo,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetActivityLogQuery(
+                search, source, entityId, dateFrom, dateTo, 1, 5000, MaxPageSize: 5000));
+            if (result.IsFailure)
+            {
+                return MapResult(result);
+            }
+
+            var csv = ActivityLogCsv.Build(result.Value.Items);
+            return Results.File(
+                System.Text.Encoding.UTF8.GetBytes(csv),
+                "text/csv; charset=utf-8",
+                $"hambox-activity-log-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv");
+        })
+            .WithName("ExportActivityLog")
+            .RequirePermission(PermissionConstants.Operations.View);
+
+        // The public "Contact support on WhatsApp" button reports its click here (no data beyond the context).
+        app.MapPost("api/v{version:apiVersion}/support-contact/click", async Task<IResult> (
+            [FromBody] SupportContactClickRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new LogSupportContactClickCommand(
+                request.Channel ?? string.Empty, request.Context, request.OrderId, request.ProductId, request.Page));
+            return result.IsSuccess ? Results.NoContent() : Results.BadRequest();
+        })
+            .WithApiVersionSet(apiVersionSet)
+            .HasApiVersion(1)
+            .WithTags("Support Contact")
+            .WithName("LogSupportContactClick")
+            .AllowAnonymous()
+            .RequireRateLimiting(HAMBOX.Modules.Commerce.Application.RateLimiting.CommerceRateLimitPolicies.CheckoutInitiation);
 
         group.MapGet("jobs", async Task<IResult> (
             [FromQuery] string? status,
@@ -181,3 +237,10 @@ internal static class OperationsEndpoints
                 Status = StatusCodes.Status400BadRequest,
             });
 }
+
+internal sealed record SupportContactClickRequest(
+    string? Channel,
+    string? Context,
+    string? OrderId,
+    string? ProductId,
+    string? Page);

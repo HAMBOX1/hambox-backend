@@ -13,7 +13,7 @@ namespace HAMBOX.UnitTests.Legal;
 /// </summary>
 public sealed class LegalRequiredContentSeederTests
 {
-    private static readonly string[] RequiredSlugs = ["terms", "privacy", "refund", "delivery"];
+    private static readonly string[] RequiredSlugs = ["terms", "privacy", "refund", "delivery", "support"];
 
     private static (IServiceProvider Services, LegalDbContext Db) BuildProvider(string dbName)
     {
@@ -24,26 +24,84 @@ public sealed class LegalRequiredContentSeederTests
     }
 
     [Fact]
-    public async Task SeedAsync_EmptyDatabase_CreatesAllFourSectionsWithPublishedRealContent()
+    public async Task SeedAsync_EmptyDatabase_CreatesAllSectionsWithPublishedRealContent()
     {
         var (services, db) = BuildProvider($"legal-seed-{Guid.NewGuid():N}");
 
         await LegalRequiredContentSeeder.SeedAsync(services);
 
         var sections = await db.LegalSections.Include(s => s.Versions).ToListAsync();
-        Assert.Equal(4, sections.Count);
+        Assert.Equal(5, sections.Count);
 
         foreach (var slug in RequiredSlugs)
         {
             var section = Assert.Single(sections, s => s.Slug == slug);
-            Assert.True(section.RequireAcceptance);
+            Assert.Equal(slug != "support", section.RequireAcceptance);
             Assert.NotNull(section.PublishedVersionId);
 
             var published = section.Versions.Single(v => v.Id == section.PublishedVersionId);
             Assert.True(published.IsPublished);
             Assert.False(string.IsNullOrWhiteSpace(published.ContentEn));
             Assert.False(string.IsNullOrWhiteSpace(published.TitleEn));
+
+            // Audit R59: every policy is published in both languages.
+            Assert.False(string.IsNullOrWhiteSpace(published.ContentAr));
+            Assert.False(string.IsNullOrWhiteSpace(published.TitleAr));
         }
+    }
+
+    [Fact]
+    public async Task SeedAsync_PublishedEnglishSeedWithoutArabic_GetsTheTranslation_WithoutANewVersion()
+    {
+        var (services, db) = BuildProvider($"legal-seed-{Guid.NewGuid():N}");
+
+        // A database seeded before the Arabic text existed: published English, no translation.
+        await LegalRequiredContentSeeder.SeedAsync(services);
+        db.ChangeTracker.Clear();
+        var refund = await db.LegalSections.Include(s => s.Versions).SingleAsync(s => s.Slug == "refund");
+        var version = refund.Versions.Single();
+        typeof(LegalSectionVersion).GetProperty(nameof(LegalSectionVersion.ContentAr))!.SetValue(version, null);
+        typeof(LegalSectionVersion).GetProperty(nameof(LegalSectionVersion.TitleAr))!.SetValue(version, null);
+        await db.SaveChangesAsync();
+
+        await LegalRequiredContentSeeder.SeedAsync(services);
+
+        db.ChangeTracker.Clear();
+        var reloaded = await db.LegalSections.Include(s => s.Versions).AsNoTracking().SingleAsync(s => s.Slug == "refund");
+        var only = Assert.Single(reloaded.Versions);
+        Assert.False(string.IsNullOrWhiteSpace(only.ContentAr));
+    }
+
+    [Fact]
+    public async Task SeedAsync_AdminEditedEnglish_NeverGetsTheStockArabicAdded()
+    {
+        var (services, db) = BuildProvider($"legal-seed-{Guid.NewGuid():N}");
+
+        var terms = LegalSection.Create("terms");
+        terms.UpdateMetadata("terms", "Legal", "pi pi-file-check", 0, null, null, null, null, null, true, true, true);
+        var version = terms.CreateDraftVersion("Our Terms", null, "Our own wording.", null, null);
+        terms.PublishVersion(version.Id, "real-admin");
+        db.LegalSections.Add(terms);
+        await db.SaveChangesAsync();
+
+        await LegalRequiredContentSeeder.SeedAsync(services);
+
+        db.ChangeTracker.Clear();
+        var reloaded = await db.LegalSections.Include(s => s.Versions).AsNoTracking().SingleAsync(s => s.Slug == "terms");
+        Assert.Null(Assert.Single(reloaded.Versions).ContentAr);
+    }
+
+    [Fact]
+    public async Task SeedAsync_PrivacyPolicy_DescribesConsentGatedAnalytics()
+    {
+        var (services, db) = BuildProvider($"legal-seed-{Guid.NewGuid():N}");
+
+        await LegalRequiredContentSeeder.SeedAsync(services);
+
+        var privacy = await db.LegalSections.Include(s => s.Versions).AsNoTracking().SingleAsync(s => s.Slug == "privacy");
+        var published = privacy.Versions.Single(v => v.Id == privacy.PublishedVersionId);
+        Assert.Contains("only after", published.ContentEn);
+        Assert.DoesNotContain("does not run any third-party analytics", published.ContentEn);
     }
 
     [Fact]
@@ -55,7 +113,7 @@ public sealed class LegalRequiredContentSeederTests
         await LegalRequiredContentSeeder.SeedAsync(services);
 
         var sections = await db.LegalSections.Include(s => s.Versions).ToListAsync();
-        Assert.Equal(4, sections.Count);
+        Assert.Equal(5, sections.Count);
         Assert.All(sections, s => Assert.Single(s.Versions));
     }
 
@@ -179,7 +237,9 @@ public sealed class LegalRequiredContentSeederTests
             .ToListAsync();
 
         Assert.Equal(4, eligible.Count);
-        foreach (var slug in RequiredSlugs)
+        // The support policy is informational — it is published but not part of the acceptance flow.
+        Assert.DoesNotContain(eligible, s => s.Slug == "support");
+        foreach (var slug in RequiredSlugs.Where(slug => slug != "support"))
         {
             var section = Assert.Single(eligible, s => s.Slug == slug);
             var versionNumber = section.Versions.FirstOrDefault(v => v.Id == section.PublishedVersionId)?.VersionNumber ?? 0;

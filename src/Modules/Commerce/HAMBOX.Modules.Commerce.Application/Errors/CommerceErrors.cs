@@ -144,6 +144,10 @@ public static class CommerceErrors
     /// <summary>
     /// Gets the error for when a review already exists.
     /// </summary>
+    public static readonly Error SupportChannelInvalid = new(
+        "Support.ChannelInvalid",
+        "Unknown support channel.");
+
     public static readonly Error CannotVoteOnOwnReview = new(
         "Reviews.CannotVoteOnOwnReview",
         "You cannot vote on your own review.");
