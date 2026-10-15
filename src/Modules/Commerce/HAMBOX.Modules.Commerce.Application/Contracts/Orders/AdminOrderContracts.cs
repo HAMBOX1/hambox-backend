@@ -133,9 +133,11 @@ public sealed record AdminOrderAuditEntryDto(
     DateTimeOffset OccurredOnUtc,
     string? Reason = null,
     string? IpAddress = null,
-    string? UserAgent = null);
+    string? UserAgent = null,
+    string? OldValue = null,
+    string? NewValue = null);
 
-public sealed record UpdateAdminOrderStatusRequest(string Status);
+public sealed record UpdateAdminOrderStatusRequest(string Status, string? Reason = null);
 
 public sealed record UpsertAdminOrderNoteRequest(string Body);
 
@@ -164,7 +166,8 @@ public sealed record AdminCustomerOrderHistoryItemDto(
 
 public sealed record BulkAdminOrdersRequest(
     string Action,
-    IReadOnlyList<Guid> OrderIds);
+    IReadOnlyList<Guid> OrderIds,
+    string? Reason = null);
 
 public sealed record BulkAdminOrdersResultDto(
     int SuccessCount,
@@ -173,7 +176,8 @@ public sealed record BulkAdminOrdersResultDto(
 
 public sealed record AssignAdminOrderManualCodeRequest(
     Guid OrderItemId,
-    string LicenseKey);
+    string LicenseKey,
+    string? Reason = null);
 
 public sealed record RetryAdminOrderFulfillmentResultDto(
     int CodesDelivered,

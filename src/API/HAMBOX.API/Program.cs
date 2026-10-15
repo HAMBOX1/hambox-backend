@@ -114,6 +114,7 @@ try
     builder.Services.AddIdentityInfrastructure(builder.Configuration);
     builder.Services.AddCatalogInfrastructure(builder.Configuration);
     builder.Services.AddCommerceInfrastructure(builder.Configuration);
+    builder.Services.AddScoped<HAMBOX.Modules.Commerce.Application.Abstractions.IOperationalAlertNotifier, HAMBOX.API.Extensions.OperationalAlertEmailNotifier>();
     builder.Services.AddCommerceApplication();
 
     // Per-client-IP defense-in-depth on checkout/payment endpoints — additive to (never a
@@ -326,6 +327,7 @@ try
     app.MapNotificationHub();
     app.MapLocalizationEndpoints();
     app.MapEncryptionHealthEndpoints();
+    app.MapWorkerHealthEndpoints();
     app.MapHealthChecks("/health");
 
     app.Run();

@@ -14,7 +14,8 @@ internal sealed class GenerateOperationalAlertsJobHandler(
     ICommerceDbContext db,
     IInventoryEngine inventory,
     IWorkerRuntimeState worker,
-    ISuppliersDbContext suppliersDb) : BackgroundJobHandlerBase<string?>(serializer)
+    ISuppliersDbContext suppliersDb,
+    IOperationalAlertNotifier? notifier = null) : BackgroundJobHandlerBase<string?>(serializer)
 {
     /// <summary>
     /// Contract-mandated default (§25.10/§41): jobs — and, per the same clause, individual order
@@ -54,6 +55,7 @@ internal sealed class GenerateOperationalAlertsJobHandler(
 
     public override async Task HandleAsync(string? payload, IBackgroundJobContext context, CancellationToken cancellationToken)
     {
+        var passStartedUtc = DateTimeOffset.UtcNow;
         var stuckCutoffUtc = DateTimeOffset.UtcNow - StuckJobThreshold;
         var stuckJobs = await db.OperationalJobs.CountAsync(
             j => (j.Status == OperationalJobStatus.Queued && j.CreatedOnUtc <= stuckCutoffUtc)
@@ -125,6 +127,21 @@ internal sealed class GenerateOperationalAlertsJobHandler(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Rows created by THIS pass are, by the upsert's own dedup rule, genuinely new incidents: tell the people
+        // who must act on them (a critical alert nobody reads is the same as no alert).
+        if (notifier is not null)
+        {
+            var created = await db.OperationalAlerts
+                .AsNoTracking()
+                .Where(a => a.CreatedOnUtc >= passStartedUtc && a.Severity == OperationalAlertSeverity.Critical)
+                .ToListAsync(cancellationToken);
+
+            foreach (var alert in created)
+            {
+                await notifier.NotifyAsync(alert.Code, alert.Title, alert.Message, alert.Severity.ToString(), cancellationToken);
+            }
+        }
     }
 
     /// <summary>

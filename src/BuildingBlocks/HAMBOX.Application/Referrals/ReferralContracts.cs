@@ -19,4 +19,13 @@ public interface IReferralRedemptionService
     /// registration that triggered this call has already succeeded.
     /// </summary>
     Task<Result> RedeemAsync(string referralCode, string referredUserId, string referredEmail, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Same as <see cref="RedeemAsync(string, string, string, CancellationToken)"/> but also tells the program where
+    /// the sign-up came from, so referral farming (many accounts from one address, sign-up bursts) can be held for review.
+    /// </summary>
+    Task<Result> RedeemAsync(
+        string referralCode, string referredUserId, string referredEmail, string? registrationIp,
+        CancellationToken cancellationToken = default) =>
+        RedeemAsync(referralCode, referredUserId, referredEmail, cancellationToken);
 }

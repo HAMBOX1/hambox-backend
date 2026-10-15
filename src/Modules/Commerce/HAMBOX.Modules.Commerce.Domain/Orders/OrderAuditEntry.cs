@@ -5,7 +5,7 @@ namespace HAMBOX.Modules.Commerce.Domain.Orders;
 /// <summary>
 /// Immutable audit entry for order lifecycle events.
 /// </summary>
-public sealed class OrderAuditEntry : Entity
+public sealed class OrderAuditEntry : Entity, IRequestOriginStamped
 {
     private OrderAuditEntry()
     {
@@ -20,7 +20,9 @@ public sealed class OrderAuditEntry : Entity
         string? actorDisplayName,
         string? reason,
         string? ipAddress,
-        string? userAgent)
+        string? userAgent,
+        string? oldValue,
+        string? newValue)
         : base(id)
     {
         OrderId = orderId;
@@ -31,6 +33,8 @@ public sealed class OrderAuditEntry : Entity
         Reason = reason;
         IpAddress = ipAddress;
         UserAgent = userAgent;
+        OldValue = Truncate(oldValue);
+        NewValue = Truncate(newValue);
         OccurredOnUtc = DateTimeOffset.UtcNow;
     }
 
@@ -53,7 +57,23 @@ public sealed class OrderAuditEntry : Entity
     /// <summary>Browser / device User-Agent of the actor.</summary>
     public string? UserAgent { get; private set; }
 
+    /// <summary>What the changed field was before the action (a status, a hold state…).</summary>
+    public string? OldValue { get; private set; }
+
+    /// <summary>What it is after the action.</summary>
+    public string? NewValue { get; private set; }
+
     public DateTimeOffset OccurredOnUtc { get; private set; }
+
+    /// <summary>Filled in by the persistence layer when the row is first saved, unless the creator already set them.</summary>
+    public void StampOrigin(string? ipAddress, string? userAgent)
+    {
+        IpAddress ??= Truncate(ipAddress, 64);
+        UserAgent ??= Truncate(userAgent, 500);
+    }
+
+    private static string? Truncate(string? value, int max = 500) =>
+        value is not null && value.Length > max ? value[..max] : value;
 
     public static OrderAuditEntry Create(
         Guid orderId,
@@ -63,6 +83,9 @@ public sealed class OrderAuditEntry : Entity
         string? actorDisplayName = null,
         string? reason = null,
         string? ipAddress = null,
-        string? userAgent = null) =>
-        new(Guid.NewGuid(), orderId, eventType, description, actorUserId, actorDisplayName, reason, ipAddress, userAgent);
+        string? userAgent = null,
+        string? oldValue = null,
+        string? newValue = null) =>
+        new(Guid.NewGuid(), orderId, eventType, description, actorUserId, actorDisplayName, reason, ipAddress, userAgent,
+            oldValue, newValue);
 }

@@ -55,6 +55,14 @@ public sealed class AuditInterceptor(
             }
         }
 
+        foreach (var entry in context.ChangeTracker.Entries<IRequestOriginStamped>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.StampOrigin(currentUserService.IpAddress, currentUserService.UserAgent);
+            }
+        }
+
         foreach (var entry in context.ChangeTracker.Entries<IAuditable>())
         {
             if (entry.State == EntityState.Added)

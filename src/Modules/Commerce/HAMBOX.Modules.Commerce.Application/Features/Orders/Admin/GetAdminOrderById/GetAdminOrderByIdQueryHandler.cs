@@ -202,7 +202,9 @@ internal sealed class GetAdminOrderByIdQueryHandler
                 e.OccurredOnUtc,
                 e.Reason,
                 e.IpAddress,
-                e.UserAgent)).ToList(),
+                e.UserAgent,
+                e.OldValue,
+                e.NewValue)).ToList(),
             paymentCallbacks.Select(c => new AdminOrderPaymentCallbackDto(
                 c.Id,
                 c.Provider,

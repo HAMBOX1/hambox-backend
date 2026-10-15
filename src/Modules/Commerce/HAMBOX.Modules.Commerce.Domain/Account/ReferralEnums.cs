@@ -24,4 +24,10 @@ public enum ReferralAuditAction
 
     /// <summary>Reserved for fraud review (not implemented) — no code path sets this yet.</summary>
     Rejected = 5,
+
+    /// <summary>The referral looked like farming (shared IP, sign-up burst) and is waiting for an admin.</summary>
+    HeldForReview = 6,
+
+    /// <summary>An admin cleared a held referral.</summary>
+    ReviewApproved = 7,
 }

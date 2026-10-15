@@ -96,7 +96,7 @@ internal sealed class OperationalJobWorker(
     /// resolved during DI registration) because the scheduler is a runtime singleton that must be the
     /// one instance the app actually built, not one built by a throwaway <c>IServiceCollection</c> provider.
     /// </summary>
-    private void RegisterBuiltInRecurringJobs()
+    internal void RegisterBuiltInRecurringJobs()
     {
         recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.expire-inventory-reservations", OperationalJobTypes.ExpireInventoryReservations, TimeSpan.FromMinutes(5)));
@@ -197,6 +197,12 @@ internal sealed class OperationalJobWorker(
         {
             logger.LogWarning(ex, "Operational job {JobId} ({JobType}) failed", tracked.Id, tracked.JobType);
             var delay = ComputeRetryDelay(retrySettings, tracked.Attempts);
+            if (ex is JobRetryAfterException retryAfter && retryAfter.RetryAfter > delay)
+            {
+                // The dependency told us exactly how long to stay away — never come back sooner than that.
+                delay = retryAfter.RetryAfter;
+            }
+
             tracked.MarkFailed(ex.Message, ex.ToString(), delay, retrySettings.DeadLetterThreshold);
             history.Complete(tracked.Status, ex.ToString());
             workerState.RecordFailure();

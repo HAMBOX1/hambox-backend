@@ -17,7 +17,10 @@ public static class AdminReferralMapper
             entry.CreatedOnUtc,
             entry.QualifiedOnUtc,
             entry.RewardedOnUtc,
-            entry.ExpiresOnUtc);
+            entry.ExpiresOnUtc,
+            entry.IsHeldForReview,
+            entry.ReviewReason,
+            entry.RegistrationIp);
 
     public static AdminReferralAuditEntryDto ToAuditEntry(ReferralAuditLog log) =>
         new(

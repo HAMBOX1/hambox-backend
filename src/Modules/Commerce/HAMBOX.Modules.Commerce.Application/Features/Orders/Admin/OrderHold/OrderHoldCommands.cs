@@ -44,7 +44,8 @@ internal sealed class HoldAdminOrderCommandHandler(
         var actorId = currentUser.UserId ?? "system";
         var actorName = currentUser.DisplayName ?? actorId;
         db.OrderAuditEntries.Add(OrderAuditEntry.Create(
-            order.Id, "OrderHeld", $"Order placed on hold: {order.HoldReason}", actorId, actorName));
+            order.Id, "OrderHeld", $"Order placed on hold: {order.HoldReason}", actorId, actorName,
+            reason: order.HoldReason, oldValue: "NotOnHold", newValue: "AdminHold"));
         order.RecordAdminEdit(actorId, actorName);
 
         await db.SaveChangesAsync(cancellationToken);
@@ -80,7 +81,10 @@ internal sealed class ReleaseAdminOrderHoldCommandHandler(
             previousKind == OrderHoldKind.ManualReview ? "ManualReviewApproved" : "OrderHoldReleased",
             string.IsNullOrWhiteSpace(request.Note) ? "Hold released." : $"Hold released: {request.Note.Trim()}",
             actorId,
-            actorName));
+            actorName,
+            reason: string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
+            oldValue: previousKind.ToString(),
+            newValue: "NotOnHold"));
         order.RecordAdminEdit(actorId, actorName);
 
         await db.SaveChangesAsync(cancellationToken);

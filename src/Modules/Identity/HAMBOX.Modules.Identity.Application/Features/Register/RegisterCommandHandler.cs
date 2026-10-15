@@ -91,7 +91,8 @@ internal sealed class RegisterCommandHandler(
         // on an invalid/disabled code rather than failing, since registration has already succeeded.
         if (!string.IsNullOrWhiteSpace(request.ReferralCode))
         {
-            await referralRedemption.RedeemAsync(request.ReferralCode, user.Id.ToString(), request.Email, cancellationToken);
+            await referralRedemption.RedeemAsync(
+                request.ReferralCode, user.Id.ToString(), request.Email, request.IpAddress, cancellationToken);
         }
 
         // Sequential, not cross-schema-atomic with the user creation above — acceptable for a

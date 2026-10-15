@@ -3,6 +3,8 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Orders;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetAdminOrderById;
+using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.OrderHold;
+using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.ResendAdminOrderCodes;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.UpdateAdminOrderStatus;
 using HAMBOX.Modules.Commerce.Domain.Enums;
@@ -31,6 +33,14 @@ internal sealed class BulkAdminOrdersCommandHandler
         }
 
         var action = command.Request.Action.Trim().ToLowerInvariant();
+
+        // Everything but a plain re-send is a manual action on someone's order: it needs a recorded reason.
+        var reason = action == "resend-codes" ? Result.Success(string.Empty) : AdminActionReason.Require(command.Request.Reason);
+        if (reason.IsFailure)
+        {
+            return Result.Failure<BulkAdminOrdersResultDto>(reason.Error);
+        }
+
         var success = 0;
         var errors = new List<string>();
 
@@ -38,9 +48,10 @@ internal sealed class BulkAdminOrdersCommandHandler
         {
             var result = action switch
             {
-                "cancel" => await BulkCancelAsync(orderId, cancellationToken),
-                "mark-processing" => await BulkStatusAsync(orderId, "Processing", cancellationToken),
-                "mark-completed" => await BulkStatusAsync(orderId, "Completed", cancellationToken),
+                "cancel" => await BulkStatusAsync(orderId, "Cancelled", reason.Value, cancellationToken),
+                "mark-processing" => await BulkStatusAsync(orderId, "Processing", reason.Value, cancellationToken),
+                "mark-completed" => await BulkStatusAsync(orderId, "Completed", reason.Value, cancellationToken),
+                "hold" => await _sender.Send(new HoldAdminOrderCommand(orderId, reason.Value), cancellationToken),
                 "resend-codes" => await BulkResendAsync(orderId, cancellationToken),
                 _ => Result.Failure(CommerceErrors.OrderBulkActionNotSupported(action)),
             };
@@ -61,22 +72,14 @@ internal sealed class BulkAdminOrdersCommandHandler
             errors));
     }
 
-    private async Task<Result> BulkCancelAsync(Guid orderId, CancellationToken cancellationToken)
-    {
-        var result = await _sender.Send(
-            new UpdateAdminOrderStatusCommand(orderId, new UpdateAdminOrderStatusRequest("Cancelled")),
-            cancellationToken);
-
-        return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
-    }
-
     private async Task<Result> BulkStatusAsync(
         Guid orderId,
         string status,
+        string reason,
         CancellationToken cancellationToken)
     {
         var result = await _sender.Send(
-            new UpdateAdminOrderStatusCommand(orderId, new UpdateAdminOrderStatusRequest(status)),
+            new UpdateAdminOrderStatusCommand(orderId, new UpdateAdminOrderStatusRequest(status, reason)),
             cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);

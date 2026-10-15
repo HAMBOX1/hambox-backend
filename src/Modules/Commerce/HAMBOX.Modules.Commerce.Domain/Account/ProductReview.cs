@@ -52,6 +52,35 @@ public sealed class ProductReview : Entity
     /// </summary>
     public string Comment { get; private set; } = string.Empty;
 
+    /// <summary>True while a moderator has taken this review off the storefront.</summary>
+    public bool IsHidden { get; private set; }
+
+    public string? HiddenReason { get; private set; }
+
+    public string? HiddenByUserId { get; private set; }
+
+    public DateTimeOffset? HiddenOnUtc { get; private set; }
+
+    /// <summary>Takes the review off the public storefront (it stays visible to its author and to admins).</summary>
+    public void Hide(string moderatorUserId, string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(moderatorUserId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        IsHidden = true;
+        HiddenReason = reason.Length > 500 ? reason[..500] : reason;
+        HiddenByUserId = moderatorUserId;
+        HiddenOnUtc = DateTimeOffset.UtcNow;
+    }
+
+    public void Unhide()
+    {
+        IsHidden = false;
+        HiddenReason = null;
+        HiddenByUserId = null;
+        HiddenOnUtc = null;
+    }
+
     /// <summary>
     /// Creates a new product review.
     /// </summary>

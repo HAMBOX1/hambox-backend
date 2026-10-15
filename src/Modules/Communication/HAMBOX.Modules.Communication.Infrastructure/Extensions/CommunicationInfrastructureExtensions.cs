@@ -25,7 +25,10 @@ public static class CommunicationInfrastructureExtensions
 
         services.AddScoped<ICommunicationTemplateRenderer, CommunicationTemplateRenderer>();
         services.AddScoped<ICommunicationPreferenceService, CommunicationPreferenceService>();
-        services.AddScoped<ICommunicationService, CommunicationService>();
+        services.AddScoped<CommunicationService>();
+        services.AddScoped<ICommunicationService>(sp => new FailSoftCommunicationService(
+            sp.GetRequiredService<CommunicationService>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FailSoftCommunicationService>>()));
 
         // Register every ICommunicationProvider here. Adding a future real channel (Sms, WhatsApp, ...)
         // means adding one more line like this — no other file in the module needs to change.

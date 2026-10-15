@@ -152,7 +152,9 @@ internal static class AccountMapper
             review.Rating,
             review.Comment,
             review.CreatedOnUtc,
-            review.ModifiedOnUtc);
+            review.ModifiedOnUtc,
+            IsHidden: review.IsHidden,
+            HiddenReason: review.IsHidden ? review.HiddenReason : null);
 
     public static Contracts.Account.UserNotificationDto ToUserNotificationDto(UserNotification notification) =>
         new(

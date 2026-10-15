@@ -33,6 +33,11 @@ internal sealed class ProductReviewConfiguration : IEntityTypeConfiguration<Prod
             .IsRequired()
             .HasMaxLength(2000);
 
+        builder.Property(r => r.IsHidden).IsRequired().HasDefaultValue(false);
+        builder.Property(r => r.HiddenReason).HasMaxLength(500);
+        builder.Property(r => r.HiddenByUserId).HasMaxLength(450);
+        builder.Property(r => r.HiddenOnUtc);
+
         builder.Property(r => r.CreatedOnUtc)
             .IsRequired();
 

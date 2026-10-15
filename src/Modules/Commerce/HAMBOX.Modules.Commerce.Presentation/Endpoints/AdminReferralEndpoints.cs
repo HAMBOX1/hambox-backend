@@ -1,4 +1,5 @@
 using Asp.Versioning.Builder;
+using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.ApproveAdminReferral;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.GetAdminReferrals;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.GetAdminReferralById;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.ReverseAdminReferral;
@@ -48,6 +49,12 @@ internal static class AdminReferralEndpoints
         group.MapPost("{id:guid}/reverse", async Task<IResult> (Guid id, ISender sender) =>
             MapResult(await sender.Send(new ReverseAdminReferralCommand(id))))
         .WithName("ReverseAdminReferral")
+        .RequirePermission(PermissionConstants.Referral.Manage);
+
+        // Clears a referral held for review as possible farming (audit R49).
+        group.MapPost("{id:guid}/approve", async Task<IResult> (Guid id, ISender sender) =>
+            MapResult(await sender.Send(new ApproveAdminReferralCommand(id))))
+        .WithName("ApproveAdminReferral")
         .RequirePermission(PermissionConstants.Referral.Manage);
     }
 

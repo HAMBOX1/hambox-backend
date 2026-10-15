@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RefundAdminOrder;
 
-public sealed record RefundAdminOrderCommand(Guid OrderId) : IRequest<Result<AdminOrderDetailDto>>;
+public sealed record RefundAdminOrderCommand(Guid OrderId, string? Reason = null) : IRequest<Result<AdminOrderDetailDto>>;
 
 internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdminOrderCommand, Result<AdminOrderDetailDto>>
 {
@@ -43,7 +43,14 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
         RefundAdminOrderCommand command,
         CancellationToken cancellationToken)
     {
+        var reason = AdminActionReason.Require(command.Reason);
+        if (reason.IsFailure)
+        {
+            return Result.Failure<AdminOrderDetailDto>(reason.Error);
+        }
+
         Order? order = null;
+        var previousStatus = string.Empty;
 
         try
         {
@@ -59,6 +66,7 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                 }
 
                 var wasAlreadyReleased = order.Status is OrderStatus.Cancelled or OrderStatus.Refunded;
+                previousStatus = order.Status.ToString();
 
                 try
                 {
@@ -78,7 +86,10 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                         ? $"Order was refunded by an administrator. The money still has to be returned to the customer through {order.PaymentProvider} (transaction {order.PaymentTransactionId}); record the reference once it is done."
                         : "Order was refunded by an administrator.",
                     actorId,
-                    actorName));
+                    actorName,
+                    reason: reason.Value,
+                    oldValue: previousStatus,
+                    newValue: order.Status.ToString()));
                 order.RecordAdminEdit(actorId, actorName);
 
                 await _dbContext.SaveChangesAsync(ct);

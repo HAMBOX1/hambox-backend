@@ -39,7 +39,28 @@ public sealed record ProductReviewDto(
     int Rating,
     string Comment,
     DateTimeOffset CreatedOnUtc,
-    DateTimeOffset? ModifiedOnUtc);
+    DateTimeOffset? ModifiedOnUtc,
+    int HelpfulCount = 0,
+    int NotHelpfulCount = 0,
+    string? MyVote = null,
+    bool IsHidden = false,
+    string? HiddenReason = null);
+
+/// <summary>A review as moderators see it: author, votes and the moderation state.</summary>
+public sealed record AdminReviewDto(
+    Guid Id,
+    Guid ProductId,
+    string UserId,
+    Guid OrderId,
+    int Rating,
+    string Comment,
+    int HelpfulCount,
+    int NotHelpfulCount,
+    bool IsHidden,
+    string? HiddenReason,
+    string? HiddenByUserId,
+    DateTimeOffset? HiddenOnUtc,
+    DateTimeOffset CreatedOnUtc);
 
 /// <summary>
 /// Represents a user notification.

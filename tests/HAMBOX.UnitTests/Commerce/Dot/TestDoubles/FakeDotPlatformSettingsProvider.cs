@@ -13,12 +13,15 @@ internal sealed class FakeDotPlatformSettingsProvider : IPlatformSettingsProvide
 {
     public int ReservationTimeoutMinutes { get; set; } = 30;
 
+    /// <summary>Turns the referral program on (with a zero reward) for tests that exercise redemption.</summary>
+    public bool ReferralEnabled { get; set; }
+
     public Task<T> GetAsync<T>(string categoryKey, CancellationToken cancellationToken = default)
     {
         object payload = categoryKey switch
         {
             PlatformSettingsCategoryKeys.Commerce => new CommerceSettingsPayload(0m, false, ReservationTimeoutMinutes, 0, 0, "INV"),
-            PlatformSettingsCategoryKeys.Referral => new ReferralSettingsPayload(false, 0, 0m, 0),
+            PlatformSettingsCategoryKeys.Referral => new ReferralSettingsPayload(ReferralEnabled, 0, 0m, 30),
             _ => throw new NotSupportedException($"Not needed by DOT tests: {categoryKey}."),
         };
 

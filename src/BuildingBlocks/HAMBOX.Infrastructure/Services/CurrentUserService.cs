@@ -48,6 +48,19 @@ public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor)
             StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
+    public string? IpAddress => httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    /// <inheritdoc />
+    public string? UserAgent
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+    }
+
+    /// <inheritdoc />
     public Guid? SessionId
     {
         get

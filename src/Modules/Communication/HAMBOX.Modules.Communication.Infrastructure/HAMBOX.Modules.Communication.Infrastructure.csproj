@@ -28,4 +28,8 @@
     <ProjectReference Include="..\..\Identity\HAMBOX.Modules.Identity.Application\HAMBOX.Modules.Identity.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HAMBOX.UnitTests" />
+  </ItemGroup>
+
 </Project>

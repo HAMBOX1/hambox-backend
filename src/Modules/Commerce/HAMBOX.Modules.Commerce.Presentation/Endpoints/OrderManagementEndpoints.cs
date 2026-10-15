@@ -8,6 +8,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetAdminOrderSta
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RefundAdminOrder;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.ResendAdminOrderCodes;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.GetPaymentWebhookLogs;
+using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.ManualDelivery;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.OrderHold;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.SettleOrderRefund;
 using HAMBOX.Modules.Commerce.Application.Features.Orders.Admin.RetryAdminOrderFulfillment;
@@ -90,8 +91,11 @@ internal static class OrderManagementEndpoints
         .WithName("UpdateAdminOrderStatus")
         .RequirePermission(PermissionConstants.Orders.Edit);
 
-        group.MapPost("{id:guid}/refund", async Task<IResult> (Guid id, ISender sender) =>
-            MapResult(await sender.Send(new RefundAdminOrderCommand(id))))
+        group.MapPost("{id:guid}/refund", async Task<IResult> (
+            Guid id,
+            [FromBody] RefundAdminOrderRequest? request,
+            ISender sender) =>
+            MapResult(await sender.Send(new RefundAdminOrderCommand(id, request?.Reason))))
         .WithName("RefundAdminOrder")
         .RequirePermission(PermissionConstants.Orders.Refund);
 
@@ -168,6 +172,25 @@ internal static class OrderManagementEndpoints
         .WithName("SettleOrderRefund")
         .RequirePermission(PermissionConstants.Orders.Refund);
 
+        group.MapPost("{id:guid}/mark-delivered", async Task<IResult> (
+            Guid id,
+            [FromBody] MarkOrderDeliveredRequest request,
+            ISender sender) =>
+            MapResult(await sender.Send(new MarkOrderDeliveredManuallyCommand(id, request.Reason, request.Evidence))))
+        .WithName("MarkOrderDeliveredManually")
+        .RequirePermission(PermissionConstants.Orders.Edit);
+
+        group.MapPost("{id:guid}/contact", async Task<IResult> (
+            Guid id,
+            [FromBody] ContactOrderCustomerRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ContactOrderCustomerCommand(id, request.Subject, request.Message));
+            return result.IsSuccess ? Results.Ok(new { ticketId = result.Value }) : MapResult(Result.Failure(result.Error));
+        })
+        .WithName("ContactOrderCustomer")
+        .RequirePermission(PermissionConstants.Orders.Edit);
+
         group.MapPost("{id:guid}/hold", async Task<IResult> (
             Guid id,
             [FromBody] HoldAdminOrderRequest request,
@@ -225,3 +248,9 @@ internal sealed record HoldAdminOrderRequest(string? Reason);
 internal sealed record ReleaseAdminOrderHoldRequest(string? Note);
 
 internal sealed record SettleOrderRefundRequest(string? GatewayReference, string? Note);
+
+internal sealed record RefundAdminOrderRequest(string? Reason);
+
+internal sealed record MarkOrderDeliveredRequest(string? Reason, string? Evidence);
+
+internal sealed record ContactOrderCustomerRequest(string? Subject, string? Message);

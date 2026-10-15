@@ -18,6 +18,8 @@ internal sealed class OrderAuditEntryConfiguration : IEntityTypeConfiguration<Or
         builder.Property(e => e.Reason).HasMaxLength(500);
         builder.Property(e => e.IpAddress).HasMaxLength(64);
         builder.Property(e => e.UserAgent).HasMaxLength(500);
+        builder.Property(e => e.OldValue).HasMaxLength(500);
+        builder.Property(e => e.NewValue).HasMaxLength(500);
 
         builder.HasIndex(e => e.OrderId).HasDatabaseName("IX_OrderAuditEntries_OrderId");
         builder.HasIndex(e => e.OccurredOnUtc).HasDatabaseName("IX_OrderAuditEntries_OccurredOnUtc");

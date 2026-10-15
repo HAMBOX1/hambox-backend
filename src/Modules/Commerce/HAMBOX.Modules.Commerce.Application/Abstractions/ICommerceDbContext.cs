@@ -51,6 +51,9 @@ public interface ICommerceDbContext
     /// </summary>
     DbSet<ProductReview> ProductReviews { get; }
 
+    /// <summary>Gets the helpful / not-helpful votes on reviews.</summary>
+    DbSet<ReviewVote> ReviewVotes { get; }
+
     /// <summary>
     /// Gets the user notifications database set.
     /// </summary>

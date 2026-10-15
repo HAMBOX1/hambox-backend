@@ -36,4 +36,10 @@ public interface ICurrentUserService
     /// everywhere" handler distinguish and preserve the caller's own current session.
     /// </summary>
     Guid? SessionId { get; }
+
+    /// <summary>Network address of the current request (after trusted-proxy handling), if any.</summary>
+    string? IpAddress => null;
+
+    /// <summary>User-Agent of the current request, if any.</summary>
+    string? UserAgent => null;
 }

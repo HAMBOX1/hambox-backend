@@ -45,7 +45,14 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
         UpdateAdminOrderStatusCommand command,
         CancellationToken cancellationToken)
     {
+        var reason = AdminActionReason.Require(command.Request.Reason);
+        if (reason.IsFailure)
+        {
+            return Result.Failure<AdminOrderDetailDto>(reason.Error);
+        }
+
         Order? order = null;
+        var previousStatus = string.Empty;
 
         try
         {
@@ -66,6 +73,7 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
                 }
 
                 var wasAlreadyReleased = order.Status is OrderStatus.Cancelled or OrderStatus.Refunded;
+                previousStatus = order.Status.ToString();
 
                 order.SetAdminStatus(status);
 
@@ -76,7 +84,10 @@ internal sealed class UpdateAdminOrderStatusCommandHandler
                     "StatusChanged",
                     $"Order status changed to {command.Request.Status}.",
                     actorId,
-                    actorName));
+                    actorName,
+                    reason: reason.Value,
+                    oldValue: previousStatus,
+                    newValue: order.Status.ToString()));
                 order.RecordAdminEdit(actorId, actorName);
 
                 await _dbContext.SaveChangesAsync(ct);

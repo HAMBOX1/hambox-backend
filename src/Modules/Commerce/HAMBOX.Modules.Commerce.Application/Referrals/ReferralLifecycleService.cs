@@ -6,6 +6,7 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Account;
+using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.SharedKernel.Results;
 using Microsoft.EntityFrameworkCore;
@@ -65,7 +66,17 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     public async Task<bool> ReferralCodeExistsAsync(string referralCode, CancellationToken cancellationToken = default) =>
         await _db.ReferralProfiles.AnyAsync(p => p.ReferralCode == referralCode, cancellationToken);
 
-    public async Task<Result> RedeemAsync(string referralCode, string referredUserId, string referredEmail, CancellationToken cancellationToken = default)
+    /// <summary>Referrals from one address that look like farming. Both thresholds are deliberately conservative.</summary>
+    public const int SameIpReferralsBeforeReview = 2;
+
+    public const int ReferralsPerDayBeforeReview = 5;
+
+    public Task<Result> RedeemAsync(string referralCode, string referredUserId, string referredEmail, CancellationToken cancellationToken = default) =>
+        RedeemAsync(referralCode, referredUserId, referredEmail, registrationIp: null, cancellationToken);
+
+    public async Task<Result> RedeemAsync(
+        string referralCode, string referredUserId, string referredEmail, string? registrationIp,
+        CancellationToken cancellationToken = default)
     {
         var settings = await GetSettingsAsync(cancellationToken);
 
@@ -98,7 +109,15 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
         }
 
         var expiresOnUtc = DateTime.UtcNow.AddDays(settings.RewardExpiryDays);
-        var entry = ReferralHistoryEntry.CreatePending(referrer.UserId, referredUserId, referredEmail, expiresOnUtc);
+        var entry = ReferralHistoryEntry.CreatePending(
+            referrer.UserId, referredUserId, referredEmail, expiresOnUtc, registrationIp);
+
+        var suspicion = await AssessAsync(referrer.UserId, registrationIp, cancellationToken);
+        if (suspicion is not null)
+        {
+            entry.FlagForReview(suspicion);
+        }
+
         _db.ReferralHistoryEntries.Add(entry);
         _db.ReferralAuditLogs.Add(ReferralAuditLog.Create(
             entry.Id,
@@ -107,6 +126,13 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
             points: null,
             performedByUserId: referredUserId,
             details: $"Referral code {referralCode} redeemed at registration."));
+
+        if (suspicion is not null)
+        {
+            _db.ReferralAuditLogs.Add(ReferralAuditLog.Create(
+                entry.Id, referrer.UserId, ReferralAuditAction.HeldForReview, points: null,
+                performedByUserId: "system", details: suspicion));
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -150,6 +176,16 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
         if (entry is null)
         {
             return ReferralQualificationOutcome.NotApplicable;
+        }
+
+        if (entry.IsHeldForReview)
+        {
+            // Suspected farming: nothing is awarded until an admin has looked at it. It stays Pending (and still
+            // expires on its own) — never silently rewarded, never silently destroyed.
+            _logger.LogInformation(
+                "Referral {ReferralId} not rewarded for order {OrderNumber}: held for review ({Reason}).",
+                entry.Id, order.OrderNumber, entry.ReviewReason);
+            return ReferralQualificationOutcome.Ineligible;
         }
 
         var isExpired = entry.ExpiresOnUtc is DateTime expiresOnUtc && DateTime.UtcNow > expiresOnUtc;
@@ -346,6 +382,74 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     /// means the desired outcome (this transition happens at most once) was already achieved by the
     /// winner, so losing the race here is a correct no-op, not a failure.
     /// </summary>
+    /// <summary>Why a new referral should wait for a human look, or null when it looks organic.</summary>
+    private async Task<string?> AssessAsync(string referrerUserId, string? registrationIp, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(registrationIp) && registrationIp != "unknown")
+        {
+            var sameIp = await _db.ReferralHistoryEntries.CountAsync(
+                h => h.ReferrerUserId == referrerUserId && h.RegistrationIp == registrationIp, cancellationToken);
+
+            if (sameIp >= SameIpReferralsBeforeReview - 1)
+            {
+                return $"{sameIp + 1} referred accounts registered from the same address ({registrationIp}).";
+            }
+        }
+
+        var since = DateTimeOffset.UtcNow.AddHours(-24);
+        var recent = await _db.ReferralHistoryEntries.CountAsync(
+            h => h.ReferrerUserId == referrerUserId && h.CreatedOnUtc >= since, cancellationToken);
+
+        return recent + 1 > ReferralsPerDayBeforeReview
+            ? $"{recent + 1} referrals for one referrer within 24 hours."
+            : null;
+    }
+
+    /// <summary>
+    /// An admin clears a held referral. If the referred user already has a completed order the referral is
+    /// qualified and rewarded right away (that order is what would have done it); otherwise it simply becomes
+    /// eligible for the first completed order.
+    /// </summary>
+    public async Task<Result> AdminApproveReviewAsync(Guid referralHistoryEntryId, string actorUserId, CancellationToken cancellationToken)
+    {
+        var entry = await _db.ReferralHistoryEntries.FirstOrDefaultAsync(h => h.Id == referralHistoryEntryId, cancellationToken);
+        if (entry is null)
+        {
+            return Result.Failure(CommerceErrors.ReferralNotFound);
+        }
+
+        if (!entry.IsHeldForReview)
+        {
+            return Result.Failure(CommerceErrors.ReferralNotHeldForReview);
+        }
+
+        var cleared = await TryTransitionAsync(
+            entry,
+            () => entry.ApproveReview(actorUserId),
+            ReferralAuditAction.ReviewApproved,
+            points: null,
+            actorUserId,
+            "Cleared by an administrator after review.",
+            cancellationToken);
+
+        if (!cleared)
+        {
+            return Result.Failure(CommerceErrors.ReferralAlreadyResolved);
+        }
+
+        var firstCompleted = await _db.Orders
+            .Where(o => o.UserId == entry.ReferredUserId && o.Status == OrderStatus.Completed)
+            .OrderBy(o => o.CreatedOnUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (firstCompleted is not null)
+        {
+            await ProcessOrderCompletedAsync(firstCompleted, cancellationToken);
+        }
+
+        return Result.Success();
+    }
+
     private async Task<bool> TryTransitionAsync(
         ReferralHistoryEntry entry,
         Action transition,

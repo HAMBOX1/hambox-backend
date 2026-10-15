@@ -144,6 +144,14 @@ public static class CommerceErrors
     /// <summary>
     /// Gets the error for when a review already exists.
     /// </summary>
+    public static readonly Error CannotVoteOnOwnReview = new(
+        "Reviews.CannotVoteOnOwnReview",
+        "You cannot vote on your own review.");
+
+    public static readonly Error ReviewVoteInvalid = new(
+        "Reviews.VoteInvalid",
+        "Vote must be 'helpful' or 'not_helpful'.");
+
     public static readonly Error ReviewAlreadyExists = new(
         "Reviews.AlreadyExists",
         "You have already reviewed this product.");
@@ -202,6 +210,22 @@ public static class CommerceErrors
     public static Error PurchaseLimitPerDayExceeded(string productName, int limit, int alreadyBought) => new(
         "Checkout.PurchaseLimitPerDayExceeded",
         $"You can buy at most {limit} of \"{productName}\" every 24 hours (you already bought {alreadyBought}).");
+
+    public static readonly Error ReferralNotHeldForReview = new(
+        "Referral.NotHeldForReview",
+        "This referral is not waiting for review.");
+
+    public static readonly Error ActionReasonRequired = new(
+        "Commerce.ActionReasonRequired",
+        "Enter a reason (at least 3 characters) for this action — it is recorded in the order's audit trail.");
+
+    public static readonly Error DeliveryEvidenceRequired = new(
+        "Commerce.DeliveryEvidenceRequired",
+        "Describe how and where the order was delivered (a reference, a chat link, a screenshot id).");
+
+    public static readonly Error OrderNotPaidForDelivery = new(
+        "Commerce.OrderNotPaidForDelivery",
+        "Only a paid, open order can be marked as delivered.");
 
     public static readonly Error RefundReferenceRequired = new(
         "Commerce.RefundReferenceRequired",

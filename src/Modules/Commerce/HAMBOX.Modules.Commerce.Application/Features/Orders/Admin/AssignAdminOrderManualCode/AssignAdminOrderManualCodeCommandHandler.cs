@@ -37,6 +37,12 @@ internal sealed class AssignAdminOrderManualCodeCommandHandler
         AssignAdminOrderManualCodeCommand command,
         CancellationToken cancellationToken)
     {
+        var reason = AdminActionReason.Require(command.Request.Reason);
+        if (reason.IsFailure)
+        {
+            return Result.Failure<AdminOrderDetailDto>(reason.Error);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Request.LicenseKey))
         {
             return Result.Failure<AdminOrderDetailDto>(
@@ -72,7 +78,10 @@ internal sealed class AssignAdminOrderManualCodeCommandHandler
             "ManualCodeAssigned",
             "A digital code was manually assigned to an order line item.",
             actorId,
-            actorName));
+            actorName,
+            reason: reason.Value,
+            oldValue: "no code",
+            newValue: AdminOrderMapper.MaskLicenseKey(command.Request.LicenseKey)));
         order.RecordAdminEdit(actorId, actorName);
 
         await _dbContext.SaveChangesAsync(cancellationToken);

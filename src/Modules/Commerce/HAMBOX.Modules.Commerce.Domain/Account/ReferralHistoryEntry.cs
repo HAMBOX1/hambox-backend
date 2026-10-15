@@ -16,9 +16,11 @@ public sealed class ReferralHistoryEntry : Entity
         string referrerUserId,
         string referredUserId,
         string referredEmail,
-        DateTime? expiresOnUtc)
+        DateTime? expiresOnUtc,
+        string? registrationIp)
         : base(id)
     {
+        RegistrationIp = registrationIp;
         ReferrerUserId = referrerUserId;
         ReferredUserId = referredUserId;
         ReferredEmail = referredEmail;
@@ -79,11 +81,40 @@ public sealed class ReferralHistoryEntry : Entity
     /// </summary>
     public Guid ConcurrencyStamp { get; private set; } = Guid.NewGuid();
 
+    /// <summary>Network address the referred user registered from — used only to spot referral farming.</summary>
+    public string? RegistrationIp { get; private set; }
+
+    /// <summary>Why this referral is held for a human look (shared IP, burst of sign-ups…); null when it is clean.</summary>
+    public string? ReviewReason { get; private set; }
+
+    /// <summary>True while a flagged referral has not yet been cleared by an admin.</summary>
+    public bool IsHeldForReview => ReviewReason is not null && ReviewApprovedByUserId is null;
+
+    public string? ReviewApprovedByUserId { get; private set; }
+
+    public DateTime? ReviewApprovedOnUtc { get; private set; }
+
+    public void FlagForReview(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ReviewReason = reason.Length > 500 ? reason[..500] : reason;
+        ReviewApprovedByUserId = null;
+        ReviewApprovedOnUtc = null;
+        ConcurrencyStamp = Guid.NewGuid();
+    }
+
+    public void ApproveReview(string adminUserId)
+    {
+        ReviewApprovedByUserId = adminUserId;
+        ReviewApprovedOnUtc = DateTime.UtcNow;
+        ConcurrencyStamp = Guid.NewGuid();
+    }
+
     /// <summary>
     /// Creates a pending referral history entry.
     /// </summary>
     public static ReferralHistoryEntry CreatePending(
-        string referrerUserId, string referredUserId, string referredEmail, DateTime? expiresOnUtc = null)
+        string referrerUserId, string referredUserId, string referredEmail, DateTime? expiresOnUtc = null, string? registrationIp = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(referrerUserId);
         ArgumentException.ThrowIfNullOrWhiteSpace(referredUserId);
@@ -93,7 +124,9 @@ public sealed class ReferralHistoryEntry : Entity
             throw new InvalidOperationException("A user cannot refer themselves.");
         }
 
-        return new ReferralHistoryEntry(Guid.NewGuid(), referrerUserId, referredUserId, referredEmail ?? string.Empty, expiresOnUtc);
+        return new ReferralHistoryEntry(
+            Guid.NewGuid(), referrerUserId, referredUserId, referredEmail ?? string.Empty, expiresOnUtc,
+            registrationIp is { Length: > 64 } ? registrationIp[..64] : registrationIp);
     }
 
     /// <summary>

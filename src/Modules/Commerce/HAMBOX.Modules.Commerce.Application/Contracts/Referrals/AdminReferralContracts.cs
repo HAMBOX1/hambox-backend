@@ -11,7 +11,10 @@ public sealed record AdminReferralListItemDto(
     DateTimeOffset CreatedOnUtc,
     DateTime? QualifiedOnUtc,
     DateTime? RewardedOnUtc,
-    DateTime? ExpiresOnUtc);
+    DateTime? ExpiresOnUtc,
+    bool HeldForReview = false,
+    string? ReviewReason = null,
+    string? RegistrationIp = null);
 
 public sealed record AdminReferralAuditEntryDto(
     Guid Id,

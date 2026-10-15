@@ -16,6 +16,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.DeleteReview;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.GetMyReviews;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.GetProductReviews;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.UpdateReview;
+using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.VoteOnReview;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Wishlist.AddWishlistItem;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Wishlist.GetWishlist;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Wishlist.MoveWishlistItemToCart;
@@ -166,6 +167,19 @@ internal static class AccountEndpoints
             var result = await sender.Send(new UpdateReviewCommand(id, request.Rating, request.Comment));
             return ToResult(result);
         }).WithName("UpdateReview");
+
+        // Helpful / not helpful vote. Body { "vote": "helpful" | "not_helpful" }; DELETE removes the caller's vote.
+        group.MapPut("reviews/{id:guid}/vote", async (Guid id, [FromBody] ReviewVoteRequest request, ISender sender) =>
+        {
+            var result = await sender.Send(new VoteOnReviewCommand(id, request.Vote));
+            return ToResult(result);
+        }).WithName("VoteOnReview");
+
+        group.MapDelete("reviews/{id:guid}/vote", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new VoteOnReviewCommand(id, null));
+            return ToResult(result);
+        }).WithName("RemoveReviewVote");
 
         group.MapDelete("reviews/{id:guid}", async (Guid id, ISender sender) =>
         {
@@ -327,3 +341,4 @@ internal sealed record WishlistItemRequest(Guid ProductId);
 internal sealed record RevealLicenseKeyRequest(string? OtpCode);
 internal sealed record CreateReviewRequest(Guid ProductId, Guid OrderId, int Rating, string Comment);
 internal sealed record UpdateReviewRequest(int Rating, string Comment);
+internal sealed record ReviewVoteRequest(string Vote);

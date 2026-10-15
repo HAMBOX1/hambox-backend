@@ -41,6 +41,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     /// <inheritdoc />
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
 
+    public DbSet<ReviewVote> ReviewVotes => Set<ReviewVote>();
+
     /// <inheritdoc />
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 

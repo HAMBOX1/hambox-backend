@@ -31,6 +31,11 @@ internal sealed class ReferralHistoryEntryConfiguration : IEntityTypeConfigurati
         builder.Property(r => r.PointsEarned)
             .IsRequired();
 
+        builder.Property(r => r.RegistrationIp).HasMaxLength(64);
+        builder.Property(r => r.ReviewReason).HasMaxLength(500);
+        builder.Property(r => r.ReviewApprovedByUserId).HasMaxLength(450);
+        builder.HasIndex(r => new { r.ReferrerUserId, r.RegistrationIp });
+
         builder.Property(r => r.Status)
             .IsRequired()
             .HasConversion<int>();

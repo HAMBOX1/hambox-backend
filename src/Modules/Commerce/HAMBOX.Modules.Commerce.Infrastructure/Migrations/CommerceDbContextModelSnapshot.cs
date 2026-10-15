@@ -158,6 +158,22 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("HiddenByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("HiddenOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("HiddenReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsHidden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -278,6 +294,21 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("RegistrationIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ReviewApprovedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ReviewApprovedOnUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime?>("RewardedOnUtc")
                         .HasColumnType("datetime2");
 
@@ -295,6 +326,8 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_ReferralHistoryEntries_Status");
+
+                    b.HasIndex("ReferrerUserId", "RegistrationIp");
 
                     b.ToTable("ReferralHistoryEntries", "commerce");
                 });
@@ -343,6 +376,38 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                         .HasDatabaseName("IX_ReferralProfiles_UserId");
 
                     b.ToTable("ReferralProfiles", "commerce");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.ReviewVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsHelpful")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ReviewVotes_ReviewId_UserId");
+
+                    b.ToTable("ReviewVotes", "commerce");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.UserNotification", b =>
@@ -1411,8 +1476,16 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uniqueidentifier");
