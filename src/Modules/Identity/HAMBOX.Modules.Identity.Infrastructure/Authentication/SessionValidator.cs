@@ -12,6 +12,33 @@ internal sealed class SessionValidator(
     IPlatformSettingsProvider platformSettings,
     ISecurityEventLogger securityEventLogger) : ISessionValidator
 {
+    /// <summary>
+    /// How often a working admin's "last activity" is brought forward. Idle time is measured from this timestamp,
+    /// and it used to move only when the access token was refreshed — with 60-minute access tokens that is far less
+    /// often than the 30-minute idle limit, so an admin who was actively editing was signed out after ~30 minutes
+    /// and lost their unsaved work. Any successful admin request now counts as activity (at most once a minute, to
+    /// keep the write rate negligible), so "idle" means what it says.
+    /// </summary>
+    private static readonly TimeSpan ActivityTouchInterval = TimeSpan.FromMinutes(1);
+
+    private async Task TouchActivityAsync(Domain.Sessions.UserSession session, CancellationToken cancellationToken)
+    {
+        if (DateTimeOffset.UtcNow - session.LastActivityOnUtc < ActivityTouchInterval)
+        {
+            return;
+        }
+
+        try
+        {
+            session.RecordActivity();
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // Another concurrent request already moved the timestamp: nothing to do, the session is alive.
+        }
+    }
+
     public async Task<bool> IsSessionActiveAsync(Guid sessionId, CancellationToken cancellationToken = default)
     {
         if (sessionId == Guid.Empty)
@@ -40,6 +67,7 @@ internal sealed class SessionValidator(
         var lifetimeExceeded = session.HasExceededMaxLifetime(TimeSpan.FromHours(auth.AdminMaxSessionLifetimeHours));
         if (!idleExceeded && !lifetimeExceeded)
         {
+            await TouchActivityAsync(session, cancellationToken);
             return true;
         }
 
