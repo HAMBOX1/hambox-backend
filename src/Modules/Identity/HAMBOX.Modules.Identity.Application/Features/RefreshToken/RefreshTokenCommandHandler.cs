@@ -27,6 +27,15 @@ internal sealed class RefreshTokenCommandHandler(
     ISecurityEventLogger securityEventLogger,
     IOptions<JwtSettings> jwtSettings) : IRequestHandler<RefreshTokenCommand, Result<AuthTokenResponse>>
 {
+    /// <summary>
+    /// How long after a rotation the previous refresh token is still accepted as a harmless retry. The new token travels
+    /// back in a response; if that response is lost (the page reloads mid-request, a phone changes network, two tabs
+    /// refresh together) the client still holds the old token and presents it again. Treating that as theft revoked
+    /// every session of the user, which signed admins out while they were working. Past this window a reused token is
+    /// still treated as theft.
+    /// </summary>
+    private static readonly TimeSpan ReuseGraceWindow = TimeSpan.FromMinutes(2);
+
     /// <inheritdoc />
     public async Task<Result<AuthTokenResponse>> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
     {
@@ -39,13 +48,21 @@ internal sealed class RefreshTokenCommandHandler(
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
         }
 
+        var withinReuseGrace = false;
         if (existingToken.WasReused())
         {
-            await RevokeAllUserTokensAsync(existingToken.UserId, cancellationToken);
-            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+            withinReuseGrace = !existingToken.IsExpired
+                && existingToken.RevokedOnUtc is { } rotatedAt
+                && DateTimeOffset.UtcNow - rotatedAt <= ReuseGraceWindow;
+
+            if (!withinReuseGrace)
+            {
+                await RevokeAllUserTokensAsync(existingToken.UserId, cancellationToken);
+                return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+            }
         }
 
-        if (!existingToken.IsActive)
+        if (!existingToken.IsActive && !withinReuseGrace)
         {
             return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
         }
@@ -91,7 +108,10 @@ internal sealed class RefreshTokenCommandHandler(
             existingToken.IsPersistent);
 
         existingToken.MarkReplacedBy(newRefreshTokenValue);
-        existingToken.Revoke();
+        if (!existingToken.IsRevoked)
+        {
+            existingToken.Revoke();
+        }
 
         var roleAndPermissionClaims = await userClaimsService.GetClaimsAsync(user.Id, cancellationToken);
         var otpVerified = existingToken.AuthContext == AuthContextTypes.Admin;
@@ -109,7 +129,16 @@ internal sealed class RefreshTokenCommandHandler(
 
         dbContext.RefreshTokens.Add(newRefreshToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another request carrying the same token won the rotation a moment ago. Fail this one quietly instead of
+            // returning a server error; the caller's next refresh lands inside the reuse grace window and succeeds.
+            return Result.Failure<AuthTokenResponse>(IdentityErrors.InvalidToken);
+        }
 
         return Result.Success(new AuthTokenResponse(accessToken, newRefreshTokenValue, expiresAt, refreshExpiresAt));
     }
