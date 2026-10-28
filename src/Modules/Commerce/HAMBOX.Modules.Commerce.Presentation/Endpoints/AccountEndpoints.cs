@@ -128,6 +128,19 @@ internal static class AccountEndpoints
             return ToResult(result);
         }).WithName("RevealCustomerLibraryKeyWithOtp");
 
+        // The picture of a picture-type code; only answers right after the owner revealed it.
+        group.MapGet("library/{id:guid}/image", async (Guid id, HttpContext httpContext, ISender sender) =>
+        {
+            var result = await sender.Send(new GetCustomerLibraryImageQuery(id));
+            if (!result.IsSuccess)
+            {
+                return ToResult(result);
+            }
+
+            httpContext.Response.Headers.CacheControl = "no-store";
+            return Results.Stream(result.Value.Content, result.Value.ContentType);
+        }).WithName("GetCustomerLibraryImage");
+
         group.MapPost("library/{id:guid}/reveal/otp", async (Guid id, ISender sender) =>
         {
             var result = await sender.Send(new RequestLicenseKeyRevealOtpCommand(id));
