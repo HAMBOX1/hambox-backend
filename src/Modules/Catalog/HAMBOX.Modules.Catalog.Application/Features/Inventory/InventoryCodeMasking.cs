@@ -15,6 +15,11 @@ public static class InventoryCodeMasking
             return value;
         }
 
+        if (HAMBOX.Application.Abstractions.ImageCodes.IsImageCode(value))
+        {
+            return "[image]";
+        }
+
         // A multi-line code is a whole account block, so showing its last characters would leak part of a
         // password or 2FA code — hide it entirely.
         if (value.Contains('\n'))

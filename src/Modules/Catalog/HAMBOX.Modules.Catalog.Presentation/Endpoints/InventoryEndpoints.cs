@@ -298,6 +298,42 @@ internal static class InventoryEndpoints
             ISender sender) => await Send(sender, new ImportInventoryCodesCommand(variantId, batchId, body.Codes, body.Note)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Import);
 
+        // Pictures as stock: every uploaded image is one code that the customer later receives as that picture.
+        group.MapPost("/variants/{variantId:guid}/batches/{batchId:guid}/import-images", async (
+            Guid variantId,
+            Guid batchId,
+            IFormFileCollection files,
+            ISender sender) =>
+        {
+            if (files.Count == 0 || files.Count > 100)
+            {
+                return Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = "Upload between 1 and 100 images.", Status = 400 });
+            }
+
+            var streams = new List<Stream>();
+            try
+            {
+                var items = new List<ImageCodeFile>();
+                foreach (var file in files)
+                {
+                    var stream = file.OpenReadStream();
+                    streams.Add(stream);
+                    items.Add(new ImageCodeFile(stream, file.FileName, file.ContentType, file.Length));
+                }
+
+                return await Send(sender, new ImportImageCodesCommand(variantId, batchId, items));
+            }
+            finally
+            {
+                foreach (var stream in streams)
+                {
+                    await stream.DisposeAsync();
+                }
+            }
+        })
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Import)
+            .DisableAntiforgery();
+
         group.MapGet("/variants/{variantId:guid}/codes", async (
             Guid variantId,
             [FromQuery] int pageNumber,

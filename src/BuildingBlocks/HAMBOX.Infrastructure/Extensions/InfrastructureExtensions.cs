@@ -217,4 +217,11 @@ public static class InfrastructureExtensions
         var prefix = $"{publicBasePath.TrimEnd('/')}/{DataProtectionKeysSegment}";
         return requestPath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>True for anything under the uploads root's private segment (picture codes) that must not be served publicly.</summary>
+    public static bool IsPrivateUploadRequest(PathString requestPath, string publicBasePath)
+    {
+        var prefix = $"{publicBasePath.TrimEnd('/')}/{HAMBOX.Application.Abstractions.ImageCodes.PrivateSegment}";
+        return requestPath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);
+    }
 }

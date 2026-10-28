@@ -143,6 +143,11 @@ public static class AdminOrderMapper
             return "—";
         }
 
+        if (HAMBOX.Application.Abstractions.ImageCodes.IsImageCode(key))
+        {
+            return "[image]";
+        }
+
         if (key.Contains('\n'))
         {
             return "•••••••• (multi-line)";

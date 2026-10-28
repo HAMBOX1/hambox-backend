@@ -292,7 +292,8 @@ try
     // before the static file middleware gets a chance to serve it.
     app.Use(async (context, next) =>
     {
-        if (InfrastructureExtensions.IsDataProtectionKeysRequest(context.Request.Path, fileStorageSettings.PublicBasePath))
+        if (InfrastructureExtensions.IsDataProtectionKeysRequest(context.Request.Path, fileStorageSettings.PublicBasePath)
+            || InfrastructureExtensions.IsPrivateUploadRequest(context.Request.Path, fileStorageSettings.PublicBasePath))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
