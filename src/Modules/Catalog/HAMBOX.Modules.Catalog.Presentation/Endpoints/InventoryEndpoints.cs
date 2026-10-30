@@ -253,6 +253,13 @@ internal static class InventoryEndpoints
             ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder, body.DescriptionHtml)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
+        // Hide / show an option value by deactivating / reactivating the variants that use it (nothing is deleted).
+        group.MapPost("/options/{optionId:guid}/visibility", async (
+            Guid optionId,
+            [FromBody] SetOptionVisibilityRequest body,
+            ISender sender) => await SendEmpty(sender, new SetOptionVisibilityCommand(optionId, body.Visible)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
         group.MapDelete("/options/{optionId:guid}", async (Guid optionId, [FromQuery] bool force, ISender sender) =>
             await SendEmpty(sender, new DeleteProductOptionCommand(optionId, force)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
@@ -565,3 +572,5 @@ internal sealed record BulkVariantIdsRequest(IReadOnlyList<Guid> VariantIds);
 internal sealed record RevealInventoryCodeRequest(string? Reason);
 
 internal sealed record MarkInventoryCodeFailedRequest(string? Reason);
+
+internal sealed record SetOptionVisibilityRequest(bool Visible);
