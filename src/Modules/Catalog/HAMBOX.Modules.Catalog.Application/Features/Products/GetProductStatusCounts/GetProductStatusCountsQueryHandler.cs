@@ -20,7 +20,7 @@ internal sealed class GetProductStatusCountsQueryHandler
     public async Task<Result<ProductStatusCountsDto>> Handle(GetProductStatusCountsQuery request, CancellationToken cancellationToken)
     {
         var query = ProductQueryFilters.ApplyBaseFilters(
-            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId);
+            _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId, db: _dbContext);
 
         var counts = await query
             .GroupBy(p => p.Status)
@@ -30,7 +30,7 @@ internal sealed class GetProductStatusCountsQueryHandler
         int Get(ProductStatus status) => counts.GetValueOrDefault(status, 0);
 
         var pendingMergeCount = await ProductQueryFilters.ApplyBaseFilters(
-                _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId, includePendingMerge: true)
+                _dbContext.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, status: null, request.CollectionId, includePendingMerge: true, db: _dbContext)
             .CountAsync(p => p.PendingMergeIntoProductId != null, cancellationToken);
 
         var favoritesCount = await query.CountAsync(p => p.IsFavorite, cancellationToken);

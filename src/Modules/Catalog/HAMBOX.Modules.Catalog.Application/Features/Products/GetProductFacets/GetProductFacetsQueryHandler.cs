@@ -48,7 +48,7 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
             // after one of them is selected (standard faceted-nav behavior).
             var matchingProducts = ProductQueryFilters.ApplyAttributeFilters(
                 ProductQueryFilters.ApplyBaseFilters(
-                    db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active),
+                    db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db),
                 db,
                 request.AttributeFilters,
                 excludeKey: groupKey);

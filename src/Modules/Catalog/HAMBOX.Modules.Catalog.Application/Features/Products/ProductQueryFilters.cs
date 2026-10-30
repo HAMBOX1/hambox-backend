@@ -12,13 +12,53 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products;
 /// </summary>
 internal static class ProductQueryFilters
 {
+    private static IQueryable<Product> ApplyBasicSearch(IQueryable<Product> query, string searchTerm) =>
+        query.Where(p => p.NameAr.Contains(searchTerm) ||
+                         p.NameEn.Contains(searchTerm) ||
+                         p.DescriptionAr.Contains(searchTerm) ||
+                         p.DescriptionEn.Contains(searchTerm));
+
+    /// <summary>
+    /// Search that understands how products are really named: every word of the query has to match something on the
+    /// product — its name or description, its category, the SKU of a variant, or an option (group name, label or value,
+    /// e.g. "Essential", "Deluxe", "1 Month"). "Essential 1" therefore finds the product whose variants are
+    /// "Essential" and "1 Month", which a plain name search never could.
+    /// </summary>
+    private static IQueryable<Product> ApplySearch(IQueryable<Product> query, ICatalogDbContext db, string searchTerm)
+    {
+        var words = searchTerm
+            .Split([' ', '\t', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.Trim())
+            .Where(w => w.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(6)
+            .ToList();
+
+        foreach (var word in words)
+        {
+            var term = word;
+            query = query.Where(p =>
+                p.NameAr.Contains(term) ||
+                p.NameEn.Contains(term) ||
+                p.DescriptionAr.Contains(term) ||
+                p.DescriptionEn.Contains(term) ||
+                db.Categories.Any(c => c.Id == p.CategoryId && (c.NameEn.Contains(term) || c.NameAr.Contains(term))) ||
+                db.ProductVariants.Any(v => v.ProductId == p.Id && !v.IsDeleted && v.Sku.Contains(term)) ||
+                db.ProductOptionGroups.Any(g => g.ProductId == p.Id &&
+                    (g.DisplayName.Contains(term) || g.Options.Any(o => o.Label.Contains(term) || o.Value.Contains(term)))));
+        }
+
+        return query;
+    }
+
     public static IQueryable<Product> ApplyBaseFilters(
         IQueryable<Product> query,
         string? searchTerm,
         Guid? categoryId,
         ProductStatus? status,
         Guid? collectionId = null,
-        bool includePendingMerge = false)
+        bool includePendingMerge = false,
+        ICatalogDbContext? db = null)
     {
         // Products parked as a pending merge (see the Merge Products feature) are duplicates
         // awaiting an admin decision — hide them from both the storefront and the default admin
@@ -31,10 +71,7 @@ internal static class ProductQueryFilters
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            query = query.Where(p => p.NameAr.Contains(searchTerm) ||
-                                      p.NameEn.Contains(searchTerm) ||
-                                      p.DescriptionAr.Contains(searchTerm) ||
-                                      p.DescriptionEn.Contains(searchTerm));
+            query = db is null ? ApplyBasicSearch(query, searchTerm) : ApplySearch(query, db, searchTerm);
         }
 
         if (status.HasValue)

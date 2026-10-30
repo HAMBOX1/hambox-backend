@@ -52,7 +52,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             request.CategoryId,
             request.Status,
             request.CollectionId,
-            includePendingMerge: pendingMergeOnly);
+            includePendingMerge: pendingMergeOnly,
+            db: _dbContext);
 
         if (pendingMergeOnly)
         {
@@ -114,6 +115,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     ? null
                     : _dbContext.Products.FirstOrDefault(t => t.Id == p.PendingMergeIntoProductId)!.NameEn,
                 p.IsFavorite,
+                p.BadgeTextEn,
+                p.BadgeTextAr,
             })
             .ToListAsync(cancellationToken);
 
@@ -157,7 +160,9 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null,
                     PendingMergeIntoProductId: r.PendingMergeIntoProductId,
                     PendingMergeIntoProductName: r.PendingMergeIntoProductName,
-                    IsFavorite: _currentUser.IsAdminContext && r.IsFavorite);
+                    IsFavorite: _currentUser.IsAdminContext && r.IsFavorite,
+                    BadgeTextEn: r.BadgeTextEn,
+                    BadgeTextAr: r.BadgeTextAr);
             })
             .ToList();
 

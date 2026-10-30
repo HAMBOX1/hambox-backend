@@ -188,6 +188,14 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public bool IsFavorite { get; private set; }
 
+    /// <summary>
+    /// Short text (or number) the storefront shows on this product's card and page — "+3 Elite points", "NEW",
+    /// "Best seller". Chosen by the admin per product; null means no badge. See <see cref="SetBadge"/>.
+    /// </summary>
+    public string? BadgeTextEn { get; private set; }
+
+    public string? BadgeTextAr { get; private set; }
+
     /// <summary>Largest quantity of this product one order may contain (null = unlimited). Enforced at every checkout path.</summary>
     public int? MaxQuantityPerOrder { get; private set; }
 
@@ -221,6 +229,13 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public void SetFavorite(bool isFavorite)
     {
         IsFavorite = isFavorite;
+    }
+
+    /// <summary>Sets (or, with empty text, clears) the badge shown on the storefront.</summary>
+    public void SetBadge(string? textEn, string? textAr)
+    {
+        BadgeTextEn = string.IsNullOrWhiteSpace(textEn) ? null : textEn.Trim();
+        BadgeTextAr = string.IsNullOrWhiteSpace(textAr) ? null : textAr.Trim();
     }
 
     /// <summary>

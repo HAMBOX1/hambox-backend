@@ -73,6 +73,8 @@ internal static class CatalogMapper
             RequiredPlanNames: requiredPlanNames,
             LastEditedByName: isAdminContext ? product.LastEditedByName : null,
             LastEditedOnUtc: isAdminContext ? product.LastEditedOnUtc : null,
-            CategoryDescriptionHtml: categoryDescriptionHtml);
+            CategoryDescriptionHtml: categoryDescriptionHtml,
+            BadgeTextEn: product.BadgeTextEn,
+            BadgeTextAr: product.BadgeTextAr);
     }
 }

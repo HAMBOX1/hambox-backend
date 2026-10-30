@@ -90,6 +90,8 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 return await SetFulfillmentAsync(resolved.Value, request.TargetFulfillmentMode!.Value, cancellationToken);
             case "set-margin":
                 return await SetMarginAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
+            case "set-badge":
+                return await SetBadgeAsync(resolved.Value, request.BadgeTextEn, request.BadgeTextAr, cancellationToken);
         }
 
         var success = 0;
@@ -288,6 +290,35 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 {
                     errors.Add($"{id}: This product has no variants to change.");
                 }
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return Result.Success(new BulkProductsResultDto(success, errors.Count, errors));
+    }
+
+    private async Task<Result<BulkProductsResultDto>> SetBadgeAsync(
+        IReadOnlyList<Guid> productIds, string? textEn, string? textAr, CancellationToken ct)
+    {
+        var success = 0;
+        var errors = new List<string>();
+
+        foreach (var chunk in productIds.Chunk(BatchSize))
+        {
+            var ids = chunk.ToList();
+            var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+            var found = products.Select(p => p.Id).ToHashSet();
+
+            foreach (var id in ids.Where(id => !found.Contains(id)))
+            {
+                errors.Add($"{id}: {CatalogErrors.ProductNotFound.Description}");
+            }
+
+            foreach (var product in products)
+            {
+                product.SetBadge(textEn, textAr);
+                success++;
             }
 
             await _db.SaveChangesAsync(ct);
