@@ -126,6 +126,8 @@ public interface ICommerceDbContext
 
     DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations { get; }
 
+    DbSet<FloatingAd> FloatingAds { get; }
+
     DbSet<MembershipPlan> MembershipPlans { get; }
     DbSet<MembershipBenefit> MembershipBenefits { get; }
     DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess { get; }

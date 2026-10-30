@@ -13,7 +13,15 @@ public sealed record CategoryFilterItemDto(
     string? DisplayNameEn,
     string? DisplayNameAr,
     bool IsVisible,
-    int ProductCount);
+    int ProductCount,
+    string? DependsOnGroupKey,
+    IReadOnlyList<string> DependsOnValues);
+
+/// <summary>One option value of a filter group (used to pick the values another filter depends on).</summary>
+public sealed record FilterGroupValueDto(string Value, string Label);
+
+/// <summary>Every value a filter group has across the catalog.</summary>
+public sealed record FilterGroupValuesDto(string GroupKey, IReadOnlyList<FilterGroupValueDto> Values);
 
 /// <summary>An option group that can still be added to the list.</summary>
 public sealed record AvailableFilterGroupDto(string GroupKey, string DefaultName, int ProductCount);
@@ -24,7 +32,8 @@ public sealed record CategoryFilterConfigDto(
     Guid? InheritedFromCategoryId,
     bool InheritedFromDefault,
     IReadOnlyList<CategoryFilterItemDto> Items,
-    IReadOnlyList<AvailableFilterGroupDto> AvailableGroups);
+    IReadOnlyList<AvailableFilterGroupDto> AvailableGroups,
+    IReadOnlyList<FilterGroupValuesDto> GroupValues);
 
 /// <summary>Shared lookup used by both the storefront facets and the admin editor.</summary>
 internal static class CategoryFilterResolver
@@ -138,7 +147,9 @@ internal sealed class GetCategoryFilterConfigQueryHandler(ICatalogDbContext db)
                 r.DisplayNameEn,
                 r.DisplayNameAr,
                 r.IsVisible,
-                usageByKey.TryGetValue(r.GroupKey, out var u) ? u.Products : 0))
+                usageByKey.TryGetValue(r.GroupKey, out var u) ? u.Products : 0,
+                r.DependsOnGroupKey,
+                r.GetDependsOnValues()))
             .ToList();
 
         var listed = items.Select(i => i.GroupKey).ToHashSet();
@@ -149,12 +160,33 @@ internal sealed class GetCategoryFilterConfigQueryHandler(ICatalogDbContext db)
             .ThenBy(g => g.DefaultName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // Values per group, so the admin can say "show this filter only when <group> is <value>".
+        var valueRows = await db.ProductOptions.AsNoTracking()
+            .Join(db.ProductOptionGroups.AsNoTracking(), o => o.OptionGroupId, g => g.Id, (o, g) => new { g.Key, o.Value, o.Label })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var groupValues = valueRows
+            .GroupBy(r => r.Key)
+            .Select(g => new FilterGroupValuesDto(
+                g.Key,
+                g.GroupBy(r => r.Value)
+                    .Select(v => new FilterGroupValueDto(v.Key, v.Max(x => x.Label)!))
+                    .OrderBy(v => v.Label, StringComparer.OrdinalIgnoreCase)
+                    .ToList()))
+            .ToList();
+
         return Result.Success(new CategoryFilterConfigDto(
-            request.CategoryId, hasOwnList, inheritedFrom, inheritedFromDefault, items, available));
+            request.CategoryId, hasOwnList, inheritedFrom, inheritedFromDefault, items, available, groupValues));
     }
 }
 
-public sealed record CategoryFilterInput(string GroupKey, string? DisplayNameEn, string? DisplayNameAr, bool IsVisible);
+public sealed record CategoryFilterInput(
+    string GroupKey,
+    string? DisplayNameEn,
+    string? DisplayNameAr,
+    bool IsVisible,
+    string? DependsOnGroupKey = null,
+    IReadOnlyList<string>? DependsOnValues = null);
 
 public sealed record SaveCategoryFilterConfigCommand(Guid CategoryId, IReadOnlyList<CategoryFilterInput> Items)
     : IRequest<Result>;
@@ -179,7 +211,15 @@ internal sealed class SaveCategoryFilterConfigCommandHandler(ICatalogDbContext d
             }
 
             db.CategoryFacetSettings.Add(CategoryFacetSetting.Create(
-                request.CategoryId, item.GroupKey, item.DisplayNameEn, item.DisplayNameAr, order++, item.IsVisible));
+                request.CategoryId,
+                item.GroupKey,
+                item.DisplayNameEn,
+                item.DisplayNameAr,
+                order++,
+                item.IsVisible,
+                // A filter cannot depend on itself.
+                string.Equals(item.DependsOnGroupKey, item.GroupKey, StringComparison.OrdinalIgnoreCase) ? null : item.DependsOnGroupKey,
+                item.DependsOnValues));
         }
 
         await db.SaveChangesAsync(cancellationToken);

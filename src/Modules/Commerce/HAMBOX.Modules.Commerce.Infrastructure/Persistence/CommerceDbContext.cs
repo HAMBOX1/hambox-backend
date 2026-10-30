@@ -91,6 +91,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     public DbSet<PaymentGatewayConfiguration> PaymentGatewayConfigurations => Set<PaymentGatewayConfiguration>();
 
+    public DbSet<FloatingAd> FloatingAds => Set<FloatingAd>();
+
     public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
     public DbSet<MembershipBenefit> MembershipBenefits => Set<MembershipBenefit>();
     public DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess => Set<MembershipPlanProductAccess>();

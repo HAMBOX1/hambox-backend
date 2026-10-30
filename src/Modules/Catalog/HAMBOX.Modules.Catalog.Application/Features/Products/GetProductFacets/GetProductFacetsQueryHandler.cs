@@ -38,6 +38,12 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
 
         foreach (var groupKey in groupKeys)
         {
+            // A conditional filter stays hidden until the customer has picked one of the values it depends on.
+            if (settingByKey.TryGetValue(groupKey, out var conditional) && !DependencyIsMet(conditional, request.AttributeFilters))
+            {
+                continue;
+            }
+
             // Exclude this group's own selection so its sibling values stay visible/checkable
             // after one of them is selected (standard faceted-nav behavior).
             var matchingProducts = ProductQueryFilters.ApplyAttributeFilters(
@@ -99,5 +105,32 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
             sourceId is not null
                 ? facetGroups
                 : facetGroups.OrderBy(g => g.DisplayName, StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    private static bool DependencyIsMet(
+        CategoryFacetSetting setting,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? selected)
+    {
+        if (string.IsNullOrWhiteSpace(setting.DependsOnGroupKey))
+        {
+            return true;
+        }
+
+        var wanted = setting.GetDependsOnValues();
+        if (wanted.Count == 0 || selected is null)
+        {
+            return wanted.Count == 0;
+        }
+
+        foreach (var (key, values) in selected)
+        {
+            if (string.Equals(key, setting.DependsOnGroupKey, StringComparison.OrdinalIgnoreCase)
+                && values.Any(v => wanted.Contains(v, StringComparer.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

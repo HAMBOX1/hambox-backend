@@ -184,6 +184,8 @@ internal sealed class CategoryFacetSettingConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.GroupKey).IsRequired().HasMaxLength(100);
         builder.Property(x => x.DisplayNameEn).HasMaxLength(200);
         builder.Property(x => x.DisplayNameAr).HasMaxLength(200);
+        builder.Property(x => x.DependsOnGroupKey).HasMaxLength(100);
+        builder.Property(x => x.DependsOnValues).HasMaxLength(1000);
         builder.HasIndex(x => new { x.CategoryId, x.GroupKey }).IsUnique();
         builder.HasIndex(x => new { x.CategoryId, x.SortOrder });
     }

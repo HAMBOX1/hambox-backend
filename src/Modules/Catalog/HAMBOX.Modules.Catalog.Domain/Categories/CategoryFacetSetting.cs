@@ -24,7 +24,9 @@ public sealed class CategoryFacetSetting : AggregateRoot
         string? displayNameEn,
         string? displayNameAr,
         int sortOrder,
-        bool isVisible)
+        bool isVisible,
+        string? dependsOnGroupKey,
+        IReadOnlyList<string>? dependsOnValues)
         : base(id)
     {
         CategoryId = categoryId;
@@ -33,6 +35,8 @@ public sealed class CategoryFacetSetting : AggregateRoot
         DisplayNameAr = displayNameAr;
         SortOrder = sortOrder;
         IsVisible = isVisible;
+        DependsOnGroupKey = dependsOnGroupKey;
+        DependsOnValues = dependsOnValues is { Count: > 0 } ? System.Text.Json.JsonSerializer.Serialize(dependsOnValues) : null;
     }
 
     public Guid CategoryId { get; private set; }
@@ -42,13 +46,30 @@ public sealed class CategoryFacetSetting : AggregateRoot
     public int SortOrder { get; private set; }
     public bool IsVisible { get; private set; }
 
+    /// <summary>
+    /// When set, the filter is only offered once the customer has picked one of <see cref="DependsOnValues"/> in the
+    /// filter group <see cref="DependsOnGroupKey"/> (e.g. "Duration" only after "Product type = Subscription").
+    /// </summary>
+    public string? DependsOnGroupKey { get; private set; }
+
+    /// <summary>JSON array of the option values of <see cref="DependsOnGroupKey"/> that switch this filter on.</summary>
+    public string? DependsOnValues { get; private set; }
+
+    /// <summary>The parent values as a list (empty when the filter has no condition).</summary>
+    public IReadOnlyList<string> GetDependsOnValues() =>
+        string.IsNullOrWhiteSpace(DependsOnValues)
+            ? []
+            : System.Text.Json.JsonSerializer.Deserialize<List<string>>(DependsOnValues) ?? [];
+
     public static CategoryFacetSetting Create(
         Guid categoryId,
         string groupKey,
         string? displayNameEn,
         string? displayNameAr,
         int sortOrder,
-        bool isVisible)
+        bool isVisible,
+        string? dependsOnGroupKey = null,
+        IReadOnlyList<string>? dependsOnValues = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(groupKey);
 
@@ -59,6 +80,10 @@ public sealed class CategoryFacetSetting : AggregateRoot
             string.IsNullOrWhiteSpace(displayNameEn) ? null : displayNameEn.Trim(),
             string.IsNullOrWhiteSpace(displayNameAr) ? null : displayNameAr.Trim(),
             sortOrder,
-            isVisible);
+            isVisible,
+            string.IsNullOrWhiteSpace(dependsOnGroupKey) || dependsOnValues is not { Count: > 0 } ? null : dependsOnGroupKey.Trim(),
+            dependsOnValues is { Count: > 0 } && !string.IsNullOrWhiteSpace(dependsOnGroupKey)
+                ? dependsOnValues.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                : null);
     }
 }
