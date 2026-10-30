@@ -339,6 +339,32 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                         (v, c) => c.Id)
                     .Count())
                 .ThenByDescending(p => p.CreatedOnUtc),
+            // Cost / margin come from the variants (the cheapest cost is what the table shows). Products with no
+            // cost set sort last in both directions so the useful rows come first.
+            ProductSortBy.CostAsc => query
+                .OrderBy(p => _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && v.CostPrice != null) ? 0 : 1)
+                .ThenBy(p => _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && v.CostPrice != null)
+                    .Min(v => v.CostPrice))
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.CostDesc => query
+                .OrderBy(p => _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && v.CostPrice != null) ? 0 : 1)
+                .ThenByDescending(p => _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && v.CostPrice != null)
+                    .Min(v => v.CostPrice))
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.MarginAsc => query
+                .OrderBy(p => p.Price > 0 && _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && v.CostPrice != null) ? 0 : 1)
+                .ThenBy(p => (p.Price - _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && v.CostPrice != null)
+                    .Min(v => v.CostPrice)) / (p.Price == 0 ? 1 : p.Price))
+                .ThenByDescending(p => p.CreatedOnUtc),
+            ProductSortBy.MarginDesc => query
+                .OrderBy(p => p.Price > 0 && _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && v.CostPrice != null) ? 0 : 1)
+                .ThenByDescending(p => (p.Price - _dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && v.CostPrice != null)
+                    .Min(v => v.CostPrice)) / (p.Price == 0 ? 1 : p.Price))
+                .ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.Newest => query.OrderByDescending(p => p.CreatedOnUtc),
             _ => query.OrderByDescending(p => p.CreatedOnUtc),
         };

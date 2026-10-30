@@ -11,7 +11,9 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.BulkProducts;
 /// Action is one of "publish" | "unpublish" | "archive" — no extra fields needed — or
 /// "change-category" (needs <see cref="TargetCategoryId"/>) / "adjust-price" (needs
 /// <see cref="PriceMode"/> + <see cref="PriceValue"/>) / "assign-collection" | "remove-collection"
-/// (needs <see cref="TargetCollectionId"/>). Delete and duplicate are deliberately
+/// (needs <see cref="TargetCollectionId"/>) / "set-fulfillment" (needs <see cref="TargetFulfillmentMode"/>, applied to
+/// every variant of each product) / "set-margin" (needs <see cref="PriceValue"/> as the margin percent: the sale
+/// price becomes cost ÷ (1 − margin)). Delete and duplicate are deliberately
 /// separate endpoints/commands so each can carry its own permission (Delete / Create).
 /// </summary>
 public sealed record BulkProductsRequest(
@@ -24,7 +26,8 @@ public sealed record BulkProductsRequest(
     Guid? TargetCategoryId,
     PriceAdjustmentMode? PriceMode,
     decimal? PriceValue,
-    Guid? TargetCollectionId = null);
+    Guid? TargetCollectionId = null,
+    FulfillmentMode? TargetFulfillmentMode = null);
 
 public sealed record BulkProductsResultDto(int SuccessCount, int ErrorCount, IReadOnlyList<string> Errors);
 

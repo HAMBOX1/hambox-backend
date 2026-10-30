@@ -16,4 +16,8 @@ public enum ProductSortBy
     StatusDesc = 8,
     StockAsc = 9,
     StockDesc = 10,
+    CostAsc = 11,
+    CostDesc = 12,
+    MarginAsc = 13,
+    MarginDesc = 14,
 }
