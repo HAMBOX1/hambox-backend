@@ -234,7 +234,7 @@ internal static class InventoryEndpoints
         group.MapPut("/option-groups/{groupId:guid}", async (
             Guid groupId,
             [FromBody] UpdateOptionGroupRequest body,
-            ISender sender) => await SendEmpty(sender, new UpdateProductOptionGroupCommand(groupId, body.DisplayName, body.SortOrder, body.IsRequired, body.DescriptionHtml)))
+            ISender sender) => await SendEmpty(sender, new UpdateProductOptionGroupCommand(groupId, body.DisplayName, body.SortOrder, body.IsRequired, body.DescriptionHtml, body.ShowDescriptionInline)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         group.MapDelete("/option-groups/{groupId:guid}", async (Guid groupId, [FromQuery] bool force, ISender sender) =>
@@ -250,7 +250,7 @@ internal static class InventoryEndpoints
         group.MapPut("/options/{optionId:guid}", async (
             Guid optionId,
             [FromBody] UpdateOptionRequest body,
-            ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder, body.DescriptionHtml)))
+            ISender sender) => await SendEmpty(sender, new UpdateProductOptionCommand(optionId, body.Label, body.SortOrder, body.DescriptionHtml, body.ShowDescriptionInline)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
         // Hide / show an option value by deactivating / reactivating the variants that use it (nothing is deleted).
@@ -563,8 +563,8 @@ internal sealed record BulkUpdateVariantsRequest(
     IReadOnlyList<Guid> VariantIds,
     decimal? PriceOverride,
     ProductVariantStatus? Status);
-internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrder, bool IsRequired, string? DescriptionHtml = null);
-internal sealed record UpdateOptionRequest(string Label, int SortOrder, string? DescriptionHtml = null);
+internal sealed record UpdateOptionGroupRequest(string DisplayName, int SortOrder, bool IsRequired, string? DescriptionHtml = null, bool? ShowDescriptionInline = null);
+internal sealed record UpdateOptionRequest(string Label, int SortOrder, string? DescriptionHtml = null, bool? ShowDescriptionInline = null);
 internal sealed record ReorderIdsRequest(IReadOnlyList<Guid> OrderedIds);
 internal sealed record BulkCodeIdsRequest(IReadOnlyList<Guid> CodeIds);
 internal sealed record BulkVariantIdsRequest(IReadOnlyList<Guid> VariantIds);

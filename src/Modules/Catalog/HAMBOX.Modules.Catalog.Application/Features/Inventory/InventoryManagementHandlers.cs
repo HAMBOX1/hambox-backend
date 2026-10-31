@@ -52,12 +52,13 @@ public sealed record UpdateProductOptionGroupCommand(
     string DisplayName,
     int SortOrder,
     bool IsRequired,
-    string? DescriptionHtml = null) : IRequest<Result>;
+    string? DescriptionHtml = null,
+    bool? ShowDescriptionInline = null) : IRequest<Result>;
 
 public sealed record DeleteProductOptionGroupCommand(Guid GroupId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionGroupsCommand(Guid ProductId, IReadOnlyList<Guid> OrderedGroupIds) : IRequest<Result>;
 
-public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder, string? DescriptionHtml = null) : IRequest<Result>;
+public sealed record UpdateProductOptionCommand(Guid OptionId, string Label, int SortOrder, string? DescriptionHtml = null, bool? ShowDescriptionInline = null) : IRequest<Result>;
 public sealed record DeleteProductOptionCommand(Guid OptionId, bool Force = false) : IRequest<Result>;
 public sealed record ReorderProductOptionsCommand(Guid GroupId, IReadOnlyList<Guid> OrderedOptionIds) : IRequest<Result>;
 
@@ -447,6 +448,11 @@ internal sealed class UpdateProductOptionGroupCommandHandler : IRequestHandler<U
 
         var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);
         group.Update(request.DisplayName, request.SortOrder, request.IsRequired, descriptionHtml);
+        if (request.ShowDescriptionInline is { } inlineGroup)
+        {
+            group.SetShowDescriptionInline(inlineGroup);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -603,6 +609,11 @@ internal sealed class UpdateProductOptionCommandHandler : IRequestHandler<Update
 
         var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);
         option.Update(request.Label, request.SortOrder, descriptionHtml);
+        if (request.ShowDescriptionInline is { } inlineOption)
+        {
+            option.SetShowDescriptionInline(inlineOption);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

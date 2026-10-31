@@ -25,9 +25,10 @@ internal static class StorefrontProductConfigurationBuilder
         var optionGroupDtos = optionGroups.Select(g => new ProductOptionGroupDto(
             g.Id, g.ProductId, g.ParentOptionId, g.Key, g.DisplayName, g.SortOrder, g.IsRequired,
             g.Options.OrderBy(o => o.SortOrder)
-                .Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml))
+                .Select(o => new ProductOptionDto(o.Id, o.OptionGroupId, o.Value, o.Label, o.SortOrder, o.DescriptionHtml, o.ShowDescriptionInline))
                 .ToList(),
-            g.DescriptionHtml)).ToList();
+            g.DescriptionHtml,
+            g.ShowDescriptionInline)).ToList();
 
         var validCombinationKeys = VariantCombinationHelper.BuildValidCombinationKeys(optionGroups);
 

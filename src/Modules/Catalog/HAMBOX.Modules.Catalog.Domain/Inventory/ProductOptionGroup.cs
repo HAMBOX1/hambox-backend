@@ -33,6 +33,11 @@ public sealed class ProductOptionGroup : Entity, IAuditable
     /// value within the group they pick. Distinct from each <see cref="ProductOption.DescriptionHtml"/>,
     /// which is specific to one value. Sanitization happens in the Application layer before this is set.</summary>
     public string? DescriptionHtml { get; private set; }
+
+    /// <summary>Show the group's general instructions directly on the product page (see <see cref="ProductOption.ShowDescriptionInline"/>).</summary>
+    public bool ShowDescriptionInline { get; private set; }
+
+    public void SetShowDescriptionInline(bool value) => ShowDescriptionInline = value;
     public IReadOnlyCollection<ProductOption> Options => _options.AsReadOnly();
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }

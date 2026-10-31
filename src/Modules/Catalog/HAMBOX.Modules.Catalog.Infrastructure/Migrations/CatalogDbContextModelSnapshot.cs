@@ -1131,6 +1131,9 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<Guid>("OptionGroupId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("ShowDescriptionInline")
+                        .HasColumnType("bit");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
@@ -1186,6 +1189,9 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ShowDescriptionInline")
+                        .HasColumnType("bit");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");

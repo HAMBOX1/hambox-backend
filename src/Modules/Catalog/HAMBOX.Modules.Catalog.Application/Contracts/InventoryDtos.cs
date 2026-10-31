@@ -2,7 +2,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 
 public sealed record ProductPlanDto(Guid Id, Guid ProductId, string Name, string Slug, int SortOrder, string Status);
 
-public sealed record ProductOptionDto(Guid Id, Guid OptionGroupId, string Value, string Label, int SortOrder, string? DescriptionHtml = null);
+public sealed record ProductOptionDto(Guid Id, Guid OptionGroupId, string Value, string Label, int SortOrder, string? DescriptionHtml = null, bool ShowDescriptionInline = false);
 
 public sealed record ProductOptionGroupDto(
     Guid Id,
@@ -13,7 +13,8 @@ public sealed record ProductOptionGroupDto(
     int SortOrder,
     bool IsRequired,
     IReadOnlyList<ProductOptionDto> Options,
-    string? DescriptionHtml = null);
+    string? DescriptionHtml = null,
+    bool ShowDescriptionInline = false);
 
 /// <summary>Lightweight autocomplete suggestion for the "reuse a saved option group" combobox.</summary>
 public sealed record OptionGroupTemplateSummaryDto(Guid Id, string Name, int OptionCount);

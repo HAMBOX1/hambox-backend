@@ -27,6 +27,13 @@ public sealed class ProductOption : Entity, IAuditable
     /// activation requirements). Null means no description — callers must never pass raw
     /// unsanitized HTML here; sanitization happens in the Application layer before this is set.</summary>
     public string? DescriptionHtml { get; private set; }
+
+    /// <summary>
+    /// When true the storefront shows this value's instructions right under the options instead of behind the
+    /// "Important information" button — for notes the customer must not miss (how to activate, a how-to video...).
+    /// </summary>
+    public bool ShowDescriptionInline { get; private set; }
+
     public string? CreatedBy { get; set; }
     public string? ModifiedBy { get; set; }
 
@@ -36,6 +43,8 @@ public sealed class ProductOption : Entity, IAuditable
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
         return new ProductOption(Guid.NewGuid(), optionGroupId, value.Trim().ToLowerInvariant(), label.Trim(), sortOrder, descriptionHtml);
     }
+
+    public void SetShowDescriptionInline(bool value) => ShowDescriptionInline = value;
 
     public void Update(string label, int sortOrder, string? descriptionHtml)
     {
