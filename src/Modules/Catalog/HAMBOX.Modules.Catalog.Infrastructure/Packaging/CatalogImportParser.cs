@@ -45,10 +45,9 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             // Variants and Inventory Codes are deliberately not read here even if present in an
             // older-style workbook — variants are generated afterward via "Generate Variants",
             // and codes are added per-variant in the catalog admin UI, not bundled with a product import.
-            var productsSheet = FindSheet(workbook, "Products") ?? workbook.Worksheets.FirstOrDefault();
             return ToPackage(
                 entityType,
-                ReadSheetRows(productsSheet),
+                ReadProductRows(workbook),
                 ReadSheetRows(FindSheet(workbook, "Variant Groups")),
                 ReadSheetRows(FindSheet(workbook, "Variant Options")),
                 [],
@@ -83,6 +82,46 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
     };
 
     // ---------- tabular readers ----------
+
+    // Tabs that mean something other than "a category's products" — everything else in a Products workbook is read as
+    // a category tab (see ReadProductRows). The names match CatalogImportTemplateGenerator plus the usual notes tabs.
+    private static readonly HashSet<string> NonCategorySheets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Products", "Variant Groups", "Variant Options", "Variants", "Inventory Codes", "Inventory", "Codes",
+        "Categories", "Collections", "Instructions", "README", "Notes", "Lists", "Summary",
+    };
+
+    /// <summary>
+    /// The product rows of a Products workbook. Besides the classic "Products" tab, any other tab that is not one of the
+    /// reserved names is a category tab: its name is the category, so a row there does not need a CategorySlug cell
+    /// (a filled one still wins). A workbook with only a "Products" tab, or a single tab of any name, reads exactly as
+    /// before. The rows are merged into one list so row numbers stay unique across tabs.
+    /// </summary>
+    private static List<Dictionary<string, string>> ReadProductRows(XLWorkbook workbook)
+    {
+        var productsSheet = FindSheet(workbook, "Products");
+        if (productsSheet is null && workbook.Worksheets.Count <= 1)
+        {
+            return ReadSheetRows(workbook.Worksheets.FirstOrDefault());
+        }
+
+        var rows = ReadSheetRows(productsSheet);
+        foreach (var sheet in workbook.Worksheets.Where(s => !NonCategorySheets.Contains(s.Name.Trim())))
+        {
+            var category = sheet.Name.Trim();
+            foreach (var row in ReadSheetRows(sheet))
+            {
+                if (string.IsNullOrWhiteSpace(Get(row, "CategorySlug")))
+                {
+                    row["CategorySlug"] = category;
+                }
+
+                rows.Add(row);
+            }
+        }
+
+        return rows;
+    }
 
     private static IXLWorksheet? FindSheet(XLWorkbook workbook, string name) =>
         workbook.Worksheets.TryGetWorksheet(name, out var worksheet) ? worksheet : null;

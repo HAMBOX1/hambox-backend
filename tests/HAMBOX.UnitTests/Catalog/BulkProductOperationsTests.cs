@@ -10,6 +10,7 @@ using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.SharedKernel.Results;
 using HAMBOX.UnitTests.Catalog.Inventory.VariantLifecycle;
+using HAMBOX.UnitTests.Commerce.TestDoubles;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -67,7 +68,7 @@ public sealed class BulkProductOperationsTests
         return (db, a, b, products);
     }
 
-    private static BulkProductsCommandHandler Handler(TestCatalogDbContext db) => new(db, new RoutingSender(db));
+    private static BulkProductsCommandHandler Handler(TestCatalogDbContext db) => new(db, new RoutingSender(db), new FakeCurrentUserService("admin-1", "Admin"));
 
     private static BulkProductsCommand Command(
         IReadOnlyList<Guid>? ids,
