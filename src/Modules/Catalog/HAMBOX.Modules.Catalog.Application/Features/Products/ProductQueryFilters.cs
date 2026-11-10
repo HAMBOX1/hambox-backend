@@ -1,4 +1,5 @@
 using System.Linq;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Products;
@@ -29,10 +30,17 @@ internal static class ProductQueryFilters
         var words = searchTerm
             .Split([' ', '\t', '-', '_'], StringSplitOptions.RemoveEmptyEntries)
             .Select(w => w.Trim())
-            .Where(w => w.Length > 0)
+            // A word with no letter or digit (an emoji, punctuation) is ignored by SQL Server collations, so
+            // `Contains` would match every row; such words carry no meaning for a product search.
+            .Where(w => w.Any(char.IsLetterOrDigit))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(6)
             .ToList();
+
+        if (words.Count == 0)
+        {
+            return query.Where(_ => false);
+        }
 
         foreach (var word in words)
         {
@@ -69,6 +77,7 @@ internal static class ProductQueryFilters
             query = query.Where(p => p.PendingMergeIntoProductId == null);
         }
 
+        searchTerm = SearchInput.Clean(searchTerm);
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             query = db is null ? ApplyBasicSearch(query, searchTerm) : ApplySearch(query, db, searchTerm);

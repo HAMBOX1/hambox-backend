@@ -128,7 +128,7 @@ internal static class ProductEndpoints
         // POST /api/v1/products
         group.MapPost("", async Task<Results<Created<Guid>, BadRequest<ProblemDetails>>> ([FromBody] CreateProductRequest request, ISender sender) =>
         {
-            var command = new CreateProductCommand(request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc, request.Status);
+            var command = new CreateProductCommand(request.NameAr ?? string.Empty, request.NameEn, request.DescriptionAr ?? string.Empty, request.DescriptionEn ?? string.Empty, request.Price, request.CategoryId, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc, request.Status);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -150,7 +150,7 @@ internal static class ProductEndpoints
         // PUT /api/v1/products/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateProductRequest request, ISender sender) =>
         {
-            var command = new UpdateProductCommand(id, request.NameAr, request.NameEn, request.DescriptionAr, request.DescriptionEn, request.Price, request.CategoryId, request.Status, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc);
+            var command = new UpdateProductCommand(id, request.NameAr ?? string.Empty, request.NameEn, request.DescriptionAr ?? string.Empty, request.DescriptionEn ?? string.Empty, request.Price, request.CategoryId, request.Status, request.AdditionalCategoryIds, request.CollectionIds, request.PublicReleaseOnUtc);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -342,7 +342,7 @@ internal static class ProductEndpoints
             return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest(Problem(result));
         })
         .WithName("GetProductStatusCounts")
-        .AllowAnonymous();
+        .RequirePermission(PermissionConstants.Catalog.Products.View);
     }
 
     private static async Task<Results<NoContent, BadRequest<ProblemDetails>>> SendEmptyResult(ISender sender, IRequest<Result> request)

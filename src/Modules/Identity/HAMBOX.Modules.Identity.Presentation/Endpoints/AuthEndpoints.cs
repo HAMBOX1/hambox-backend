@@ -54,7 +54,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var language = httpContext.Request.Headers["Accept-Language"].ToString() is { Length: > 0 } acceptLanguage
                 ? acceptLanguage.Split(',')[0].Split(';')[0].Trim()
                 : "en";
@@ -85,7 +89,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var geoLocation = GetGeoLocation(httpContext);
 
             var command = new LoginCommand(
@@ -111,7 +119,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var geoLocation = GetGeoLocation(httpContext);
 
             var command = new GoogleLoginCommand(
@@ -135,7 +147,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var geoLocation = GetGeoLocation(httpContext);
 
             var command = new AdminLoginCommand(
@@ -177,7 +193,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
 
             var command = new VerifyAdminOtpCommand(
                 request.ChallengeId,
@@ -187,7 +207,7 @@ public static class AuthEndpoints
 
             var result = await sender.Send(command, ct);
             return HandleTokenResult(httpContext, result, cookieSettingsOptions.Value, environment, tokenGenerator);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         group.MapPost("admin/resend-otp", async (
             [FromBody] ResendAdminOtpRequest request,
@@ -199,7 +219,7 @@ public static class AuthEndpoints
             var command = new ResendAdminOtpCommand(request.ChallengeId, ipAddress);
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
-        });
+        }).RequireRateLimiting(RateLimitPolicies.AccountActions);
 
         // ──── Admin authenticator app (TOTP) ─────────────────────────────────
         group.MapGet("admin/totp", async (HttpContext httpContext, ISender sender, CancellationToken ct) =>
@@ -316,7 +336,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var command = new VerifyEmailCommand(request.Token, ipAddress, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
             return LocalizedEndpointResults.FromResult(httpContext, result);
@@ -329,7 +353,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var command = new ForgotPasswordCommand(
                 request.Email, ipAddress, request.TurnstileToken, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
@@ -343,7 +371,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var command = new ResetPasswordCommand(
                 request.Token, request.NewPassword, ipAddress, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);
@@ -357,7 +389,11 @@ public static class AuthEndpoints
             CancellationToken ct) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
+            if (string.IsNullOrWhiteSpace(userAgent))
+            {
+                userAgent = "unknown";
+            }
             var command = new ResendVerificationCommand(
                 request.Email, ipAddress, request.TurnstileToken, userAgent, GetCorrelationId(httpContext));
             var result = await sender.Send(command, ct);

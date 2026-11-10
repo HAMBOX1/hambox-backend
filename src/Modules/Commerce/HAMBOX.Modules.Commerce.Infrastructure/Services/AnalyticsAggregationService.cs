@@ -60,6 +60,7 @@ internal sealed class AnalyticsAggregationService(
             .Where(r => r.RedeemedOnUtc >= redemptionFrom && r.RedeemedOnUtc < redemptionTo)
             .GroupBy(_ => 1)
             .Select(g => new { Count = g.Count(), Discount = g.Sum(x => x.DiscountAmount) })
+            .OrderBy(a => a.Count)
             .FirstOrDefaultAsync(cancellationToken);
 
         var invites = await commerceDb.ReferralHistoryEntries.AsNoTracking()
@@ -413,15 +414,20 @@ internal sealed class AnalyticsAggregationService(
             .ToListAsync(cancellationToken);
         var avgLtv = ltvValues.Count > 0 ? Math.Round(ltvValues.Average(), 2) : 0m;
 
-        var byCountry = await commerceDb.Orders.AsNoTracking()
+        // Aggregate into an anonymous type first: EF cannot translate an OrderBy on a property of a
+        // DTO built with a constructor inside the query, so the DTO is created after materialising.
+        var byCountryRows = await commerceDb.Orders.AsNoTracking()
             .Where(o => o.CreatedOnUtc >= request.DateFrom
                         && o.CreatedOnUtc < request.DateTo
                         && o.Status == OrderStatus.Completed)
             .GroupBy(o => o.Country == null || o.Country == string.Empty ? "Unknown" : o.Country)
-            .Select(g => new AnalyticsNamedValueDto(g.Key, g.Sum(x => x.TotalAmount), g.Count()))
+            .Select(g => new { Name = g.Key, Value = g.Sum(x => x.TotalAmount), Count = g.Count() })
             .OrderByDescending(x => x.Value)
             .Take(50)
             .ToListAsync(cancellationToken);
+        var byCountry = byCountryRows
+            .Select(r => new AnalyticsNamedValueDto(r.Name, r.Value, r.Count))
+            .ToList();
 
         var firstCompleted = await commerceDb.Orders.AsNoTracking()
             .Where(o => o.Status == OrderStatus.Completed)
@@ -543,6 +549,7 @@ internal sealed class AnalyticsAggregationService(
             .Where(r => r.RedeemedOnUtc >= fromDt && r.RedeemedOnUtc < toDt)
             .GroupBy(_ => 1)
             .Select(g => new { Count = g.Count(), Discount = g.Sum(x => x.DiscountAmount) })
+            .OrderBy(a => a.Count)
             .FirstOrDefaultAsync(cancellationToken);
 
         var redemptions = redemptionAgg?.Count ?? 0;
@@ -622,17 +629,22 @@ internal sealed class AnalyticsAggregationService(
                 c.CouponId))
             .ToList();
 
-        var topPromos = await commerceDb.PromotionRedemptions.AsNoTracking()
+        var topPromoRows = await commerceDb.PromotionRedemptions.AsNoTracking()
             .Where(r => r.RedeemedOnUtc >= fromDt && r.RedeemedOnUtc < toDt)
             .GroupBy(r => new { r.PromotionId, r.PromotionName })
-            .Select(g => new AnalyticsNamedValueDto(
-                g.Key.PromotionName,
-                g.Sum(x => x.DiscountAmount),
-                g.Count(),
-                g.Key.PromotionId))
+            .Select(g => new
+            {
+                Name = g.Key.PromotionName,
+                Discount = g.Sum(x => x.DiscountAmount),
+                Count = g.Count(),
+                Id = g.Key.PromotionId,
+            })
             .OrderByDescending(x => x.Count)
             .Take(20)
             .ToListAsync(cancellationToken);
+        var topPromos = topPromoRows
+            .Select(r => new AnalyticsNamedValueDto(r.Name, r.Discount, r.Count, r.Id))
+            .ToList();
 
         var redemptionDates = await commerceDb.PromotionRedemptions.AsNoTracking()
             .Where(r => r.RedeemedOnUtc >= fromDt && r.RedeemedOnUtc < toDt)
@@ -693,15 +705,18 @@ internal sealed class AnalyticsAggregationService(
                             && o.CreatedOnUtc < request.DateTo)
                 .SumAsync(o => (decimal?)o.TotalAmount, cancellationToken) ?? 0m;
 
-        var topReferrers = await commerceDb.ReferralHistoryEntries.AsNoTracking()
+        var topReferrerRows = await commerceDb.ReferralHistoryEntries.AsNoTracking()
             .Where(r => r.CreatedOnUtc >= request.DateFrom
                         && r.CreatedOnUtc < request.DateTo
                         && r.PointsEarned > 0)
             .GroupBy(r => r.ReferrerUserId)
-            .Select(g => new AnalyticsNamedValueDto(g.Key, g.Count(), g.Count()))
+            .Select(g => new { Name = g.Key, Count = g.Count() })
             .OrderByDescending(x => x.Count)
             .Take(20)
             .ToListAsync(cancellationToken);
+        var topReferrers = topReferrerRows
+            .Select(r => new AnalyticsNamedValueDto(r.Name, r.Count, r.Count))
+            .ToList();
 
         var inviteDates = await commerceDb.ReferralHistoryEntries.AsNoTracking()
             .Where(r => r.CreatedOnUtc >= request.DateFrom && r.CreatedOnUtc < request.DateTo)

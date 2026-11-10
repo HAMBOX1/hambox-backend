@@ -8,6 +8,14 @@ public static class CommunicationErrors
         "Communication.TemplateNotFound",
         "No active template is published for this key and channel.");
 
+    public static readonly Error TemplateCategoryInvalid = new(
+        "Communication.TemplateCategoryInvalid",
+        "The template category is not valid.");
+
+    public static readonly Error TemplateAlreadyExists = new(
+        "Communication.TemplateAlreadyExists",
+        "A template with this key and channel already exists.");
+
     public static readonly Error ChannelNotRegistered = new(
         "Communication.ChannelNotRegistered",
         "No communication provider is registered for this channel.");

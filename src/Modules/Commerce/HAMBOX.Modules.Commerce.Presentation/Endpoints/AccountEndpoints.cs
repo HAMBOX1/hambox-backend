@@ -9,6 +9,8 @@ using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.GetUnre
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.MarkAllNotificationsRead;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.MarkNotificationRead;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Orders.GetOrders;
+using HAMBOX.Modules.Commerce.Application.Features.Account.Points.GetPointsHistory;
+using HAMBOX.Modules.Commerce.Application.Features.Account.Points.GetPointsSummary;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Referral.GetReferralDashboard;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Referral.GetReferralHistory;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Reviews.CreateReview;
@@ -201,13 +203,13 @@ internal static class AccountEndpoints
         }).WithName("DeleteReview");
 
         group.MapGet("notifications", async (
-            [FromQuery] int pageNumber,
-            [FromQuery] int pageSize,
-            [FromQuery] bool includeArchived,
-            [FromQuery] bool? isRead,
-            [FromQuery] string? category,
-            [FromQuery] string? search,
-            ISender sender) =>
+            ISender sender,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] bool includeArchived = false,
+            [FromQuery] bool? isRead = null,
+            [FromQuery] string? category = null,
+            [FromQuery] string? search = null) =>
         {
             var result = await sender.Send(new GetNotificationsQuery(
                 pageNumber <= 0 ? 1 : pageNumber,
@@ -269,6 +271,21 @@ internal static class AccountEndpoints
                 status));
             return ToResult(result);
         }).WithName("GetReferralHistory");
+
+        group.MapGet("points", async (ISender sender) =>
+            ToResult(await sender.Send(new GetPointsSummaryQuery())))
+        .WithName("GetPointsSummary");
+
+        group.MapGet("points/history", async (
+            [FromQuery] int pageNumber,
+            [FromQuery] int pageSize,
+            [FromQuery] string? type,
+            ISender sender) =>
+            ToResult(await sender.Send(new GetPointsHistoryQuery(
+                pageNumber <= 0 ? 1 : pageNumber,
+                pageSize <= 0 ? 10 : pageSize,
+                type))))
+        .WithName("GetPointsHistory");
 
         group.MapGet("membership", async (ISender sender) =>
             ToResult(await sender.Send(new GetCurrentMembershipQuery())))

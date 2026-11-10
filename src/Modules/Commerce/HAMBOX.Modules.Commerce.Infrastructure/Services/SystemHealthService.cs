@@ -98,6 +98,13 @@ internal sealed class SystemHealthService(
                 return new SystemHealthComponentDto("SMTP", "Degraded", "SMTP host not configured.", sw.ElapsedMilliseconds);
             }
 
+            // A configured host proves nothing: open a TCP connection so an unreachable mail server
+            // shows up here instead of only as failed deliveries later.
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(3));
+            using var client = new System.Net.Sockets.TcpClient();
+            await client.ConnectAsync(email.SmtpHost, email.SmtpPort, timeout.Token);
+
             return new SystemHealthComponentDto(
                 "SMTP",
                 "Healthy",
@@ -106,7 +113,8 @@ internal sealed class SystemHealthService(
         }
         catch (Exception ex)
         {
-            return new SystemHealthComponentDto("SMTP", "Unhealthy", ex.Message, sw.ElapsedMilliseconds);
+            var detail = ex is OperationCanceledException ? "SMTP connection timed out." : ex.Message;
+            return new SystemHealthComponentDto("SMTP", "Unhealthy", detail, sw.ElapsedMilliseconds);
         }
     }
 

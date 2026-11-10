@@ -39,6 +39,17 @@ internal sealed class PublishProductCommandHandler : IRequestHandler<PublishProd
             return Result.Failure(CatalogErrors.ProductNotFound);
         }
 
+        // Check sellability BEFORE mutating: bulk publish loops this handler on one shared DbContext, so a product
+        // flipped to Active in memory and then rejected would be persisted by the next product's SaveChanges.
+        if (product.Status is ProductStatus.Draft or ProductStatus.Inactive)
+        {
+            var publishable = await ProductPublishGuard.CheckAsync(_db, product, cancellationToken);
+            if (publishable.IsFailure)
+            {
+                return publishable;
+            }
+        }
+
         try
         {
             product.Activate();
@@ -46,6 +57,16 @@ internal sealed class PublishProductCommandHandler : IRequestHandler<PublishProd
         catch (InvalidOperationException ex)
         {
             return Result.Failure(new HAMBOX.SharedKernel.Errors.Error(CatalogErrors.InvalidProductStatusTransition.Code, ex.Message));
+        }
+
+        // Same as the editor's follow-up "activate variants" step, so a bulk publish never leaves a live product
+        // whose variants are still hidden drafts.
+        var draftVariants = await _db.ProductVariants
+            .Where(v => v.ProductId == product.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Draft)
+            .ToListAsync(cancellationToken);
+        foreach (var variant in draftVariants)
+        {
+            variant.Activate();
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -128,7 +149,15 @@ internal sealed class RestoreProductCommandHandler : IRequestHandler<RestoreProd
 
         try
         {
-            product.Restore();
+            // "Restore" brings back either a soft-deleted product or an archived one (as a Draft).
+            if (product.IsDeleted)
+            {
+                product.Restore();
+            }
+            else
+            {
+                product.Unarchive();
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -142,6 +171,9 @@ internal sealed class RestoreProductCommandHandler : IRequestHandler<RestoreProd
 
 internal sealed class DuplicateProductCommandHandler : IRequestHandler<DuplicateProductCommand, Result<Guid>>
 {
+    /// <summary>Matches the Product.NameEn/NameAr column length.</summary>
+    private const int ProductNameMaxLength = 200;
+
     private readonly ICatalogDbContext _db;
     private readonly ICurrentUserService _currentUser;
 
@@ -165,6 +197,11 @@ internal sealed class DuplicateProductCommandHandler : IRequestHandler<Duplicate
         }
 
         var suffix = string.IsNullOrWhiteSpace(request.NameSuffix) ? " (Copy)" : request.NameSuffix.Trim();
+        if (source.NameEn.Length + suffix.Length > ProductNameMaxLength || source.NameAr.Length + suffix.Length > ProductNameMaxLength)
+        {
+            return Result.Failure<Guid>(CatalogErrors.ProductNameTooLong);
+        }
+
         var duplicate = Product.Create(
             source.NameAr + suffix,
             source.NameEn + suffix,

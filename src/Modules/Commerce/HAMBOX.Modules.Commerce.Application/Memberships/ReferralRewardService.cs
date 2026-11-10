@@ -76,8 +76,9 @@ public sealed class ReferralRewardService
             .Where(p => p.UserId == referrerUserId)
             .ExecuteUpdateAsync(
                 s => s
-                    .SetProperty(p => p.LifetimePoints, p => Math.Max(0, p.LifetimePoints - points))
-                    .SetProperty(p => p.SuccessfulReferrals, p => Math.Max(0, p.SuccessfulReferrals - 1)),
+                    // A ternary (not Math.Max) so EF translates it to a SQL CASE; floors both counters at zero.
+                    .SetProperty(p => p.LifetimePoints, p => p.LifetimePoints > points ? p.LifetimePoints - points : 0)
+                    .SetProperty(p => p.SuccessfulReferrals, p => p.SuccessfulReferrals > 1 ? p.SuccessfulReferrals - 1 : 0),
                 cancellationToken);
 
         if (updated == 0)

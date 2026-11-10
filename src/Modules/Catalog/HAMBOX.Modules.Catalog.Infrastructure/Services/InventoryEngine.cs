@@ -565,7 +565,8 @@ internal sealed class InventoryEngine : IInventoryEngine
                 return (v.ProductName, v.Sku, batchLookup.GetValueOrDefault(dupBatchId));
             }
 
-            return ("Unknown product", "Unknown variant", null);
+            // The code's variant is gone from the catalog (deleted), but the code itself is still on record and unique.
+            return ("a deleted product", "deleted variant", null);
         }
 
         var imported = 0;

@@ -104,15 +104,7 @@ internal sealed class GetAccountDashboardQueryHandler : IRequestHandler<GetAccou
             })
             .ToList();
 
-        var referralProfile = await _commerceDbContext.ReferralProfiles
-            .FirstOrDefaultAsync(r => r.UserId == userId, cancellationToken);
-
-        if (referralProfile is null)
-        {
-            referralProfile = ReferralProfile.CreateForUser(userId);
-            _commerceDbContext.ReferralProfiles.Add(referralProfile);
-            await _commerceDbContext.SaveChangesAsync(cancellationToken);
-        }
+        var referralProfile = await ReferralProfileProvisioner.GetOrCreateAsync(_commerceDbContext, userId, cancellationToken);
 
         var referralSettings = await _platformSettings.GetAsync<ReferralSettingsPayload>(
             PlatformSettingsCategoryKeys.Referral, cancellationToken);

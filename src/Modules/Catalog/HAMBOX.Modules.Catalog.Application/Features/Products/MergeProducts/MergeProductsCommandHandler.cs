@@ -81,15 +81,15 @@ internal sealed class MergeProductsCommandHandler : IRequestHandler<MergeProduct
         // stock is entirely code-driven (DigitalInventoryCode), so this count has no migration
         // path and would silently disappear. Require an explicit confirmation before doing that.
         // An untouched creation-default counter is a placeholder, not recorded stock, so it doesn't count.
-        var sourceIdsWithStock = sources
+        var sourceNamesWithStock = sources
             .Where(p => !variantsBySource.ContainsKey(p.Id))
             .Where(p => p.StockQuantity > 0 && p.StockQuantity != Product.DefaultInitialStock)
-            .Select(p => p.Id)
+            .Select(p => p.NameEn)
             .ToList();
-        if (sourceIdsWithStock.Count > 0 && !request.ConfirmStockLoss)
+        if (sourceNamesWithStock.Count > 0 && !request.ConfirmStockLoss)
         {
             return Result.Failure<MergeProductsResultDto>(
-                CatalogErrors.ProductMergeStockLossRequiresConfirmation(sourceIdsWithStock));
+                CatalogErrors.ProductMergeStockLossRequiresConfirmation(sourceNamesWithStock));
         }
 
         var group = await _db.ProductOptionGroups

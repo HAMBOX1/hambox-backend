@@ -15,10 +15,15 @@ namespace HAMBOX.UnitTests.Commerce.Referrals;
 /// <summary>Audit R49: referral farming (shared address, sign-up bursts) is held for an admin, never rewarded silently.</summary>
 public sealed class ReferralAntiAbuseTests
 {
-    private static ReferralLifecycleService Service(CommerceDbContext db) =>
-        new(db, new FakeDotPlatformSettingsProvider { ReferralEnabled = true },
+    private static ReferralLifecycleService Service(CommerceDbContext db)
+    {
+        var settings = new FakeDotPlatformSettingsProvider { ReferralEnabled = true };
+        return new(db, settings,
             new ReferralRewardService(db, new FakeMembershipEngine()),
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                db, settings, NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
             new FakeCommunicationService(), NullLogger<ReferralLifecycleService>.Instance);
+    }
 
     private static async Task<string> ReferrerAsync(CommerceDbContext db)
     {

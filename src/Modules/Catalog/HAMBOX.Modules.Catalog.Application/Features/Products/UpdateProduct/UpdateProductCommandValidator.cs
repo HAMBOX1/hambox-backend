@@ -9,7 +9,10 @@ public class UpdateProductCommandValidator : AbstractValidator<UpdateProductComm
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.NameAr).MaximumLength(200);
         RuleFor(x => x.NameEn).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Price).InclusiveBetween(0, ProductPublishGuard.MaxPrice);
+        RuleFor(x => x.Price)
+            .Must(price => decimal.Round(price, 2) == price)
+            .WithMessage("Price can have at most 2 decimal places.");
         RuleFor(x => x.CategoryId).NotEmpty();
         RuleFor(x => x.Status).IsInEnum();
         RuleFor(x => x.AdditionalCategoryIds)

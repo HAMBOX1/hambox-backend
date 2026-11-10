@@ -38,15 +38,7 @@ internal sealed class GetReferralDashboardQueryHandler : IRequestHandler<GetRefe
             return Result.Failure<ReferralDashboardDto>(CommerceErrors.AuthenticationRequired);
         }
 
-        var profile = await _commerceDbContext.ReferralProfiles
-            .FirstOrDefaultAsync(r => r.UserId == _currentUserService.UserId, cancellationToken);
-
-        if (profile is null)
-        {
-            profile = ReferralProfile.CreateForUser(_currentUserService.UserId);
-            _commerceDbContext.ReferralProfiles.Add(profile);
-            await _commerceDbContext.SaveChangesAsync(cancellationToken);
-        }
+        var profile = await ReferralProfileProvisioner.GetOrCreateAsync(_commerceDbContext, _currentUserService.UserId, cancellationToken);
 
         var recentHistory = await _commerceDbContext.ReferralHistoryEntries
             .Where(h => h.ReferrerUserId == _currentUserService.UserId)
@@ -61,6 +53,6 @@ internal sealed class GetReferralDashboardQueryHandler : IRequestHandler<GetRefe
             PlatformSettingsCategoryKeys.Referral, cancellationToken);
 
         return Result.Success(AccountMapper.ToReferralDashboardDto(
-            profile, recentHistory, pendingReferrals, referralSettings.PointsPerReferral, referralSettings.PointValueUsd));
+            profile, recentHistory, pendingReferrals, referralSettings.PointsPerReferral, referralSettings.PointValueUsd, referralSettings.Enabled));
     }
 }

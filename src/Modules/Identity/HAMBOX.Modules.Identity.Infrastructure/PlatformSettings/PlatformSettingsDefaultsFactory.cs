@@ -40,6 +40,7 @@ internal static class PlatformSettingsDefaultsFactory
             PlatformSettingsCategoryKeys.Promotions => CreatePromotions(),
             PlatformSettingsCategoryKeys.Memberships => CreateMemberships(),
             PlatformSettingsCategoryKeys.Referral => CreateReferral(),
+            PlatformSettingsCategoryKeys.PurchasePoints => CreatePurchasePoints(),
             PlatformSettingsCategoryKeys.Inventory => CreateInventory(),
             PlatformSettingsCategoryKeys.Queue => CreateQueue(),
             PlatformSettingsCategoryKeys.RetryPolicies => CreateRetryPolicies(),
@@ -288,6 +289,10 @@ internal static class PlatformSettingsDefaultsFactory
 
     private static ReferralSettingsPayload CreateReferral() =>
         new(false, 100, 0.10m, 30);
+
+    // Off by default: enabling it is a business decision, and turning it on must never retro-award old orders.
+    private static PurchasePointsSettingsPayload CreatePurchasePoints() =>
+        new(false, 1m, PurchasePointsAmountBasis.NetOfTax);
 
     private static InventorySettingsPayload CreateInventory() =>
         new(5, 15, true, "AfterPayment", ShowLowStockBadge: true, ShowLowStockMessage: true);

@@ -4,6 +4,7 @@ using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Services;
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -14,15 +15,18 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
 {
     private readonly ICatalogDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICurrentUserPermissions _permissions;
     private readonly IMembershipAccessProvider _membershipAccess;
 
     public GetProductByIdQueryHandler(
         ICatalogDbContext dbContext,
         ICurrentUserService currentUser,
+        ICurrentUserPermissions permissions,
         IMembershipAccessProvider membershipAccess)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
+        _permissions = permissions;
         _membershipAccess = membershipAccess;
     }
 
@@ -35,7 +39,8 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
             .Include(entry => entry.Collections)
             .FirstOrDefaultAsync(entry => entry.Id == request.Id, cancellationToken);
 
-        if (product is null)
+        // Non-active products are admin-only; answer exactly like a missing product so their existence isn't revealed.
+        if (product is null || (!_permissions.Has(CatalogPermissions.ProductsView) && product.Status != ProductStatus.Active))
         {
             return Result.Failure<ProductDto>(CatalogErrors.ProductNotFound);
         }
@@ -60,7 +65,7 @@ internal sealed class GetProductByIdQueryHandler : IRequestHandler<GetProductByI
             isMembersOnly: productAccess.IsRestricted,
             canPurchase: canPurchase,
             requiredPlanNames: productAccess.RequiredPlanNames,
-            isAdminContext: _currentUser.IsAdminContext,
+            isAdminContext: _permissions.Has(CatalogPermissions.ProductsView),
             categoryDescriptionHtml: category?.DescriptionHtml));
     }
 

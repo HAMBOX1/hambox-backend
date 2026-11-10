@@ -3,6 +3,7 @@ using HAMBOX.Application.Membership;
 using HAMBOX.Application.Referrals;
 using HAMBOX.Application.Variants;
 using HAMBOX.Modules.Commerce.Application.Memberships;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Promotions;
 using HAMBOX.Modules.Commerce.Application.Promotions.Evaluators;
 using HAMBOX.Modules.Commerce.Application.Referrals;
@@ -27,6 +28,7 @@ public static class CommerceApplicationExtensions
         services.AddScoped<ICommerceVariantRelocator, CommerceVariantRelocator>();
         services.AddScoped<MembershipOperationsService>();
         services.AddScoped<ReferralRewardService>();
+        services.AddScoped<PurchasePointsService>();
         services.AddScoped<ReferralLifecycleService>();
         services.AddScoped<IReferralRedemptionService>(sp => sp.GetRequiredService<ReferralLifecycleService>());
         services.AddScoped<OrderFulfillmentService>();

@@ -33,7 +33,9 @@ public static class CatalogInfrastructureExtensions
         var connectionString = configuration.GetConnectionString("Database");
         services.AddDbContext<CatalogDbContext>((sp, options) =>
             options.UseSqlServer(connectionString,
-                o => o.MigrationsHistoryTable("__EFMigrationsHistory", "catalog"))
+                o => o.MigrationsHistoryTable("__EFMigrationsHistory", "catalog")
+                    // Product list projections load several collections; one joined query would multiply rows.
+                    .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
             .AddInterceptors(
                 sp.GetRequiredService<SoftDeleteInterceptor>(),
                 new ProductAggregateChangeInterceptor(),

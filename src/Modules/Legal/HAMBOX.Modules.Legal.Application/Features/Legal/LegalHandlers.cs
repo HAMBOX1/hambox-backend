@@ -1,3 +1,4 @@
+using HAMBOX.Application.Security;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Legal.Application.Abstractions;
 using HAMBOX.Modules.Legal.Application.Contracts.Legal;
@@ -250,12 +251,12 @@ internal sealed class UpdateLegalSectionCommandHandler(ILegalDbContext dbContext
         if (draft is null)
         {
             draft = section.CreateDraftVersion(
-                request.Request.TitleEn, request.Request.TitleAr, request.Request.ContentEn, request.Request.ContentAr, request.Request.VersionNotes);
+                request.Request.TitleEn, request.Request.TitleAr, RichTextSanitizer.Sanitize(request.Request.ContentEn) ?? string.Empty, RichTextSanitizer.Sanitize(request.Request.ContentAr), request.Request.VersionNotes);
             dbContext.LegalSectionVersions.Add(draft);
         }
         else
         {
-            draft.UpdateContent(request.Request.TitleEn, request.Request.TitleAr, request.Request.ContentEn, request.Request.ContentAr, request.Request.VersionNotes);
+            draft.UpdateContent(request.Request.TitleEn, request.Request.TitleAr, RichTextSanitizer.Sanitize(request.Request.ContentEn) ?? string.Empty, RichTextSanitizer.Sanitize(request.Request.ContentAr), request.Request.VersionNotes);
         }
 
         LegalAuditWriter.Record(dbContext, section.Id, LegalSectionAuditAction.Updated, currentUser.UserId);

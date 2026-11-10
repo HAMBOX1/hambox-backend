@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -19,11 +20,11 @@ internal sealed class GetCollectionsQueryHandler : IRequestHandler<GetCollection
     {
         var query = _dbContext.ProductCollections.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        if (!string.IsNullOrWhiteSpace(SearchInput.Clean(request.SearchTerm)!))
         {
             query = query.Where(c =>
-                c.Name.Contains(request.SearchTerm) ||
-                (c.Description != null && c.Description.Contains(request.SearchTerm)));
+                c.Name.Contains(SearchInput.Clean(request.SearchTerm)!) ||
+                (c.Description != null && c.Description.Contains(SearchInput.Clean(request.SearchTerm)!)));
         }
 
         int totalCount = await query.CountAsync(cancellationToken);

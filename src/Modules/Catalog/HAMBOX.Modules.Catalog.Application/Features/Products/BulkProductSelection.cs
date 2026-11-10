@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using HAMBOX.Modules.Catalog.Application.Services;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,10 +50,10 @@ internal static class BulkProductSelectionResolver
 
         if (!string.IsNullOrWhiteSpace(selection.SearchTerm))
         {
-            query = query.Where(p => p.NameAr.Contains(selection.SearchTerm) ||
-                                     p.NameEn.Contains(selection.SearchTerm) ||
-                                     p.DescriptionAr.Contains(selection.SearchTerm) ||
-                                     p.DescriptionEn.Contains(selection.SearchTerm));
+            query = query.Where(p => p.NameAr.Contains(SearchInput.Clean(selection.SearchTerm)!) ||
+                                     p.NameEn.Contains(SearchInput.Clean(selection.SearchTerm)!) ||
+                                     p.DescriptionAr.Contains(SearchInput.Clean(selection.SearchTerm)!) ||
+                                     p.DescriptionEn.Contains(SearchInput.Clean(selection.SearchTerm)!));
         }
 
         if (selection.Status.HasValue)

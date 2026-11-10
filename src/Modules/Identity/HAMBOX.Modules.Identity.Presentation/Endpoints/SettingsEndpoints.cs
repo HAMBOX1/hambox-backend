@@ -101,6 +101,11 @@ internal static class SettingsEndpoints
                 return Results.BadRequest(new { error = "TestEmail is required." });
             }
 
+            if (!System.Net.Mail.MailAddress.TryCreate(body.TestEmail, out _))
+            {
+                return Results.BadRequest(new { error = "TestEmail must be a valid e-mail address." });
+            }
+
             try
             {
                 var result = await sender.Send(new TestPlatformSettingsEmailCommand(body.TestEmail));

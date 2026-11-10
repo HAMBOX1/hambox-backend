@@ -59,7 +59,8 @@ public sealed class CommunicationPreference : Entity
         EmailEnabled = emailEnabled;
         InAppEnabled = inAppEnabled;
         MarketingEnabled = marketingEnabled;
-        SecurityEnabled = securityEnabled;
+        // Security alerts (sign-in codes, password changes) are not optional; the UI says "always on", so the API must agree.
+        SecurityEnabled = true;
         OrderEnabled = orderEnabled;
         MembershipEnabled = membershipEnabled;
         SupportEnabled = supportEnabled;

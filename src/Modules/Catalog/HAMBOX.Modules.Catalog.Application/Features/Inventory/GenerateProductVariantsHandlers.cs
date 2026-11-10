@@ -66,6 +66,11 @@ internal sealed class GenerateProductVariantsCommandHandler
         // behavior), but an option only combines with its own child groups, never a sibling
         // branch's — an empty child group just makes its parent option a leaf instead of blocking
         // generation for the whole product.
+        if (VariantCombinationHelper.CountCombinations(groups) > VariantCombinationHelper.MaxVariantsPerProduct)
+        {
+            return Result.Failure<GenerateProductVariantsResultDto>(CatalogErrors.TooManyVariantCombinations);
+        }
+
         var combinations = VariantCombinationHelper.Expand(groups);
 
         var optionLookup = groups

@@ -19,11 +19,22 @@ internal sealed class FakeReferralPlatformSettingsProvider : IPlatformSettingsPr
         PointValueUsd: 0.10m,
         RewardExpiryDays: 30);
 
+    /// <summary>Off by default so referral tests never earn purchase points unless they opt in.</summary>
+    public PurchasePointsSettingsPayload PurchasePoints { get; set; } = new(
+        Enabled: false,
+        PointsPerUsd: 1m,
+        AmountBasis: PurchasePointsAmountBasis.NetOfTax);
+
     public Task<T> GetAsync<T>(string categoryKey, CancellationToken cancellationToken = default)
     {
         if (categoryKey == PlatformSettingsCategoryKeys.Referral && typeof(T) == typeof(ReferralSettingsPayload))
         {
             return Task.FromResult((T)(object)Referral);
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.PurchasePoints && typeof(T) == typeof(PurchasePointsSettingsPayload))
+        {
+            return Task.FromResult((T)(object)PurchasePoints);
         }
 
         throw new NotSupportedException($"FakeReferralPlatformSettingsProvider has no fake for category '{categoryKey}'.");

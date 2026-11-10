@@ -21,7 +21,9 @@ public static class LocalizationExtensions
 
     public static IServiceCollection AddHamboxLocalization(this IServiceCollection services)
     {
-        services.AddLocalization(options => options.ResourcesPath = "Resources");
+        // No ResourcesPath: SharedResources already lives in the Resources namespace, so adding the path
+        // made the lookup name "…Resources.Resources.SharedResources" and every key resolved to itself.
+        services.AddLocalization();
 
         services.Configure<RequestLocalizationOptions>(options =>
         {

@@ -1,7 +1,9 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Features.Products;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -12,11 +14,24 @@ namespace HAMBOX.Modules.Catalog.Application.Features.ImportExport.ExportCatalog
 internal sealed class ExportCatalogCommandHandler(
     ICatalogDbContext dbContext,
     IBackgroundJobScheduler jobScheduler,
-    ICatalogPackageSecretProtector secretProtector)
+    ICatalogPackageSecretProtector secretProtector,
+    ICurrentUserPermissions permissions)
     : IRequestHandler<ExportCatalogCommand, Result<Guid>>
 {
     public async Task<Result<Guid>> Handle(ExportCatalogCommand request, CancellationToken cancellationToken)
     {
+        // A package can carry plaintext redemption codes and supplier buying prices. The Export permission alone must
+        // not be a way around the dedicated reveal / cost permissions those data are otherwise behind.
+        if (request.Options.IncludeDigitalCodes && !permissions.Has(CatalogPermissions.RevealCodes))
+        {
+            return Result.Failure<Guid>(CatalogErrors.ExportCodesNotPermitted);
+        }
+
+        if (request.Options.IncludeSuppliers && !permissions.Has(CatalogPermissions.ViewCosts))
+        {
+            return Result.Failure<Guid>(CatalogErrors.ExportCostsNotPermitted);
+        }
+
         IReadOnlyList<Guid> productIds;
 
         if (request.Scope.ExportEntireCatalog)

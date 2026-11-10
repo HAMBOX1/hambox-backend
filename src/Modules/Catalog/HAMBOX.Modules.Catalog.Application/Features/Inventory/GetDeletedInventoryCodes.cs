@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
@@ -59,7 +60,7 @@ internal sealed class GetDeletedInventoryCodesQueryHandler(ICatalogDbContext db)
 
         // Product/variant lookups include soft-deleted rows: a code deleted along with its product is exactly
         // the kind of record the owner needs to find again.
-        var term = request.SearchTerm?.Trim();
+        var term = SearchInput.Clean(request.SearchTerm);
         if (!string.IsNullOrEmpty(term))
         {
             var matchingVariantIds = db.ProductVariants.IgnoreQueryFilters().AsNoTracking()

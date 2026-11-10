@@ -411,11 +411,11 @@ internal static class SecurityEndpoints
         // ──── Country Restrictions ───────────────────────────────────────
         group.MapGet("countries", async Task<IResult> (
             [FromQuery] string? searchTerm,
-            [FromQuery] bool overriddenOnly,
+            [FromQuery] bool? overriddenOnly,
             ISender sender,
             CancellationToken ct) =>
         {
-            var result = await sender.Send(new GetCountryRestrictionsQuery(searchTerm, overriddenOnly), ct);
+            var result = await sender.Send(new GetCountryRestrictionsQuery(searchTerm, overriddenOnly ?? false), ct);
             return MapResult(result);
         })
         .WithName("GetCountryRestrictions")

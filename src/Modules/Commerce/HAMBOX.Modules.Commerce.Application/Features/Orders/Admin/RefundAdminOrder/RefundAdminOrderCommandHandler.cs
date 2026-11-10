@@ -65,6 +65,12 @@ internal sealed class RefundAdminOrderCommandHandler : IRequestHandler<RefundAdm
                     throw new InvalidOperationException(CommerceErrors.OrderNotFound.Description);
                 }
 
+                if (order.Status == OrderStatus.Refunded)
+                {
+                    // Already refunded: repeating it must not add another audit entry or re-open a settled refund.
+                    return;
+                }
+
                 var wasAlreadyReleased = order.Status is OrderStatus.Cancelled or OrderStatus.Refunded;
                 previousStatus = order.Status.ToString();
 

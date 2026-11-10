@@ -42,7 +42,13 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
         _membershipAccess = membershipAccess;
     }
 
-    public async Task<Result<Contracts.CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken)
+    public Task<Result<Contracts.CartDto>> Handle(AddCartItemCommand request, CancellationToken cancellationToken) =>
+        CartMutationGate.RunAsync(
+            _currentUserService.UserId ?? request.GuestSessionId ?? "guest",
+            () => HandleCoreAsync(request, cancellationToken),
+            cancellationToken);
+
+    private async Task<Result<Contracts.CartDto>> HandleCoreAsync(AddCartItemCommand request, CancellationToken cancellationToken)
     {
         var product = await _catalogDbContext.Products
             .FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);

@@ -144,6 +144,73 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.ToTable("OrderLicenseKeys", "commerce");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.PointsTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("EligibleAmountUsd")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("PointsPerUsd")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PointsTransactions_IdempotencyKey");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("IX_PointsTransactions_OrderId");
+
+                    b.HasIndex("UserId", "OccurredOnUtc")
+                        .HasDatabaseName("IX_PointsTransactions_UserId_OccurredOnUtc");
+
+                    b.ToTable("PointsTransactions", "commerce");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Commerce.Domain.Account.ProductReview", b =>
                 {
                     b.Property<Guid>("Id")

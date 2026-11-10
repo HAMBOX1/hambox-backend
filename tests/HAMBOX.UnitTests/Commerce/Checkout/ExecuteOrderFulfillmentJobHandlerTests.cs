@@ -116,7 +116,11 @@ public sealed class ExecuteOrderFulfillmentJobHandlerTests
 
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(
-            commerceDb, new FakeCommerceSettingsProvider(), referralRewardService, new FakeCommunicationService(),
+            commerceDb, new FakeCommerceSettingsProvider(), referralRewardService,
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, new FakeCommerceSettingsProvider(),
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
+            new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
 
         var handler = new ExecuteOrderFulfillmentJobHandler(

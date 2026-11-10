@@ -122,7 +122,7 @@ public static class CommerceInfrastructureExtensions
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddScoped<IPaymentGateway>(sp => (IPaymentGateway)sp.GetRequiredService<IDotFawryPaymentGateway>());
 
-        services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly);
+        services.AddValidatorsFromAssembly(typeof(AddCartItemCommandValidator).Assembly, includeInternalTypes: true);
 
         services.AddSingleton<IWorkerRuntimeState, WorkerRuntimeState>();
 

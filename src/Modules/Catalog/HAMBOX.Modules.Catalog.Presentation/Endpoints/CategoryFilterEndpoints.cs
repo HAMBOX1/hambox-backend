@@ -39,7 +39,7 @@ internal static class CategoryFilterEndpoints
             [FromBody] SaveCategoryFiltersRequest body,
             ISender sender) =>
         {
-            var result = await sender.Send(new SaveCategoryFilterConfigCommand(categoryId, body.Items));
+            var result = await sender.Send(new SaveCategoryFilterConfigCommand(categoryId, body.Items ?? []));
             return result.IsSuccess
                 ? Results.NoContent()
                 : Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = result.Error.Description });

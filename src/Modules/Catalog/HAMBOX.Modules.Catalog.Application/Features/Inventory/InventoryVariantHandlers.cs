@@ -16,16 +16,23 @@ public sealed record GetInventoryStatisticsQuery(Guid? ProductId, Guid? VariantI
 internal sealed class GetInventoryStatisticsQueryHandler : IRequestHandler<GetInventoryStatisticsQuery, Result<InventoryStatisticsDto>>
 {
     private readonly IInventoryEngine _engine;
+    private readonly ICurrentUserPermissions _permissions;
 
-    public GetInventoryStatisticsQueryHandler(IInventoryEngine engine) => _engine = engine;
+    public GetInventoryStatisticsQueryHandler(IInventoryEngine engine, ICurrentUserPermissions permissions)
+    {
+        _engine = engine;
+        _permissions = permissions;
+    }
 
     public async Task<Result<InventoryStatisticsDto>> Handle(GetInventoryStatisticsQuery request, CancellationToken cancellationToken)
     {
         var stats = await _engine.GetStatisticsAsync(request.ProductId, request.VariantId, cancellationToken);
+        var canViewCosts = _permissions.Has(CatalogPermissions.ViewCosts);
         return Result.Success(new InventoryStatisticsDto(
             stats.Available, stats.Reserved, stats.Sold, stats.Expired,
             stats.LowStockVariants, stats.OutOfStockVariants,
-            stats.InventoryValue, stats.PurchaseCost, stats.EstimatedRevenue, stats.EstimatedProfit));
+            canViewCosts ? stats.InventoryValue : null, canViewCosts ? stats.PurchaseCost : null,
+            canViewCosts ? stats.EstimatedRevenue : null, canViewCosts ? stats.EstimatedProfit : null));
     }
 }
 
@@ -35,11 +42,13 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
 {
     private readonly ICatalogDbContext _db;
     private readonly IInventoryEngine _engine;
+    private readonly ICurrentUserPermissions _permissions;
 
-    public GetProductVariantsQueryHandler(ICatalogDbContext db, IInventoryEngine engine)
+    public GetProductVariantsQueryHandler(ICatalogDbContext db, IInventoryEngine engine, ICurrentUserPermissions permissions)
     {
         _db = db;
         _engine = engine;
+        _permissions = permissions;
     }
 
     public async Task<Result<IReadOnlyList<ProductVariantDto>>> Handle(GetProductVariantsQuery request, CancellationToken cancellationToken)
@@ -63,6 +72,7 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 .Select(group => new { VariantId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(entry => entry.VariantId, entry => entry.Count, cancellationToken);
 
+        var canViewCosts = _permissions.Has(CatalogPermissions.ViewCosts);
         var dtos = variants.Select(v =>
         {
             stock.TryGetValue(v.Id, out var s);
@@ -73,7 +83,7 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 s?.Available ?? 0, s?.Reserved ?? 0, s?.Sold ?? 0, totalCodes,
                 s?.IsLowStock ?? false, s?.IsOutOfStock ?? true,
                 v.SelectedOptions.Select(o => o.OptionId).ToList(), v.FulfillmentMode.ToString(),
-                v.CostPrice, v.MemberPrice);
+                canViewCosts ? v.CostPrice : null, v.MemberPrice);
         }).ToList();
 
         return Result.Success<IReadOnlyList<ProductVariantDto>>(dtos);
@@ -121,6 +131,13 @@ internal sealed class CreateProductVariantCommandHandler : IRequestHandler<Creat
         {
             return Result.Failure<Guid>(CatalogErrors.IncompleteVariantCombination(
                 missingGroups.Select(g => g.DisplayName).ToList()));
+        }
+
+        var skuTaken = await _db.ProductVariants.IgnoreQueryFilters()
+            .AnyAsync(v => v.Sku == request.Sku.Trim().ToUpper() && !v.IsDeleted, cancellationToken);
+        if (skuTaken)
+        {
+            return Result.Failure<Guid>(CatalogErrors.VariantSkuExists);
         }
 
         var variant = ProductVariant.Create(
@@ -276,6 +293,13 @@ internal sealed class CreateProductOptionGroupCommandHandler : IRequestHandler<C
             }
         }
 
+        var keyTaken = await _db.ProductOptionGroups
+            .AnyAsync(g => g.ProductId == request.ProductId && g.Key == request.Key.Trim().ToLower(), cancellationToken);
+        if (keyTaken)
+        {
+            return Result.Failure<Guid>(CatalogErrors.OptionGroupKeyExists);
+        }
+
         var group = ProductOptionGroup.Create(request.ProductId, request.Key, request.DisplayName, request.SortOrder, request.IsRequired, request.ParentOptionId);
         _db.ProductOptionGroups.Add(group);
         _db.InventoryAuditLogs.Add(InventoryAuditLog.Create(
@@ -308,6 +332,13 @@ internal sealed class CreateProductOptionCommandHandler : IRequestHandler<Create
         if (group is null)
         {
             return Result.Failure<Guid>(CatalogErrors.ProductNotFound);
+        }
+
+        var valueTaken = await _db.ProductOptions
+            .AnyAsync(o => o.OptionGroupId == request.OptionGroupId && o.Value == request.Value.Trim().ToLower(), cancellationToken);
+        if (valueTaken)
+        {
+            return Result.Failure<Guid>(CatalogErrors.OptionValueExists);
         }
 
         var descriptionHtml = ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml);

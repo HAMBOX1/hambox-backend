@@ -177,7 +177,7 @@ internal static class CategoryEndpoints
             ISender sender) =>
         {
             var command = new ReorderCategoriesCommand(
-                request.Entries.Select(e => new CategoryReorderEntry(e.Id, e.ParentId, e.SortOrder)).ToList());
+                (request.Entries ?? []).Select(e => new CategoryReorderEntry(e.Id, e.ParentId, e.SortOrder)).ToList());
             var result = await sender.Send(command);
 
             if (result.IsSuccess)

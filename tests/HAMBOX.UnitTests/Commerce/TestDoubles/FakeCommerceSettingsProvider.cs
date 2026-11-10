@@ -18,6 +18,10 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
     /// that are exclusively about supplier pricing.</summary>
     public ReferralSettingsPayload Referral { get; set; } = new(Enabled: false, PointsPerReferral: 0, PointValueUsd: 0m, RewardExpiryDays: 0);
 
+    /// <summary>Disabled by default, like <see cref="Referral"/>: order completion awards purchase points as a side effect.</summary>
+    public PurchasePointsSettingsPayload PurchasePoints { get; set; } = new(
+        Enabled: false, PointsPerUsd: 1m, AmountBasis: PurchasePointsAmountBasis.NetOfTax);
+
     public PromotionsSettingsPayload Promotions { get; set; } = new(50m, StackCouponsAllowed: true, 1000, 1);
 
     public RetryPoliciesSettingsPayload RetryPolicies { get; set; } = new(3, 30, 120, 5, UseExponentialBackoff: false);
@@ -34,6 +38,11 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
         if (categoryKey == PlatformSettingsCategoryKeys.Referral && Referral is T referral)
         {
             return Task.FromResult(referral);
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.PurchasePoints && PurchasePoints is T purchasePoints)
+        {
+            return Task.FromResult(purchasePoints);
         }
 
         if (categoryKey == PlatformSettingsCategoryKeys.Promotions && Promotions is T promotions)

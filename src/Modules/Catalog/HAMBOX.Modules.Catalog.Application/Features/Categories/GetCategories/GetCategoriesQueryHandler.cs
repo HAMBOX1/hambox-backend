@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -19,9 +20,9 @@ internal sealed class GetCategoriesQueryHandler : IRequestHandler<GetCategoriesQ
     {
         var query = _dbContext.Categories.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        if (!string.IsNullOrWhiteSpace(SearchInput.Clean(request.SearchTerm)!))
         {
-            query = query.Where(c => c.NameAr.Contains(request.SearchTerm) || c.NameEn.Contains(request.SearchTerm));
+            query = query.Where(c => c.NameAr.Contains(SearchInput.Clean(request.SearchTerm)!) || c.NameEn.Contains(SearchInput.Clean(request.SearchTerm)!));
         }
 
         if (request.ActiveOnly.HasValue)

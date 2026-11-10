@@ -14,15 +14,18 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     {
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("First name is required.")
-            .MaximumLength(100).WithMessage("First name must not exceed 100 characters.");
+            .MaximumLength(100).WithMessage("First name must not exceed 100 characters.")
+            .WithoutMarkup();
 
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Last name is required.")
-            .MaximumLength(100).WithMessage("Last name must not exceed 100 characters.");
+            .MaximumLength(100).WithMessage("Last name must not exceed 100 characters.")
+            .WithoutMarkup();
 
         RuleFor(x => x.PhoneNumber)
             .MaximumLength(20).WithMessage("Phone number must not exceed 20 characters.")
-            .When(x => x.PhoneNumber is not null);
+            .PhoneFormat()
+            .When(x => !string.IsNullOrWhiteSpace(x.PhoneNumber));
 
         RuleFor(x => x.PreferredLanguage)
             .Must(lang => lang is null || lang is "en" or "ar")

@@ -8,7 +8,7 @@ public class AdjustProductPriceCommandValidator : AbstractValidator<AdjustProduc
     {
         RuleFor(x => x.ProductId).NotEmpty();
         RuleFor(x => x.Mode).IsInEnum();
-        RuleFor(x => x.Value).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.Value).InclusiveBetween(0, ProductPublishGuard.MaxPrice);
         RuleFor(x => x.Value).LessThanOrEqualTo(100).When(x => x.Mode == PriceAdjustmentMode.DecreasePercent);
     }
 }

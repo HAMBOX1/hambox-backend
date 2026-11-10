@@ -1,4 +1,5 @@
 using FluentValidation;
+using HAMBOX.Application.Abstractions;
 
 namespace HAMBOX.Modules.Identity.Application.Features.ChangePassword;
 
@@ -10,14 +11,16 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
     /// <summary>
     /// Initializes a new instance of the <see cref="ChangePasswordCommandValidator"/> class.
     /// </summary>
-    public ChangePasswordCommandValidator()
+    public ChangePasswordCommandValidator(IPlatformSettingsProvider platformSettings)
     {
         RuleFor(x => x.CurrentPassword)
             .NotEmpty().WithMessage("Current password is required.");
 
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("New password is required.")
-            .MinimumLength(8).WithMessage("New password must be at least 8 characters long.")
-            .MaximumLength(128).WithMessage("New password must not exceed 128 characters.");
+            .MaximumLength(128).WithMessage("New password must not exceed 128 characters.")
+            .MeetsConfiguredPasswordPolicy(platformSettings)
+            .Must((command, newPassword) => newPassword != command.CurrentPassword)
+            .WithMessage("The new password must be different from the current password.");
     }
 }

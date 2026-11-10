@@ -1,3 +1,4 @@
+using HAMBOX.Application.Security;
 using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Contracts;
 using HAMBOX.Modules.Support.Application.Errors;
@@ -20,7 +21,14 @@ internal sealed class CreateKnowledgeArticleCommandHandler(ISupportDbContext dbC
             return Result.Failure<KnowledgeArticleDetailDto>(SupportErrors.KnowledgeCategoryNotFound);
         }
 
-        var article = KnowledgeArticle.Create(request.CategoryId, request.Title, request.Body, request.Visibility);
+        var article = KnowledgeArticle.Create(request.CategoryId, request.Title, RichTextSanitizer.Sanitize(request.Body) ?? string.Empty, request.Visibility);
+        var slugTaken = await dbContext.KnowledgeArticles.IgnoreQueryFilters()
+            .AnyAsync(a => a.Slug == article.Slug, cancellationToken);
+        if (slugTaken)
+        {
+            return Result.Failure<KnowledgeArticleDetailDto>(SupportErrors.KnowledgeSlugExists);
+        }
+
         dbContext.KnowledgeArticles.Add(article);
         await dbContext.SaveChangesAsync(cancellationToken);
 

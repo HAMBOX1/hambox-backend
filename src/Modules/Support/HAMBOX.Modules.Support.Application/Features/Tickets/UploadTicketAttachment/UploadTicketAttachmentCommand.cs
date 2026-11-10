@@ -10,4 +10,6 @@ public sealed record UploadTicketAttachmentCommand(
     Stream Content,
     string FileName,
     string ContentType,
-    long FileSizeBytes) : IRequest<Result<TicketAttachmentDto>>;
+    long FileSizeBytes,
+    // True for the customer endpoint: the ticket must belong to the uploader. Agents are authorized by permission instead.
+    bool RequireTicketOwnership = false) : IRequest<Result<TicketAttachmentDto>>;

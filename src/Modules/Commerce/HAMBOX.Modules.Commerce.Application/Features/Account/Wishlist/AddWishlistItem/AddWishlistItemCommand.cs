@@ -62,7 +62,23 @@ internal sealed class AddWishlistItemCommandHandler : IRequestHandler<AddWishlis
 
         var item = WishlistItem.Create(_currentUserService.UserId, request.ProductId);
         _commerceDbContext.WishlistItems.Add(item);
-        await _commerceDbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _commerceDbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // A double-click / parallel request added it first: report "already there" rather than a 500.
+            _commerceDbContext.WishlistItems.Remove(item);
+            var addedMeanwhile = await _commerceDbContext.WishlistItems.AsNoTracking()
+                .AnyAsync(w => w.UserId == _currentUserService.UserId && w.ProductId == request.ProductId, cancellationToken);
+            if (!addedMeanwhile)
+            {
+                throw;
+            }
+
+            return Result.Failure<Contracts.Account.WishlistItemDto>(CommerceErrors.WishlistItemExists);
+        }
 
         var imageUrls = await ProductPrimaryImageResolver.GetPrimaryImageUrlsAsync(
             _catalogDbContext,

@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Application.Security;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
@@ -71,6 +72,8 @@ internal sealed class RevealCustomerLibraryKeyQueryHandler
             join order in _commerceDbContext.Orders.AsNoTracking() on license.OrderId equals order.Id
             where license.Id == request.LibraryItemId
                   && order.UserId == userId
+                  // A refunded or cancelled order no longer entitles the customer to the key (the library already says canReveal=false).
+                  && order.Status == OrderStatus.Completed
             select license)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -173,6 +176,8 @@ internal sealed class RequestLicenseKeyRevealOtpCommandHandler
             from license in _commerceDbContext.OrderLicenseKeys.AsNoTracking()
             join order in _commerceDbContext.Orders.AsNoTracking() on license.OrderId equals order.Id
             where license.Id == request.LibraryItemId && order.UserId == userId
+                  // A refunded or cancelled order no longer entitles the customer to the key (the library already says canReveal=false).
+                  && order.Status == OrderStatus.Completed
             select license.Id)
             .AnyAsync(cancellationToken);
 

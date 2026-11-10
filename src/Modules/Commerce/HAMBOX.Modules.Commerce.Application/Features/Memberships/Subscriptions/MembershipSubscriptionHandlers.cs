@@ -32,64 +32,116 @@ internal sealed class MembershipSubscriptionHandlers :
     private readonly ICommerceDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
     private readonly MembershipOperationsService _operations;
+    private readonly IUserDirectory _userDirectory;
 
-    public MembershipSubscriptionHandlers(ICommerceDbContext dbContext, ICurrentUserService currentUser, MembershipOperationsService operations)
+    private const int MaxBulkAssignUsers = 500;
+
+    public MembershipSubscriptionHandlers(
+        ICommerceDbContext dbContext,
+        ICurrentUserService currentUser,
+        MembershipOperationsService operations,
+        IUserDirectory userDirectory)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _operations = operations;
+        _userDirectory = userDirectory;
     }
 
-    public async Task<Result<MembershipSubscriptionDto>> Handle(AssignMembershipCommand command, CancellationToken cancellationToken)
+    /// <summary>
+    /// The membership operations signal a business rule ("plan is not active", "cancelled subscriptions cannot be
+    /// renewed") by throwing; turn that into a normal 400 instead of an unhandled 500.
+    /// </summary>
+    private static async Task<Result<T>> GuardAsync<T>(Func<Task<Result<T>>> action)
     {
-        var subscription = await _operations.AssignAsync(command.Request.UserId, command.Request.PlanId, command.Request.AutoRenew, _currentUser.UserId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
-        return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
-    }
-
-    public async Task<Result<int>> Handle(BulkAssignMembershipCommand command, CancellationToken cancellationToken)
-    {
-        var count = 0;
-        foreach (var userId in command.Request.UserIds.Distinct())
+        try
         {
-            await _operations.AssignAsync(userId, command.Request.PlanId, command.Request.AutoRenew, _currentUser.UserId, cancellationToken);
-            count++;
+            return await action();
         }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Result.Success(count);
+        catch (InvalidOperationException exception)
+        {
+            return Result.Failure<T>(CommerceErrors.MembershipOperationRejected(exception.Message));
+        }
     }
 
-    public async Task<Result<MembershipSubscriptionDto>> Handle(RenewMembershipCommand command, CancellationToken cancellationToken)
-    {
-        var subscription = await _operations.RenewAsync(command.SubscriptionId, _currentUser.UserId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
-        return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
-    }
+    public Task<Result<MembershipSubscriptionDto>> Handle(AssignMembershipCommand command, CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
+        {
+            var existing = await _userDirectory.GetExistingUserIdsAsync([command.Request.UserId ?? string.Empty], cancellationToken);
+            if (!existing.Contains(command.Request.UserId ?? string.Empty))
+            {
+                return Result.Failure<MembershipSubscriptionDto>(CommerceErrors.MembershipUserNotFound);
+            }
 
-    public async Task<Result<MembershipSubscriptionDto>> Handle(UpgradeMembershipCommand command, CancellationToken cancellationToken)
-    {
-        var subscription = await _operations.ChangePlanAsync(command.SubscriptionId, command.Request.TargetPlanId, MembershipHistoryAction.Upgraded, _currentUser.UserId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
-        return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
-    }
+            var subscription = await _operations.AssignAsync(command.Request.UserId!, command.Request.PlanId, command.Request.AutoRenew, _currentUser.UserId, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
+            return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
+        });
 
-    public async Task<Result<MembershipSubscriptionDto>> Handle(DowngradeMembershipCommand command, CancellationToken cancellationToken)
-    {
-        var subscription = await _operations.ChangePlanAsync(command.SubscriptionId, command.Request.TargetPlanId, MembershipHistoryAction.Downgraded, _currentUser.UserId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
-        return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
-    }
+    public Task<Result<int>> Handle(BulkAssignMembershipCommand command, CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
+        {
+            var userIds = (command.Request.UserIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (userIds.Count > MaxBulkAssignUsers)
+            {
+                return Result.Failure<int>(CommerceErrors.MembershipTooManyUsers);
+            }
+
+            // Nothing is assigned unless every id is a real account: no orphan subscriptions for typos.
+            var existing = await _userDirectory.GetExistingUserIdsAsync(userIds, cancellationToken);
+            if (userIds.Any(id => !existing.Contains(id)))
+            {
+                return Result.Failure<int>(CommerceErrors.MembershipUserNotFound);
+            }
+
+            var count = 0;
+            foreach (var userId in userIds)
+            {
+                await _operations.AssignAsync(userId, command.Request.PlanId, command.Request.AutoRenew, _currentUser.UserId, cancellationToken);
+                count++;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Success(count);
+        });
+
+    public Task<Result<MembershipSubscriptionDto>> Handle(RenewMembershipCommand command, CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
+        {
+            var subscription = await _operations.RenewAsync(command.SubscriptionId, _currentUser.UserId, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
+            return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
+        });
+
+    public Task<Result<MembershipSubscriptionDto>> Handle(UpgradeMembershipCommand command, CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
+        {
+            var subscription = await _operations.ChangePlanAsync(command.SubscriptionId, command.Request.TargetPlanId, MembershipHistoryAction.Upgraded, _currentUser.UserId, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
+            return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
+        });
+
+    public Task<Result<MembershipSubscriptionDto>> Handle(DowngradeMembershipCommand command, CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
+        {
+            var subscription = await _operations.ChangePlanAsync(command.SubscriptionId, command.Request.TargetPlanId, MembershipHistoryAction.Downgraded, _currentUser.UserId, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            var plan = await _dbContext.MembershipPlans.FirstAsync(p => p.Id == subscription.PlanId, cancellationToken);
+            return Result.Success(MembershipMapper.ToSubscriptionDto(subscription, plan));
+        });
 
     public async Task<Result> Handle(CancelMembershipCommand command, CancellationToken cancellationToken)
     {
-        await _operations.CancelAsync(command.SubscriptionId, _currentUser.UserId, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-        return Result.Success();
+        var result = await GuardAsync(async () =>
+        {
+            await _operations.CancelAsync(command.SubscriptionId, _currentUser.UserId, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Success(true);
+        });
+        return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
     }
 
     public async Task<Result<MembershipStatisticsDto>> Handle(GetMembershipStatisticsQuery request, CancellationToken cancellationToken)

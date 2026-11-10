@@ -88,7 +88,7 @@ internal static class LegalEndpoints
         acceptance.MapPost("", async Task<IResult> (HttpContext httpContext, ISender sender) =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var userAgent = httpContext.Request.Headers["User-Agent"].ToString() ?? "unknown";
+            var userAgent = string.IsNullOrWhiteSpace(httpContext.Request.Headers["User-Agent"]) ? "unknown" : httpContext.Request.Headers["User-Agent"].ToString();
             var language = httpContext.Request.Headers["Accept-Language"].ToString() is { Length: > 0 } acceptLanguage
                 ? acceptLanguage.Split(',')[0].Split(';')[0].Trim()
                 : "en";

@@ -185,6 +185,9 @@ public static class CommerceErrors
         "The coupon code was not found.");
 
     public static readonly Error MembershipPlanNotFound = new("Memberships.PlanNotFound", "Membership plan was not found.");
+    public static readonly Error MembershipUserNotFound = new("Memberships.UserNotFound", "One or more of the selected users do not exist.");
+    public static readonly Error MembershipTooManyUsers = new("Memberships.TooManyUsers", "Assign to at most 500 users at a time.");
+    public static Error MembershipOperationRejected(string reason) => new("Memberships.OperationRejected", reason);
     public static readonly Error MembershipSubscriptionNotFound = new("Memberships.SubscriptionNotFound", "Membership subscription was not found.");
     public static readonly Error MembershipSubscriptionAlreadyActive = new("Memberships.SubscriptionAlreadyActive", "You already have an active membership. Use upgrade or downgrade instead.");
     public static readonly Error MembershipPlanSlugExists = new("Memberships.SlugExists", "A plan with this slug already exists.");
@@ -246,6 +249,10 @@ public static class CommerceErrors
     public static readonly Error HoldReasonRequired = new(
         "Commerce.HoldReasonRequired",
         "Enter a reason for holding this order.");
+
+    public static readonly Error OrderAlreadyOnHold = new(
+        "Commerce.OrderAlreadyOnHold",
+        "This order is already on hold. Release the hold first.");
 
     public static readonly Error OrderCannotBeHeld = new(
         "Commerce.OrderCannotBeHeld",

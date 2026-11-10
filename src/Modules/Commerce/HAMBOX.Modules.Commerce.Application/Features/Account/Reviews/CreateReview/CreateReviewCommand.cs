@@ -70,7 +70,23 @@ internal sealed class CreateReviewCommandHandler : IRequestHandler<CreateReviewC
             request.Comment);
 
         _commerceDbContext.ProductReviews.Add(review);
-        await _commerceDbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _commerceDbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // A double-click / parallel request created it first: report "already reviewed" rather than a 500.
+            _commerceDbContext.ProductReviews.Remove(review);
+            var createdMeanwhile = await _commerceDbContext.ProductReviews.AsNoTracking()
+                .AnyAsync(r => r.UserId == _currentUserService.UserId && r.ProductId == request.ProductId, cancellationToken);
+            if (!createdMeanwhile)
+            {
+                throw;
+            }
+
+            return Result.Failure<ProductReviewDto>(CommerceErrors.ReviewAlreadyExists);
+        }
 
         return Result.Success(AccountMapper.ToProductReviewDto(review));
     }

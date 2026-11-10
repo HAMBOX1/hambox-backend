@@ -10,14 +10,13 @@ namespace HAMBOX.Modules.Identity.Application.Features.Security.BlockedUsers;
 internal sealed class GetBlockedUsersQueryHandler(IIdentityDbContext dbContext)
     : IRequestHandler<GetBlockedUsersQuery, Result<PagedResult<BlockedUserListItemDto>>>
 {
-    private static readonly UserStatus[] RestrictedStatuses =
-        [UserStatus.Suspended, UserStatus.Blocked, UserStatus.Banned];
-
     public async Task<Result<PagedResult<BlockedUserListItemDto>>> Handle(
         GetBlockedUsersQuery request,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Users.AsNoTracking().Where(u => RestrictedStatuses.Contains(u.Status));
+        // Every user is listed (restricted ones first), not only the already-restricted ones: the row actions
+        // (suspend / block / ban) apply to Active users, so an admin must be able to find one here to act on it.
+        var query = dbContext.Users.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(request.Status) &&
             Enum.TryParse<UserStatus>(request.Status, ignoreCase: true, out var status))
@@ -37,7 +36,8 @@ internal sealed class GetBlockedUsersQueryHandler(IIdentityDbContext dbContext)
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .OrderByDescending(u => u.ModifiedOnUtc)
+            .OrderBy(u => u.Status == UserStatus.Active ? 1 : 0)
+            .ThenByDescending(u => u.ModifiedOnUtc)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(u => new BlockedUserListItemDto(

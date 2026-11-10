@@ -101,6 +101,28 @@ public sealed record ReferralHistoryDto(
     DateTime? RewardedOnUtc);
 
 /// <summary>
+/// The customer's purchase-points balance. <c>Enabled</c>/<c>PointsPerUsd</c> describe the program as it is configured now;
+/// the balance and history always reflect what was actually awarded.
+/// </summary>
+public sealed record PointsSummaryDto(
+    int Balance,
+    int TotalEarned,
+    bool Enabled,
+    decimal PointsPerUsd);
+
+/// <summary>
+/// One purchase-points ledger row as shown in the customer's history.
+/// </summary>
+public sealed record PointsTransactionDto(
+    Guid Id,
+    string Type,
+    int Points,
+    Guid OrderId,
+    string OrderNumber,
+    string Description,
+    DateTimeOffset OccurredOnUtc);
+
+/// <summary>
 /// Represents the referral dashboard.
 /// </summary>
 public sealed record ReferralDashboardDto(
@@ -111,7 +133,9 @@ public sealed record ReferralDashboardDto(
     int PendingReferrals,
     decimal PointValueUsd,
     IReadOnlyList<ReferralTierDto> AvailableTiers,
-    IReadOnlyList<ReferralHistoryDto> RecentHistory);
+    IReadOnlyList<ReferralHistoryDto> RecentHistory,
+    // False while the program is switched off in Settings: invite links stop working, so the page must say so.
+    bool ProgramEnabled = true);
 
 /// <summary>
 /// Represents membership information from the active plan subscription.

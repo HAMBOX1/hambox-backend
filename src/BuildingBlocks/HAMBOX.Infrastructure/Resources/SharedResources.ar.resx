@@ -36,6 +36,12 @@
   <data name="Errors.Internal.Detail" xml:space="preserve">
     <value>حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى لاحقاً.</value>
   </data>
+  <data name="Errors.BadRequest.Title" xml:space="preserve">
+    <value>طلب غير صالح</value>
+  </data>
+  <data name="Errors.BadRequest.Detail" xml:space="preserve">
+    <value>الطلب غير صالح أو تنقصه معاملات مطلوبة.</value>
+  </data>
   <data name="Errors.IdempotencyConflict.Title" xml:space="preserve">
     <value>الطلب قيد المعالجة بالفعل</value>
   </data>

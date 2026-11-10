@@ -4,6 +4,10 @@ namespace HAMBOX.Modules.Support.Application.Errors;
 
 public static class SupportErrors
 {
+    public static readonly Error RelatedOrderNotFound = new(
+        "Support.RelatedOrderNotFound",
+        "The related order was not found.");
+
     public static readonly Error TicketNotFound = new(
         "Support.TicketNotFound", "The support ticket was not found.");
 
@@ -33,6 +37,9 @@ public static class SupportErrors
 
     public static readonly Error TagNotFound = new(
         "Support.TagNotFound", "The ticket tag was not found.");
+
+    public static readonly Error KnowledgeSlugExists = new(
+        "Support.KnowledgeSlugExists", "A knowledge-base item with this name already exists.");
 
     public static readonly Error TagAlreadyExists = new(
         "Support.TagAlreadyExists", "A tag with this name already exists.");

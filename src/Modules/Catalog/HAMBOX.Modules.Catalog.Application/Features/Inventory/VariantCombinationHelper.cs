@@ -30,6 +30,32 @@ public static class VariantCombinationHelper
         return ExpandGroups(rootGroups, childGroupsByParentOptionId);
     }
 
+    /// <summary>Most variants a product may have; stops an option matrix from exploding into millions of rows.</summary>
+    public const int MaxVariantsPerProduct = 5_000;
+
+    /// <summary>
+    /// How many variants <see cref="Expand"/> would produce, computed without building them (mirrors its rules). Uses
+    /// <see cref="double"/> so a huge matrix saturates instead of overflowing.
+    /// </summary>
+    public static double CountCombinations(IReadOnlyList<ProductOptionGroup> allGroups)
+    {
+        var rootGroups = allGroups.Where(g => g.ParentOptionId is null).ToList();
+        if (rootGroups.Count == 0 || rootGroups.Any(g => g.Options.Count == 0))
+        {
+            return 0;
+        }
+
+        var childGroupsByParentOptionId = allGroups.Where(g => g.ParentOptionId is not null).ToLookup(g => g.ParentOptionId!.Value);
+        return CountGroups(rootGroups, childGroupsByParentOptionId);
+    }
+
+    private static double CountGroups(IEnumerable<ProductOptionGroup> groups, ILookup<Guid, ProductOptionGroup> childGroupsByParentOptionId) =>
+        groups.Aggregate(1d, (total, group) => total * group.Options.Sum(option =>
+        {
+            var childGroups = childGroupsByParentOptionId[option.Id].Where(g => g.Options.Count > 0).ToList();
+            return childGroups.Count == 0 ? 1d : CountGroups(childGroups, childGroupsByParentOptionId);
+        }));
+
     private static IReadOnlyList<IReadOnlyList<Guid>> ExpandGroups(
         IReadOnlyList<ProductOptionGroup> groups,
         ILookup<Guid, ProductOptionGroup> childGroupsByParentOptionId)

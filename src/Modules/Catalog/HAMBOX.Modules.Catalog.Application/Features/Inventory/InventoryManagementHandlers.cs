@@ -152,6 +152,13 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
             }
         }
 
+        var skuTaken = await _db.ProductVariants.IgnoreQueryFilters()
+            .AnyAsync(v => v.Sku == request.Sku.Trim().ToUpper() && !v.IsDeleted && v.Id != variant.Id, cancellationToken);
+        if (skuTaken)
+        {
+            return Result.Failure(CatalogErrors.VariantSkuExists);
+        }
+
         variant.Update(
             request.Sku,
             request.PlanId,
@@ -285,6 +292,13 @@ internal sealed class DuplicateProductVariantCommandHandler : IRequestHandler<Du
         {
             return Result.Failure<Guid>(CatalogErrors.IncompleteVariantCombination(
                 missingGroups.Select(g => g.DisplayName).ToList()));
+        }
+
+        var skuTaken = await _db.ProductVariants.IgnoreQueryFilters()
+            .AnyAsync(v => v.Sku == duplicateSku.Trim().ToUpper() && !v.IsDeleted, cancellationToken);
+        if (skuTaken)
+        {
+            return Result.Failure<Guid>(CatalogErrors.VariantSkuExists);
         }
 
         var duplicate = ProductVariant.Create(

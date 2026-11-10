@@ -56,6 +56,7 @@ public static class SupportCommunicationTemplateSeeder
             "<p>You were mentioned on ticket <strong>{{TicketNumber}}</strong>.</p>");
 
         await db.SaveChangesAsync();
+        await DefaultArabicTemplateCopy.BackfillAsync(db);
     }
 
     private static async Task SeedIfMissing(
@@ -73,7 +74,8 @@ public static class SupportCommunicationTemplateSeeder
     private static void SeedTemplate(CommunicationDbContext db, string key, string channel, string subject, string body)
     {
         var template = CommunicationTemplate.Create(key, channel, CommunicationCategory.Support);
-        var version = template.CreateDraftVersion(subject, null, body, null, null);
+        var arabic = DefaultArabicTemplateCopy.For(key, channel);
+        var version = template.CreateDraftVersion(subject, arabic.Subject, body, arabic.Body, null);
         template.PublishVersion(version.Id, "system");
         db.CommunicationTemplates.Add(template);
     }

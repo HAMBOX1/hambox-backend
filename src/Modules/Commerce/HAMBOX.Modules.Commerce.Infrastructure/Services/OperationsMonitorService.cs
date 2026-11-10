@@ -142,6 +142,7 @@ internal sealed class OperationsMonitorService(
             .Where(j => j.Status == OperationalJobStatus.Completed
                         && j.StartedOnUtc != null
                         && j.FinishedOnUtc != null)
+            .OrderByDescending(j => j.FinishedOnUtc)
             .Select(j => new { j.StartedOnUtc, j.FinishedOnUtc })
             .Take(500)
             .ToListAsync(cancellationToken);

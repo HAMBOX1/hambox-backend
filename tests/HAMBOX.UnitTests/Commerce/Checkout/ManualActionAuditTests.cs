@@ -63,6 +63,9 @@ public sealed class ManualActionAuditTests
         var communication = new FakeCommunicationService();
         var referral = new ReferralLifecycleService(
             db, new FakeDotPlatformSettingsProvider(), new ReferralRewardService(db, new FakeMembershipEngine()),
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                db, new FakeDotPlatformSettingsProvider(),
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
             communication, NullLogger<ReferralLifecycleService>.Instance);
         return new UpdateAdminOrderStatusCommandHandler(
             db, new FakeCommerceTransactionService(), new FakeCurrentUserService(adminId),

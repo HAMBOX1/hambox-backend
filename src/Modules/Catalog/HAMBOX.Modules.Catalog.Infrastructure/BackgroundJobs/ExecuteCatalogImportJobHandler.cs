@@ -98,8 +98,14 @@ internal sealed class ExecuteCatalogImportJobHandler(
         }
         catch (Exception ex)
         {
-            job.MarkFailed(ex.Message);
-            await catalogDb.SaveChangesAsync(cancellationToken);
+            // A rejected save leaves the offending rows tracked, so saving the failure on the same tracker would throw
+            // again and the job would stay "Queued" forever. Drop the tracked state and record the failure cleanly.
+            catalogDb.ChangeTracker.Clear();
+            var failedJob = await catalogDb.CatalogPackageJobs.FirstAsync(j => j.Id == payload.PackageJobId, CancellationToken.None);
+            failedJob.MarkFailed(ex is DbUpdateException
+                ? "A value in the file is out of range for the database (check prices, name lengths and quantities). Nothing was imported."
+                : ex.Message);
+            await catalogDb.SaveChangesAsync(CancellationToken.None);
             throw;
         }
     }
@@ -684,8 +690,11 @@ internal sealed class ExecuteCatalogImportJobHandler(
     /// </summary>
     private static void ApplyRequestedStatus(Product product, string? statusText)
     {
+        // An import never makes a product live: at this point its variants and prices don't exist yet, so it could
+        // not be sold. "Active" rows stay as they are and are published afterwards through the guarded publish action.
         if (string.IsNullOrWhiteSpace(statusText)
             || !Enum.TryParse<ProductStatus>(statusText, ignoreCase: true, out var desired)
+            || desired == ProductStatus.Active
             || product.Status == desired)
         {
             return;
@@ -693,9 +702,6 @@ internal sealed class ExecuteCatalogImportJobHandler(
 
         switch (desired)
         {
-            case ProductStatus.Active when product.Status != ProductStatus.Archived:
-                product.Activate();
-                break;
             case ProductStatus.Inactive when product.Status == ProductStatus.Active:
                 product.Deactivate();
                 break;

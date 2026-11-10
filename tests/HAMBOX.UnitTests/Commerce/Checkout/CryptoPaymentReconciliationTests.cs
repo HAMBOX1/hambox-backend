@@ -86,6 +86,9 @@ public sealed class CryptoPaymentReconciliationTests
         var referralLifecycle = new ReferralLifecycleService(
             commerceDb, new FakeDotPlatformSettingsProvider(),
             new ReferralRewardService(commerceDb, new FakeMembershipEngine()),
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, new FakeDotPlatformSettingsProvider(),
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
             communication, NullLogger<ReferralLifecycleService>.Instance);
 
         var jobQueue = new FakeOperationalJobQueue();

@@ -2,6 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Errors;
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,17 @@ internal sealed class AdjustProductPriceCommandHandler : IRequestHandler<AdjustP
         if (newPrice < 0)
         {
             return Result.Failure(CatalogErrors.InvalidPriceAdjustment);
+        }
+
+        if (newPrice > ProductPublishGuard.MaxPrice)
+        {
+            return Result.Failure(CatalogErrors.ProductPriceTooHigh);
+        }
+
+        // A live product must keep a positive price; only drafts/inactive products may be zeroed.
+        if (newPrice <= 0 && product.Status == ProductStatus.Active)
+        {
+            return Result.Failure(CatalogErrors.ProductNotPublishablePrice);
         }
 
         product.ChangePrice(decimal.Round(newPrice, 2));

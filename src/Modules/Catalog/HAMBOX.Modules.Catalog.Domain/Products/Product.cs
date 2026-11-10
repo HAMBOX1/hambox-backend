@@ -476,6 +476,21 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     }
 
     /// <summary>
+    /// Brings an archived product back as a <see cref="ProductStatus.Draft"/>. It is never restored straight to
+    /// Active: it has to be published again, so the publish rules apply.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the product is not archived.</exception>
+    public void Unarchive()
+    {
+        if (Status != ProductStatus.Archived)
+        {
+            throw new InvalidOperationException("Only archived products can be unarchived.");
+        }
+
+        Status = ProductStatus.Draft;
+    }
+
+    /// <summary>
     /// Parks this product as a duplicate pending merge into <paramref name="targetProductId"/>,
     /// without touching stock or converting it into a variant yet. If currently
     /// <see cref="ProductStatus.Active"/>, also deactivates it so it's hidden from the storefront

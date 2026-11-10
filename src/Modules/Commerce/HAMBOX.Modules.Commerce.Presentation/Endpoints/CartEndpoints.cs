@@ -259,7 +259,7 @@ internal static class CartEndpoints
                 : "en";
 
             var result = await sender.Send(new CheckoutCommand(
-                request.Email, request.Country, request.PaymentMethod, ipAddress, userAgent, language));
+                CheckoutEmail.Resolve(httpContext.User, request.Email), request.Country, request.PaymentMethod, ipAddress, userAgent, language));
 
             if (result.IsSuccess)
             {
@@ -342,7 +342,7 @@ internal static class CartEndpoints
                 : "en";
 
             var result = await sender.Send(new InitiateMembershipHostedCheckoutCommand(
-                request.PlanId, request.Action, request.Gateway, request.Email, request.Country, ipAddress, userAgent, language, request.Wallet));
+                request.PlanId, request.Action, request.Gateway, CheckoutEmail.Resolve(httpContext.User, request.Email), request.Country, ipAddress, userAgent, language, request.Wallet));
 
             if (result.IsSuccess)
             {
@@ -364,12 +364,13 @@ internal static class CartEndpoints
 
         group.MapPost("checkout/membership", async Task<Results<Ok<OrderDto>, BadRequest<ProblemDetails>>> (
             [FromBody] MembershipCheckoutRequest request,
+            HttpContext httpContext,
             ISender sender) =>
         {
             var result = await sender.Send(new MembershipCheckoutCommand(
                 request.PlanId,
                 request.Action,
-                request.Email,
+                CheckoutEmail.Resolve(httpContext.User, request.Email),
                 request.Country,
                 request.PaymentMethod,
                 request.CouponCode));

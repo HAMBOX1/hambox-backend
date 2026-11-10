@@ -263,7 +263,7 @@ internal sealed class CreateSupplierCommandHandler(ISuppliersDbContext dbContext
     {
         var r = request.Request;
 
-        var codeExists = await dbContext.Suppliers.AsNoTracking()
+        var codeExists = await dbContext.Suppliers.IgnoreQueryFilters().AsNoTracking()
             .AnyAsync(s => s.Code == r.Code.Trim().ToUpper(), cancellationToken);
         if (codeExists)
         {

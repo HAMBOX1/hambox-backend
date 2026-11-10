@@ -1,3 +1,4 @@
+using HAMBOX.Application.Security;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -41,12 +42,12 @@ internal sealed class SaveProductInstructionsCommandHandler(ICatalogDbContext db
 
         if (instructions is null)
         {
-            instructions = ProductInstructions.CreateDraft(request.ProductId, request.VariantId, request.Title, request.ContentHtml);
+            instructions = ProductInstructions.CreateDraft(request.ProductId, request.VariantId, request.Title, RichTextSanitizer.Sanitize(request.ContentHtml) ?? string.Empty);
             dbContext.ProductInstructions.Add(instructions);
         }
         else
         {
-            instructions.SaveDraft(request.Title, request.ContentHtml);
+            instructions.SaveDraft(request.Title, RichTextSanitizer.Sanitize(request.ContentHtml) ?? string.Empty);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

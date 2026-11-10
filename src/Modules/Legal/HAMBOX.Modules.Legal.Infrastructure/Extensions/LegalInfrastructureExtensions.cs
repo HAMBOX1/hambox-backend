@@ -1,5 +1,7 @@
 using HAMBOX.Infrastructure.Persistence.Interceptors;
+using FluentValidation;
 using HAMBOX.Modules.Legal.Application.Abstractions;
+using HAMBOX.Modules.Legal.Application.Features.Legal;
 using HAMBOX.Modules.Legal.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,6 +22,8 @@ public static class LegalInfrastructureExtensions
                 sp.GetRequiredService<SoftDeleteInterceptor>()));
 
         services.AddScoped<ILegalDbContext>(sp => sp.GetRequiredService<LegalDbContext>());
+
+        services.AddValidatorsFromAssembly(typeof(GetLegalSectionsQuery).Assembly, includeInternalTypes: true);
 
         return services;
     }

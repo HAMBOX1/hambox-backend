@@ -37,6 +37,13 @@ internal sealed class ActivateLandingPageTemplateCommandHandler(IContentDbContex
                 other.Deactivate();
             }
 
+            if (currentlyActive.Count > 0)
+            {
+                // The unique "one active page per target" index is checked per statement, and EF does not
+                // order the UPDATEs, so the old page must be saved as inactive before the new one is activated.
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
             target.Activate();
             LandingPageAuditWriter.Record(dbContext, target.Id, LandingPageAuditAction.Activated, currentUser.UserId);
             await dbContext.SaveChangesAsync(cancellationToken);

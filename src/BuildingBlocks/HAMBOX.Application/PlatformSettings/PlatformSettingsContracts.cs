@@ -18,6 +18,7 @@ public static class PlatformSettingsCategoryKeys
     public const string Promotions = "promotions";
     public const string Memberships = "memberships";
     public const string Referral = "referral";
+    public const string PurchasePoints = "purchasePoints";
     public const string Inventory = "inventory";
     public const string Queue = "queue";
     public const string RetryPolicies = "retryPolicies";
@@ -33,7 +34,7 @@ public static class PlatformSettingsCategoryKeys
     [
         General, Branding, Storefront, Localization, Currency, Theme, Email,
         Authentication, Security, Otp, Totp, Commerce, Checkout, Promotions,
-        Memberships, Referral, Inventory, Queue, RetryPolicies, Notifications,
+        Memberships, Referral, PurchasePoints, Inventory, Queue, RetryPolicies, Notifications,
         Media, Seo, Analytics, Integrations, Maintenance, Legal,
     ];
 }
@@ -286,6 +287,22 @@ public sealed record ReferralSettingsPayload(
     int PointsPerReferral,
     decimal PointValueUsd,
     int RewardExpiryDays);
+
+/// <summary>
+/// Earn-only purchase points. <paramref name="PointsPerUsd"/> is applied to the eligible amount in USD (the
+/// canonical stored order currency); <paramref name="AmountBasis"/> is <c>NetOfTax</c> (subtotal minus
+/// discounts, excluding tax and gateway fees) or <c>Total</c> (everything the customer paid).
+/// </summary>
+public sealed record PurchasePointsSettingsPayload(
+    bool Enabled,
+    decimal PointsPerUsd,
+    string AmountBasis);
+
+public static class PurchasePointsAmountBasis
+{
+    public const string NetOfTax = "NetOfTax";
+    public const string Total = "Total";
+}
 
 public sealed record InventorySettingsPayload(
     int LowStockThreshold,

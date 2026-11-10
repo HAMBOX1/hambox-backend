@@ -1,4 +1,5 @@
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Features.Products;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,12 @@ public sealed record CatalogImportPlan(
 /// </summary>
 public static class CatalogImportMatcher
 {
+    /// <summary>Matches the Product.NameEn/NameAr column length.</summary>
+    private const int ProductNameMaxLength = 200;
+
+    /// <summary>Sanity ceiling for the legacy initial StockQuantity column.</summary>
+    private const int ProductStockMaxQuantity = 1_000_000;
+
     public static async Task<CatalogImportPlan> BuildPlanAsync(
         ParsedCatalogPackage package, ICatalogDbContext db, CatalogSkuStrategy skuStrategy, CancellationToken cancellationToken)
     {
@@ -235,14 +242,33 @@ public static class CatalogImportMatcher
                 errors.Add("NameEn is required.");
             }
 
+            if ((row.NameEn ?? string.Empty).Length > ProductNameMaxLength || (row.NameAr ?? string.Empty).Length > ProductNameMaxLength)
+            {
+                errors.Add($"Product names must be {ProductNameMaxLength} characters or fewer.");
+            }
+
             if (row.Price is < 0)
             {
                 errors.Add("Price must not be negative.");
+            }
+            else if (row.Price > ProductPublishGuard.MaxPrice)
+            {
+                errors.Add($"Price must not exceed {ProductPublishGuard.MaxPrice:N0}.");
             }
 
             if (row.StockQuantity < 0)
             {
                 errors.Add("StockQuantity must not be negative.");
+            }
+            else if (row.StockQuantity > ProductStockMaxQuantity)
+            {
+                errors.Add($"StockQuantity must not exceed {ProductStockMaxQuantity:N0}.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Status)
+                && (!Enum.TryParse<ProductStatus>(row.Status, ignoreCase: true, out var parsedStatus) || !Enum.IsDefined(parsedStatus)))
+            {
+                errors.Add("Status must be Draft, Active, Inactive or Archived.");
             }
 
             if (!CategoryExists(row.CategorySlug))

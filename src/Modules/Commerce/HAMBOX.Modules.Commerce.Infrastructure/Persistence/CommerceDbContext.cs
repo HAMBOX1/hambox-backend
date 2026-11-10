@@ -54,6 +54,7 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
 
     /// <inheritdoc />
     public DbSet<ReferralAuditLog> ReferralAuditLogs => Set<ReferralAuditLog>();
+    public DbSet<PointsTransaction> PointsTransactions => Set<PointsTransaction>();
 
     /// <inheritdoc />
     public DbSet<OrderLicenseKey> OrderLicenseKeys => Set<OrderLicenseKey>();

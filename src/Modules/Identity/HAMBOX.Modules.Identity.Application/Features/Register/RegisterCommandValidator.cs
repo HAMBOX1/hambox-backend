@@ -29,40 +29,17 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
             .MaximumLength(128).WithMessage("Password must not exceed 128 characters.")
-            .MustAsync(async (password, cancellation) =>
-            {
-                var auth = await platformSettings.GetAuthenticationAsync(cancellation);
-                if (password.Length < auth.MinimumPasswordLength)
-                {
-                    return false;
-                }
-
-                if (auth.RequireNumbers && !password.Any(char.IsDigit))
-                {
-                    return false;
-                }
-
-                if (auth.RequireUppercase && !password.Any(char.IsUpper))
-                {
-                    return false;
-                }
-
-                if (auth.RequireSymbols && !password.Any(ch => !char.IsLetterOrDigit(ch)))
-                {
-                    return false;
-                }
-
-                return true;
-            })
-            .WithMessage("Password does not meet the configured password policy.");
+            .MeetsConfiguredPasswordPolicy(platformSettings);
 
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("First name is required.")
-            .MaximumLength(100).WithMessage("First name must not exceed 100 characters.");
+            .MaximumLength(100).WithMessage("First name must not exceed 100 characters.")
+            .WithoutMarkup();
 
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Last name is required.")
-            .MaximumLength(100).WithMessage("Last name must not exceed 100 characters.");
+            .MaximumLength(100).WithMessage("Last name must not exceed 100 characters.")
+            .WithoutMarkup();
 
         RuleFor(x => x.ReferralCode)
             .Matches(@"^HAM-[A-Z0-9]{8}$").WithMessage("The referral code format is invalid.")

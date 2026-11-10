@@ -2,7 +2,9 @@ using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Contracts;
 using HAMBOX.Modules.Support.Application.Services;
 using HAMBOX.Modules.Support.Domain.KnowledgeBase;
+using HAMBOX.Modules.Support.Application.Errors;
 using HAMBOX.SharedKernel.Results;
+using Microsoft.EntityFrameworkCore;
 using MediatR;
 
 namespace HAMBOX.Modules.Support.Application.Features.KnowledgeBase.CreateKnowledgeCategory;
@@ -13,6 +15,13 @@ internal sealed class CreateKnowledgeCategoryCommandHandler(ISupportDbContext db
     public async Task<Result<KnowledgeCategoryDto>> Handle(CreateKnowledgeCategoryCommand request, CancellationToken cancellationToken)
     {
         var category = KnowledgeCategory.Create(request.Name, request.SortOrder);
+        var slugTaken = await dbContext.KnowledgeCategories.IgnoreQueryFilters()
+            .AnyAsync(c => c.Slug == category.Slug, cancellationToken);
+        if (slugTaken)
+        {
+            return Result.Failure<KnowledgeCategoryDto>(SupportErrors.KnowledgeSlugExists);
+        }
+
         dbContext.KnowledgeCategories.Add(category);
         await dbContext.SaveChangesAsync(cancellationToken);
 

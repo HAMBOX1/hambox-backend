@@ -71,7 +71,8 @@ internal sealed class CreateProductCommandHandler : IRequestHandler<CreateProduc
 
         if (request.Status == HAMBOX.Modules.Catalog.Domain.Enums.ProductStatus.Active)
         {
-            product.Activate();
+            // A brand-new product has no variants yet, so it can never be sold: refuse to create it live.
+            return Result.Failure<Guid>(CatalogErrors.ProductNotPublishableNoVariant);
         }
 
         _dbContext.Products.Add(product);

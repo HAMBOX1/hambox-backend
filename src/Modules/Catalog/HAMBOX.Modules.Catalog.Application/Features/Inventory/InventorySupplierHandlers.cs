@@ -1,4 +1,5 @@
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
@@ -23,7 +24,7 @@ internal sealed class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQue
         var query = _db.InventorySuppliers.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            query = query.Where(s => s.CompanyName.Contains(request.SearchTerm));
+            query = query.Where(s => s.CompanyName.Contains(SearchInput.Clean(request.SearchTerm)!));
         }
 
         var items = await query
@@ -115,6 +116,12 @@ internal sealed class CreateInventoryBatchCommandHandler : IRequestHandler<Creat
         if (variant.Status != ProductVariantStatus.Active)
         {
             return Result.Failure<Guid>(CatalogErrors.VariantNotActive);
+        }
+
+        if (request.SupplierId.HasValue
+            && !await _db.InventorySuppliers.AnyAsync(s => s.Id == request.SupplierId.Value, cancellationToken))
+        {
+            return Result.Failure<Guid>(CatalogErrors.SupplierNotFound);
         }
 
         var batch = InventoryBatch.Create(
@@ -243,8 +250,13 @@ public sealed record GetInventoryCodesQuery(
 internal sealed class GetInventoryCodesQueryHandler : IRequestHandler<GetInventoryCodesQuery, Result<IReadOnlyList<DigitalInventoryCodeDto>>>
 {
     private readonly ICatalogDbContext _db;
+    private readonly ICurrentUserPermissions _permissions;
 
-    public GetInventoryCodesQueryHandler(ICatalogDbContext db) => _db = db;
+    public GetInventoryCodesQueryHandler(ICatalogDbContext db, ICurrentUserPermissions permissions)
+    {
+        _db = db;
+        _permissions = permissions;
+    }
 
     public async Task<Result<IReadOnlyList<DigitalInventoryCodeDto>>> Handle(GetInventoryCodesQuery request, CancellationToken cancellationToken)
     {
@@ -276,8 +288,9 @@ internal sealed class GetInventoryCodesQueryHandler : IRequestHandler<GetInvento
             .ToListAsync(cancellationToken);
 
         // Grid never exposes plaintext — only the dedicated reveal endpoint may.
+        var canViewCosts = _permissions.Has(CatalogPermissions.ViewCosts);
         var masked = items
-            .Select(c => c with { DigitalCode = InventoryCodeMasking.Mask(c.DigitalCode), SerialNumber = c.SerialNumber is null ? null : InventoryCodeMasking.Mask(c.SerialNumber) })
+            .Select(c => c with { PurchaseCost = canViewCosts ? c.PurchaseCost : null, DigitalCode = InventoryCodeMasking.Mask(c.DigitalCode), SerialNumber = c.SerialNumber is null ? null : InventoryCodeMasking.Mask(c.SerialNumber) })
             .ToList();
 
         return Result.Success<IReadOnlyList<DigitalInventoryCodeDto>>(masked);

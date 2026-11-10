@@ -105,6 +105,9 @@ public static class CommunicationDataSeeder
         }
 
         await db.SaveChangesAsync();
+
+        // Older databases hold English-only copies of the default templates: add the Arabic where it is still missing.
+        await DefaultArabicTemplateCopy.BackfillAsync(db);
     }
 
     public const string DatabaseNotificationProviderKey = "Database";
@@ -120,8 +123,9 @@ public static class CommunicationDataSeeder
         string? subjectAr = null,
         string? bodyAr = null)
     {
+        var arabic = DefaultArabicTemplateCopy.For(key, channel);
         var template = CommunicationTemplate.Create(key, channel, category);
-        var version = template.CreateDraftVersion(subjectEn, subjectAr, bodyEn, bodyAr, null);
+        var version = template.CreateDraftVersion(subjectEn, subjectAr ?? arabic.Subject, bodyEn, bodyAr ?? arabic.Body, null);
         template.PublishVersion(version.Id, "system");
         db.CommunicationTemplates.Add(template);
     }

@@ -5,6 +5,7 @@ using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -381,8 +382,5 @@ internal sealed class ExportCatalogJobHandler(
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
 
-    private static string Escape(string value) =>
-        value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r')
-            ? $"\"{value.Replace("\"", "\"\"")}\""
-            : value;
+    private static string Escape(string value) => CsvCell.Escape(value);
 }

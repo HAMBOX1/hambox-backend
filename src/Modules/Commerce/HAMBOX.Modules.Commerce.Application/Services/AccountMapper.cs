@@ -109,7 +109,8 @@ internal static class AccountMapper
         IReadOnlyList<ReferralHistoryEntry> recentHistory,
         int pendingReferrals,
         int pointsPerReferral,
-        decimal pointValueUsd) =>
+        decimal pointValueUsd,
+        bool programEnabled = true) =>
         new(
             profile.ReferralCode,
             profile.Tier,
@@ -118,7 +119,8 @@ internal static class AccountMapper
             pendingReferrals,
             pointValueUsd,
             GetReferralTiers(pointsPerReferral),
-            recentHistory.Select(ToReferralHistoryDto).ToList());
+            recentHistory.Select(ToReferralHistoryDto).ToList(),
+            programEnabled);
 
     public static Contracts.Account.WishlistItemDto ToWishlistItemDto(
         WishlistItem item,

@@ -3,6 +3,7 @@ using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Contracts;
 using HAMBOX.Modules.Support.Application.Errors;
 using HAMBOX.Modules.Support.Application.Services;
+using HAMBOX.Modules.Support.Domain.KnowledgeBase;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,14 @@ internal sealed class GetKnowledgeArticleByIdQueryHandler(ISupportDbContext dbCo
     {
         var article = await dbContext.KnowledgeArticles.FirstOrDefaultAsync(a => a.Id == request.ArticleId, cancellationToken);
         if (article is null)
+        {
+            return Result.Failure<KnowledgeArticleDetailDto>(SupportErrors.KnowledgeArticleNotFound);
+        }
+
+        // The public reader (RecordView) may only open what the public list shows. A draft or an Internal (agent-only)
+        // article answers exactly like a missing one, so its existence is not revealed either.
+        var publicReader = request.RecordView;
+        if (publicReader && (article.Status != KnowledgeArticleStatus.Published || article.Visibility != KnowledgeArticleVisibility.Public))
         {
             return Result.Failure<KnowledgeArticleDetailDto>(SupportErrors.KnowledgeArticleNotFound);
         }
@@ -36,7 +45,8 @@ internal sealed class GetKnowledgeArticleByIdQueryHandler(ISupportDbContext dbCo
         var relatedArticles = relatedIds.Count == 0
             ? []
             : await dbContext.KnowledgeArticles.AsNoTracking()
-                .Where(a => relatedIds.Contains(a.Id))
+                .Where(a => relatedIds.Contains(a.Id)
+                    && (!publicReader || (a.Status == KnowledgeArticleStatus.Published && a.Visibility == KnowledgeArticleVisibility.Public)))
                 .ToListAsync(cancellationToken);
 
         var relatedCategoryIds = relatedArticles.Select(a => a.CategoryId).Distinct().ToList();

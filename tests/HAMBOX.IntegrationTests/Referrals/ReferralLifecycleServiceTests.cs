@@ -61,7 +61,9 @@ public sealed class ReferralLifecycleServiceTests : IDisposable
         settings ??= new FakeReferralPlatformSettingsProvider();
         var communication = new FakeCommunicationService();
         var reward = new ReferralRewardService(db, new FakeMembershipEngine());
-        var lifecycle = new ReferralLifecycleService(db, settings, reward, communication, NullLogger<ReferralLifecycleService>.Instance);
+        var points = new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+            db, settings, NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance);
+        var lifecycle = new ReferralLifecycleService(db, settings, reward, points, communication, NullLogger<ReferralLifecycleService>.Instance);
 
         return (db, lifecycle, communication);
     }

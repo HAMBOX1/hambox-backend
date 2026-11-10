@@ -105,13 +105,13 @@ internal sealed class CreateCommunicationTemplateCommandHandler(ICommunicationDb
         var req = request.Request;
         if (!Enum.TryParse<CommunicationCategory>(req.Category, true, out var category))
         {
-            return Result.Failure<Guid>(CommunicationErrors.TemplateNotFound);
+            return Result.Failure<Guid>(CommunicationErrors.TemplateCategoryInvalid);
         }
 
         var exists = await db.CommunicationTemplates.AnyAsync(t => t.Key == req.Key && t.Channel == req.Channel, cancellationToken);
         if (exists)
         {
-            return Result.Failure<Guid>(CommunicationErrors.TemplateNotFound);
+            return Result.Failure<Guid>(CommunicationErrors.TemplateAlreadyExists);
         }
 
         var template = CommunicationTemplate.Create(req.Key, req.Channel, category);

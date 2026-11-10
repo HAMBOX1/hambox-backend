@@ -10,11 +10,11 @@ public sealed class CreateCampaignCommandValidator : AbstractValidator<CreateCam
         RuleFor(x => x.Request.Description).MaximumLength(2000);
         RuleFor(x => x.Request.ThemeId).NotEmpty();
         RuleFor(x => x.Request.StartsAtUtc.Kind).Equal(DateTimeKind.Utc)
-            .WithMessage("StartsAtUtc must be a UTC date/time.");
+            .WithMessage("The start date must be a valid UTC date and time.");
         RuleFor(x => x.Request.EndsAtUtc.Kind).Equal(DateTimeKind.Utc)
-            .WithMessage("EndsAtUtc must be a UTC date/time.");
+            .WithMessage("The end date must be a valid UTC date and time.");
         RuleFor(x => x.Request.EndsAtUtc).GreaterThan(x => x.Request.StartsAtUtc)
-            .WithMessage("EndsAtUtc must be after StartsAtUtc.");
+            .WithMessage("The end date must be after the start date.");
         RuleFor(x => x.Request.Priority).GreaterThanOrEqualTo(0);
     }
 }
@@ -27,11 +27,11 @@ public sealed class UpdateCampaignCommandValidator : AbstractValidator<UpdateCam
         RuleFor(x => x.Request.Description).MaximumLength(2000);
         RuleFor(x => x.Request.ThemeId).NotEmpty();
         RuleFor(x => x.Request.StartsAtUtc.Kind).Equal(DateTimeKind.Utc)
-            .WithMessage("StartsAtUtc must be a UTC date/time.");
+            .WithMessage("The start date must be a valid UTC date and time.");
         RuleFor(x => x.Request.EndsAtUtc.Kind).Equal(DateTimeKind.Utc)
-            .WithMessage("EndsAtUtc must be a UTC date/time.");
+            .WithMessage("The end date must be a valid UTC date and time.");
         RuleFor(x => x.Request.EndsAtUtc).GreaterThan(x => x.Request.StartsAtUtc)
-            .WithMessage("EndsAtUtc must be after StartsAtUtc.");
+            .WithMessage("The end date must be after the start date.");
         RuleFor(x => x.Request.Priority).GreaterThanOrEqualTo(0);
     }
 }

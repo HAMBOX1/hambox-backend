@@ -70,6 +70,17 @@ public sealed class ApiRequestLoggingMiddleware(
         return SkippedPrefixes.Any(prefix => value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// An unhandled exception is turned into its error response by the handler further out, after this
+    /// middleware has already unwound — so the response still reads 200 here. Log the status the client gets.
+    /// </summary>
+    private static int ResolveStatusCode(HttpContext context, Exception? exception) => exception switch
+    {
+        null => context.Response.StatusCode,
+        BadHttpRequestException badRequest => badRequest.StatusCode,
+        _ => StatusCodes.Status500InternalServerError,
+    };
+
     private static async Task PersistAsync(HttpContext context, long durationMs, Exception? exception)
     {
         using var scope = context.RequestServices.CreateScope();
@@ -91,7 +102,7 @@ public sealed class ApiRequestLoggingMiddleware(
         var log = ApiRequestLog.Create(
             context.Request.Method,
             context.Request.Path + context.Request.QueryString,
-            context.Response.StatusCode,
+            ResolveStatusCode(context, exception),
             durationMs,
             correlationId,
             userId,

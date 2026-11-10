@@ -47,7 +47,7 @@ internal sealed class GetProductImageLibraryQueryHandler(ICatalogDbContext db)
     {
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 200);
-        var term = request.SearchTerm?.Trim();
+        var term = SearchInput.Clean(request.SearchTerm);
 
         var products = db.Products.AsNoTracking().AsQueryable();
         if (!string.IsNullOrEmpty(term))

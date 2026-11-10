@@ -64,6 +64,14 @@ public sealed class BulkProductOperationsTests
             .Select(i => Product.Create($"منتج {i}", $"Product {i}", "d", "d", price, a.Id))
             .ToList();
         db.Products.AddRange(products);
+        // A product can only go live when it has an active variant, so seed one per product.
+        foreach (var product in products)
+        {
+            var variant = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}");
+            variant.Activate();
+            db.ProductVariants.Add(variant);
+        }
+
         await db.SaveChangesAsync();
         return (db, a, b, products);
     }

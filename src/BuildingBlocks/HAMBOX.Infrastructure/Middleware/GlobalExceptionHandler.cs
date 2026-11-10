@@ -31,6 +31,12 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status401Unauthorized,
                 localizer["Errors.Unauthorized.Title"].Value,
                 localizer["Errors.Unauthorized.Detail"].Value),
+            BadHttpRequestException badRequest => CreateProblemDetails(
+                badRequest.StatusCode,
+                localizer["Errors.BadRequest.Title"].Value,
+                environment.IsDevelopment()
+                    ? badRequest.Message
+                    : localizer["Errors.BadRequest.Detail"].Value),
             IdempotencyConflictException => CreateProblemDetails(
                 StatusCodes.Status409Conflict,
                 localizer["Errors.IdempotencyConflict.Title"].Value,
@@ -43,9 +49,9 @@ public sealed class GlobalExceptionHandler(
                     : localizer["Errors.Internal.Detail"].Value)
         };
 
-        if (exception is ValidationException)
+        if (exception is ValidationException or BadHttpRequestException)
         {
-            logger.LogWarning(exception, "Validation exception: {Message}", exception.Message);
+            logger.LogWarning(exception, "Rejected request: {Message}", exception.Message);
         }
         else
         {

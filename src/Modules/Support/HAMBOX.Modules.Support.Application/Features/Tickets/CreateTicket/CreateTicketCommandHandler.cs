@@ -1,5 +1,7 @@
 using HAMBOX.Application.Communication;
 using HAMBOX.Application.Membership;
+using HAMBOX.Modules.Commerce.Application.Abstractions;
+using HAMBOX.Modules.Support.Application.Errors;
 using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Contracts;
 using HAMBOX.Modules.Support.Application.Services;
@@ -12,6 +14,7 @@ namespace HAMBOX.Modules.Support.Application.Features.Tickets.CreateTicket;
 
 internal sealed class CreateTicketCommandHandler(
     ISupportDbContext dbContext,
+    ICommerceDbContext commerceDb,
     TicketContextBuilder contextBuilder,
     ICommunicationService communicationService,
     ISupportRealtimeNotifier realtimeNotifier,
@@ -20,6 +23,18 @@ internal sealed class CreateTicketCommandHandler(
 {
     public async Task<Result<TicketDetailDto>> Handle(CreateTicketCommand request, CancellationToken cancellationToken)
     {
+        // A customer may only attach their own order: the ticket (and the agent screen built from it) shows that order's
+        // number and history, so a foreign order id would leak someone else's purchase.
+        if (request.RelatedOrderId is Guid relatedOrderId && request.CreatedByUserId == request.CustomerUserId)
+        {
+            var ownsOrder = await commerceDb.Orders.AsNoTracking()
+                .AnyAsync(o => o.Id == relatedOrderId && o.UserId == request.CustomerUserId, cancellationToken);
+            if (!ownsOrder)
+            {
+                return Result.Failure<TicketDetailDto>(SupportErrors.RelatedOrderNotFound);
+            }
+        }
+
         var categoryId = request.CategoryId ?? await dbContext.TicketCategories
             .Where(c => c.IsDefault && c.IsActive)
             .Select(c => (Guid?)c.Id)

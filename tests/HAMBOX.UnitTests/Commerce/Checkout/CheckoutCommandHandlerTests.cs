@@ -87,6 +87,9 @@ public sealed class CheckoutCommandHandlerTests
             commerceDb,
             settingsProvider,
             referralRewardService,
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, settingsProvider,
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
             new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
 
@@ -212,6 +215,9 @@ public sealed class CheckoutCommandHandlerTests
             commerceDb,
             settingsProvider,
             referralRewardService,
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, settingsProvider,
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
             new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
 

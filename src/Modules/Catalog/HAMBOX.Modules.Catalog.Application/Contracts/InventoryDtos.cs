@@ -127,10 +127,11 @@ public sealed record InventoryStatisticsDto(
     int Expired,
     int LowStockVariants,
     int OutOfStockVariants,
-    decimal InventoryValue,
-    decimal PurchaseCost,
-    decimal EstimatedRevenue,
-    decimal EstimatedProfit);
+    // Cost-derived figures are null unless the caller holds Catalog.Inventory.ViewCosts.
+    decimal? InventoryValue,
+    decimal? PurchaseCost,
+    decimal? EstimatedRevenue,
+    decimal? EstimatedProfit);
 
 public sealed record InventoryReservationDto(
     Guid Id,

@@ -1,7 +1,9 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Application.Services;
+using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -11,15 +13,20 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.Images.GetProduct
 public sealed record GetProductImagesQuery(Guid ProductId) : IRequest<Result<IReadOnlyList<ProductImageDto>>>;
 
 internal sealed class GetProductImagesQueryHandler(
-    ICatalogDbContext dbContext) : IRequestHandler<GetProductImagesQuery, Result<IReadOnlyList<ProductImageDto>>>
+    ICatalogDbContext dbContext,
+    ICurrentUserPermissions permissions) : IRequestHandler<GetProductImagesQuery, Result<IReadOnlyList<ProductImageDto>>>
 {
     public async Task<Result<IReadOnlyList<ProductImageDto>>> Handle(
         GetProductImagesQuery request,
         CancellationToken cancellationToken)
     {
+        var isStaff = permissions.Has(CatalogPermissions.ProductsView);
         var productExists = await dbContext.Products
             .AsNoTracking()
-            .AnyAsync(product => product.Id == request.ProductId, cancellationToken);
+            .AnyAsync(
+                product => product.Id == request.ProductId
+                    && (isStaff || product.Status == ProductStatus.Active),
+                cancellationToken);
 
         if (!productExists)
         {

@@ -118,7 +118,11 @@ public sealed class SupplierPricedCheckoutTests
             new HAMBOX.UnitTests.Commerce.TestDoubles.FakePaymentGatewayConfigurationProvider());
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(
-            commerceDb, settingsProvider, referralRewardService, new FakeCommunicationService(),
+            commerceDb, settingsProvider, referralRewardService,
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, settingsProvider,
+                NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
+            new FakeCommunicationService(),
             NullLogger<ReferralLifecycleService>.Instance);
         var jobQueue = new FakeOperationalJobQueue();
         var handler = new CheckoutCommandHandler(

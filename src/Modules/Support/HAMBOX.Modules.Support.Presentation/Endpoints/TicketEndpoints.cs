@@ -91,7 +91,7 @@ internal static class TicketEndpoints
 
             await using var stream = file.OpenReadStream();
             var result = await sender.Send(new UploadTicketAttachmentCommand(
-                id, currentUser.UserId!, stream, file.FileName, file.ContentType, file.Length));
+                id, currentUser.UserId!, stream, file.FileName, file.ContentType, file.Length, RequireTicketOwnership: true));
             return MapResult(result, StatusCodes.Status201Created);
         }).DisableAntiforgery();
     }

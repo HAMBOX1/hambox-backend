@@ -154,6 +154,16 @@ internal static class CollectionEndpoints
             [FromBody] ReorderCollectionsRequest request,
             ISender sender) =>
         {
+            if (request.Entries is null)
+            {
+                return TypedResults.BadRequest(new ProblemDetails
+                {
+                    Title = "Bad Request",
+                    Detail = "The collections to reorder are required.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
             var command = new ReorderCollectionsCommand(
                 request.Entries.Select(e => new CollectionReorderEntry(e.Id, e.ParentId, e.SortOrder)).ToList());
             var result = await sender.Send(command);

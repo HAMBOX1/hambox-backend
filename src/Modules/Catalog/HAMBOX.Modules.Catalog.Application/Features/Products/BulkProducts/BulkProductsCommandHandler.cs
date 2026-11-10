@@ -12,6 +12,8 @@ using HAMBOX.Modules.Catalog.Application.Features.Products.ChangeProductCategory
 using HAMBOX.Modules.Catalog.Application.Features.Products.RemoveProductCollection;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Domain.Inventory;
+using HAMBOX.Modules.Catalog.Domain.Products;
+using HAMBOX.SharedKernel.Errors;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,9 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
 {
     /// <summary>Products handled per database round-trip by the batched actions.</summary>
     private const int BatchSize = 200;
+
+    /// <summary>Matches the Product.BadgeTextEn/Ar column length.</summary>
+    private const int ProductBadgeMaxLength = 60;
 
     private readonly ICatalogDbContext _db;
     private readonly ISender _sender;
@@ -39,7 +44,19 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
     public async Task<Result<BulkProductsResultDto>> Handle(BulkProductsCommand command, CancellationToken cancellationToken)
     {
         var request = command.Request;
-        var action = request.Action.Trim().ToLowerInvariant();
+        var action = (request.Action ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (action.Length == 0)
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBulkActionNotSupported(action));
+        }
+
+        if (action == "set-badge"
+            && ((request.BadgeTextEn?.Trim().Length ?? 0) > ProductBadgeMaxLength
+                || (request.BadgeTextAr?.Trim().Length ?? 0) > ProductBadgeMaxLength))
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBadgeTooLong);
+        }
 
         if (action == "change-category" && request.TargetCategoryId is null)
         {
@@ -49,6 +66,16 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
         if (action == "adjust-price" && (request.PriceMode is null || request.PriceValue is null))
         {
             return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBulkActionNotSupported(action));
+        }
+
+        if (action == "adjust-price" && request.PriceValue is < 0 or > ProductPublishGuard.MaxPrice)
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPriceAdjustment);
+        }
+
+        if (action == "adjust-price" && request.PriceMode == PriceAdjustmentMode.DecreasePercent && request.PriceValue > 100)
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPriceAdjustment);
         }
 
         if ((action == "assign-collection" || action == "remove-collection") && request.TargetCollectionId is null)
@@ -234,9 +261,10 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                     _ => product.Price,
                 };
 
-                if (newPrice < 0)
+                var priceError = ValidateNewPrice(product, newPrice);
+                if (priceError is not null)
                 {
-                    errors.Add($"{product.Id}: {CatalogErrors.InvalidPriceAdjustment.Description}");
+                    errors.Add($"{product.Id}: {priceError.Description}");
                     continue;
                 }
 
@@ -364,7 +392,15 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                     continue;
                 }
 
-                product.ChangePrice(decimal.Round(costs.Min() / factor, 2));
+                var marginPrice = costs.Min() / factor;
+                var marginError = ValidateNewPrice(product, marginPrice);
+                if (marginError is not null)
+                {
+                    errors.Add($"{product.Id}: {marginError.Description}");
+                    continue;
+                }
+
+                product.ChangePrice(decimal.Round(marginPrice, 2));
                 success++;
             }
 
@@ -372,5 +408,21 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
         }
 
         return Result.Success(new BulkProductsResultDto(success, errors.Count, errors));
+    }
+
+    /// <summary>Shared price rules for the bulk price actions: non-negative, under the ceiling, and a live product stays above zero.</summary>
+    private static Error? ValidateNewPrice(Product product, decimal newPrice)
+    {
+        if (newPrice < 0)
+        {
+            return CatalogErrors.InvalidPriceAdjustment;
+        }
+
+        if (newPrice > ProductPublishGuard.MaxPrice)
+        {
+            return CatalogErrors.ProductPriceTooHigh;
+        }
+
+        return newPrice <= 0 && product.Status == ProductStatus.Active ? CatalogErrors.ProductNotPublishablePrice : null;
     }
 }

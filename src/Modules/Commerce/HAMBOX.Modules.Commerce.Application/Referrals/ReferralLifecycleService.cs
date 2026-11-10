@@ -5,6 +5,7 @@ using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Memberships;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Domain.Account;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -46,6 +47,7 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     private readonly ICommerceDbContext _db;
     private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ReferralRewardService _rewardService;
+    private readonly PurchasePointsService _purchasePoints;
     private readonly ICommunicationService _communicationService;
     private readonly ILogger<ReferralLifecycleService> _logger;
 
@@ -53,12 +55,14 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
         ICommerceDbContext db,
         IPlatformSettingsProvider platformSettings,
         ReferralRewardService rewardService,
+        PurchasePointsService purchasePoints,
         ICommunicationService communicationService,
         ILogger<ReferralLifecycleService> logger)
     {
         _db = db;
         _platformSettings = platformSettings;
         _rewardService = rewardService;
+        _purchasePoints = purchasePoints;
         _communicationService = communicationService;
         _logger = logger;
     }
@@ -159,8 +163,18 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     /// by an optimistic concurrency token, so if two of the referred user's orders complete at the same
     /// instant, only one can win it, and calling this twice for the same order (a retried job, a
     /// duplicate webhook) is a no-op the second time because the entry is no longer Pending.
+    /// <para>
+    /// This is also the single "order just completed" seam, so it credits the order's purchase points first
+    /// (idempotent per order) — every completion path already calls it, and none has to learn about points.
+    /// </para>
     /// </summary>
     public async Task<ReferralQualificationOutcome> ProcessOrderCompletedAsync(Order order, CancellationToken cancellationToken)
+    {
+        await _purchasePoints.AwardForOrderAsync(order, cancellationToken);
+        return await QualifyReferralAsync(order, cancellationToken);
+    }
+
+    private async Task<ReferralQualificationOutcome> QualifyReferralAsync(Order order, CancellationToken cancellationToken)
     {
         var settings = await GetSettingsAsync(cancellationToken);
         if (!settings.Enabled)
@@ -267,6 +281,9 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     /// </summary>
     public async Task ReverseForOrderAsync(Order order, CancellationToken cancellationToken)
     {
+        // Same seam as ProcessOrderCompletedAsync: a cancelled/refunded order gives back its purchase points too.
+        await _purchasePoints.ReverseForOrderAsync(order, refundedAmountUsd: null, cancellationToken);
+
         var entry = await _db.ReferralHistoryEntries
             .FirstOrDefaultAsync(h => h.ReferredUserId == order.UserId, cancellationToken);
 
@@ -444,7 +461,8 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
 
         if (firstCompleted is not null)
         {
-            await ProcessOrderCompletedAsync(firstCompleted, cancellationToken);
+            // Referral only: this is an old order, and purchase points are never awarded retroactively.
+            await QualifyReferralAsync(firstCompleted, cancellationToken);
         }
 
         return Result.Success();

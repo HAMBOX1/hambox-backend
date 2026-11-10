@@ -1,5 +1,6 @@
 using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Modules.Identity.Application.Abstractions;
+using HAMBOX.SharedKernel.Errors;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 
@@ -24,8 +25,16 @@ internal sealed class GetPlatformSettingsCategoryQueryHandler(IPlatformSettingsS
 {
     public async Task<Result<PlatformSettingsCategoryDto>> Handle(
         GetPlatformSettingsCategoryQuery request,
-        CancellationToken cancellationToken) =>
-        Result.Success(await settingsService.GetCategoryAsync(request.CategoryKey, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        if (!PlatformSettingsCategoryKeys.All.Contains(request.CategoryKey))
+        {
+            return Result.Failure<PlatformSettingsCategoryDto>(
+                new Error("Settings.UnknownCategory", "This settings category does not exist."));
+        }
+
+        return Result.Success(await settingsService.GetCategoryAsync(request.CategoryKey, cancellationToken));
+    }
 }
 
 public sealed record UpdatePlatformSettingsCategoryCommand(
@@ -39,13 +48,27 @@ internal sealed class UpdatePlatformSettingsCategoryCommandHandler(IPlatformSett
 {
     public async Task<Result<PlatformSettingsCategoryDto>> Handle(
         UpdatePlatformSettingsCategoryCommand request,
-        CancellationToken cancellationToken) =>
-        Result.Success(await settingsService.UpdateCategoryAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!PlatformSettingsCategoryKeys.All.Contains(request.CategoryKey))
+        {
+            return Result.Failure<PlatformSettingsCategoryDto>(
+                new Error("Settings.UnknownCategory", "This settings category does not exist."));
+        }
+
+        var problem = PlatformSettingsPayloadRules.FindProblem(request.CategoryKey, request.PayloadJson);
+        if (problem is not null)
+        {
+            return Result.Failure<PlatformSettingsCategoryDto>(new Error("Settings.InvalidValue", problem));
+        }
+
+        return Result.Success(await settingsService.UpdateCategoryAsync(
             request.CategoryKey,
             request.PayloadJson,
             request.ActorUserId,
             request.ActorDisplayName,
             cancellationToken));
+    }
 }
 
 public sealed record RestorePlatformSettingsCategoryCommand(
@@ -58,12 +81,20 @@ internal sealed class RestorePlatformSettingsCategoryCommandHandler(IPlatformSet
 {
     public async Task<Result<PlatformSettingsCategoryDto>> Handle(
         RestorePlatformSettingsCategoryCommand request,
-        CancellationToken cancellationToken) =>
-        Result.Success(await settingsService.RestoreDefaultsAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!PlatformSettingsCategoryKeys.All.Contains(request.CategoryKey))
+        {
+            return Result.Failure<PlatformSettingsCategoryDto>(
+                new Error("Settings.UnknownCategory", "This settings category does not exist."));
+        }
+
+        return Result.Success(await settingsService.RestoreDefaultsAsync(
             request.CategoryKey,
             request.ActorUserId,
             request.ActorDisplayName,
             cancellationToken));
+    }
 }
 
 public sealed record GetPlatformSettingsAuditQuery(int Take = 50)

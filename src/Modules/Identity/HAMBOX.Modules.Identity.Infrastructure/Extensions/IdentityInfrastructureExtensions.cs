@@ -279,6 +279,8 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<ISessionValidator, SessionValidator>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
+        services.AddScoped<HAMBOX.Application.Abstractions.ICurrentUserPermissions, CurrentUserPermissions>();
+        services.AddScoped<HAMBOX.Application.Abstractions.IUserDirectory, HAMBOX.Modules.Identity.Infrastructure.Services.UserDirectory>();
         services.AddScoped<IAuthorizationHandler, CustomerContextAuthorizationHandler>();
         services.AddScoped<IAdminAccessResolver, AdminAccessResolver>();
         services.AddSingleton<IOtpCodeGenerator, OtpCodeGenerator>();
@@ -324,7 +326,7 @@ public static class IdentityInfrastructureExtensions
         services.AddScoped<IBackgroundJobHandler, CleanupExpiredEmailBansJobHandler>();
 
         // 4. Register FluentValidation Validators
-        services.AddValidatorsFromAssembly(typeof(RegisterCommandValidator).Assembly);
+        services.AddValidatorsFromAssembly(typeof(RegisterCommandValidator).Assembly, includeInternalTypes: true);
 
         return services;
     }

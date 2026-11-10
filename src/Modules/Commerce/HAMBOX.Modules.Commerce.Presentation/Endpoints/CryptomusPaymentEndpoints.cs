@@ -44,7 +44,7 @@ internal static class CryptomusPaymentEndpoints
                 : "en";
 
             var result = await sender.Send(new InitiateCryptomusCheckoutCommand(
-                request.Email, request.Country, ipAddress, userAgent, language));
+                CheckoutEmail.Resolve(httpContext.User, request.Email), request.Country, ipAddress, userAgent, language));
 
             if (result.IsSuccess)
             {

@@ -293,6 +293,16 @@ internal static class ProductImageEndpoints
             [FromBody] ReorderProductImagesRequest request,
             ISender sender) =>
         {
+            if (request.OrderedImageIds is null)
+            {
+                return TypedResults.BadRequest(new ProblemDetails
+                {
+                    Title = "Bad Request",
+                    Detail = "The ordered image ids are required.",
+                    Status = StatusCodes.Status400BadRequest
+                });
+            }
+
             var result = await sender.Send(new ReorderProductImagesCommand(productId, request.OrderedImageIds));
 
             if (result.IsSuccess)

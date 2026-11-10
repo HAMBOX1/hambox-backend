@@ -1,3 +1,5 @@
+using FluentValidation;
+using HAMBOX.Modules.Suppliers.Application.Features.Suppliers;
 using HAMBOX.Modules.Suppliers.Infrastructure.Providers;
 using Microsoft.Extensions.Logging;
 using HAMBOX.Application.BackgroundJobs;
@@ -151,6 +153,8 @@ public static class SuppliersInfrastructureExtensions
         services.AddOptions<SupplierAvailabilityOptions>()
             .Bind(configuration.GetSection(SupplierAvailabilityOptions.SectionName))
             .ValidateOnStart();
+
+        services.AddValidatorsFromAssembly(typeof(GetSuppliersQuery).Assembly, includeInternalTypes: true);
 
         return services;
     }

@@ -22,6 +22,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 {
     private readonly ICatalogDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICurrentUserPermissions _permissions;
     private readonly IMembershipAccessProvider _membershipAccess;
     private readonly IFulfillmentRouter _fulfillmentRouter;
     private readonly ILogger<GetProductsQueryHandler> _logger;
@@ -29,12 +30,14 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
     public GetProductsQueryHandler(
         ICatalogDbContext dbContext,
         ICurrentUserService currentUser,
+        ICurrentUserPermissions permissions,
         IMembershipAccessProvider membershipAccess,
         IFulfillmentRouter fulfillmentRouter,
         ILogger<GetProductsQueryHandler> logger)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
+        _permissions = permissions;
         _membershipAccess = membershipAccess;
         _fulfillmentRouter = fulfillmentRouter;
         _logger = logger;
@@ -44,13 +47,17 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
     {
         // The list endpoint is AllowAnonymous for the storefront, so an anonymous caller must never
         // be able to see parked duplicates via this flag — only honor it in an admin context.
-        var pendingMergeOnly = request.PendingMergeOnly && _currentUser.IsAdminContext;
+        var pendingMergeOnly = request.PendingMergeOnly && IsStaff;
+
+        // Drafts, inactive and archived products are admin-only: an anonymous/customer caller is always
+        // pinned to Active regardless of the status they ask for.
+        var status = IsStaff ? request.Status : ProductStatus.Active;
 
         var query = ProductQueryFilters.ApplyBaseFilters(
             _dbContext.Products.AsNoTracking(),
             request.SearchTerm,
             request.CategoryId,
-            request.Status,
+            status,
             request.CollectionId,
             includePendingMerge: pendingMergeOnly,
             db: _dbContext);
@@ -62,7 +69,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         // Same admin-only gating as PendingMergeOnly above — favorites are a personal admin
         // bookmark, never a storefront concept.
-        var favoritesOnly = request.FavoritesOnly && _currentUser.IsAdminContext;
+        var favoritesOnly = request.FavoritesOnly && IsStaff;
         if (favoritesOnly)
         {
             query = query.Where(p => p.IsFavorite);
@@ -70,7 +77,15 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 
-        query = ApplySort(query, request.SortBy);
+        // Sorting by cost, margin or stock would leak supplier economics through the ordering alone, so those
+        // keys are admin-only; everyone else falls back to the default order.
+        var sortBy = request.SortBy;
+        if ((IsCostSort(sortBy) && !CanViewCosts) || (IsStockSort(sortBy) && !IsStaff))
+        {
+            sortBy = null;
+        }
+
+        query = ApplySort(query, sortBy);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -80,9 +95,11 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         // matching" elsewhere in this module. The capped value (not -1) flows into the PagedResult
         // below so the frontend renders the true count it actually received.
         const int MaxAllPageSize = 5000;
+        const int MaxPublicPageSize = 100;
+        var maxPageSize = IsStaff ? MaxAllPageSize : MaxPublicPageSize;
         var effectivePageSize = request.PageSize == -1
-            ? Math.Max(1, Math.Min(totalCount, MaxAllPageSize))
-            : request.PageSize;
+            ? Math.Max(1, Math.Min(totalCount, maxPageSize))
+            : Math.Min(request.PageSize, maxPageSize);
         var effectivePageNumber = request.PageSize == -1 ? 1 : request.PageNumber;
 
         var rows = await query
@@ -156,11 +173,11 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     access.IsRestricted,
                     canPurchase,
                     access.RequiredPlanNames,
-                    LastEditedByName: _currentUser.IsAdminContext ? r.LastEditedByName : null,
-                    LastEditedOnUtc: _currentUser.IsAdminContext ? r.LastEditedOnUtc : null,
+                    LastEditedByName: IsStaff ? r.LastEditedByName : null,
+                    LastEditedOnUtc: IsStaff ? r.LastEditedOnUtc : null,
                     PendingMergeIntoProductId: r.PendingMergeIntoProductId,
                     PendingMergeIntoProductName: r.PendingMergeIntoProductName,
-                    IsFavorite: _currentUser.IsAdminContext && r.IsFavorite,
+                    IsFavorite: IsStaff && r.IsFavorite,
                     BadgeTextEn: r.BadgeTextEn,
                     BadgeTextAr: r.BadgeTextAr);
             })
@@ -244,7 +261,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             }
         }
 
-        if (_currentUser.IsAdminContext && products.Count > 0)
+        if (IsStaff && products.Count > 0)
         {
             // Sale = what each variant sells for before any supplier-derived price: its own override, else the
             // product's base price. Supplier-derived prices already show in the list Price column above.
@@ -266,7 +283,10 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 .Select(p =>
                 {
                     var variants = variantsByProduct[p.Id].ToList();
-                    var (costMin, costMax) = Range(variants.Where(v => v.CostPrice.HasValue).Select(v => v.CostPrice!.Value));
+                    // Cost is only for staff holding ViewCosts; everyone else gets sale/member tiers without it.
+                    var (costMin, costMax) = CanViewCosts
+                        ? Range(variants.Where(v => v.CostPrice.HasValue).Select(v => v.CostPrice!.Value))
+                        : (null, null);
                     var (memberMin, memberMax) = Range(variants.Where(v => v.MemberPrice.HasValue).Select(v => v.MemberPrice!.Value));
                     var (saleMin, saleMax) = variants.Count == 0
                         ? (p.Price, p.Price)
@@ -284,7 +304,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            await TryLogSearchAsync(request.SearchTerm.Trim(), totalCount, cancellationToken);
+            await TryLogSearchAsync(SearchInput.Clean(request.SearchTerm)!, totalCount, cancellationToken);
         }
 
         return Result.Success(new PagedResult<ProductDto>(products, effectivePageNumber, effectivePageSize, totalCount));
@@ -305,6 +325,16 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             _logger.LogDebug(ex, "Best-effort search query logging failed.");
         }
     }
+
+    /// <summary>The caller is catalog staff: an OTP-verified admin who holds Catalog.Products.View (not merely any admin token).</summary>
+    private bool IsStaff => _permissions.Has(CatalogPermissions.ProductsView);
+
+    private bool CanViewCosts => _permissions.Has(CatalogPermissions.ViewCosts);
+
+    private static bool IsCostSort(ProductSortBy? sortBy) => sortBy is
+        ProductSortBy.CostAsc or ProductSortBy.CostDesc or ProductSortBy.MarginAsc or ProductSortBy.MarginDesc;
+
+    private static bool IsStockSort(ProductSortBy? sortBy) => sortBy is ProductSortBy.StockAsc or ProductSortBy.StockDesc;
 
     private IQueryable<Domain.Products.Product> ApplySort(
         IQueryable<Domain.Products.Product> query,

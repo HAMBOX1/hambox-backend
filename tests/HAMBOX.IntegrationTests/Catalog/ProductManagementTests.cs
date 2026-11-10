@@ -8,6 +8,7 @@ using HAMBOX.Modules.Catalog.Application.Features.Products.DeleteProduct;
 using HAMBOX.Modules.Catalog.Application.Features.Products.UpdateProduct;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Enums;
+using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +94,14 @@ public sealed class ProductManagementTests : IAsyncLifetime
         Assert.Equal(0, await db.Products.CountAsync());
     }
 
+    /// <summary>A product can only go live with a variant, so lifecycle tests that publish give theirs one first.</summary>
+    private async Task AddVariantAsync(Guid productId)
+    {
+        await using var db = CreateContext();
+        db.ProductVariants.Add(ProductVariant.Create(productId, $"SKU-{Guid.NewGuid():N}"));
+        await db.SaveChangesAsync();
+    }
+
     // ─── edit ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -100,6 +109,7 @@ public sealed class ProductManagementTests : IAsyncLifetime
     {
         var (categoryA, categoryB) = await SeedCategoriesAsync();
         var id = await CreateAsync(categoryA);
+        await AddVariantAsync(id);
 
         await using (var db = CreateContext())
         {
@@ -192,6 +202,7 @@ public sealed class ProductManagementTests : IAsyncLifetime
     {
         var (categoryA, _) = await SeedCategoriesAsync();
         var id = await CreateAsync(categoryA);
+        await AddVariantAsync(id);
 
         await using (var db = CreateContext())
         {

@@ -79,7 +79,10 @@ internal sealed class DotFawryTestHarness
         var promotionRedemptionService = new PromotionRedemptionService(commerceDb);
         var referralRewardService = new ReferralRewardService(commerceDb, new FakeMembershipEngine());
         var referralLifecycle = new ReferralLifecycleService(
-            commerceDb, platformSettings, referralRewardService, communication, NullLogger<ReferralLifecycleService>.Instance);
+            commerceDb, platformSettings, referralRewardService,
+            new HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService(
+                commerceDb, platformSettings, NullLogger<HAMBOX.Modules.Commerce.Application.Points.PurchasePointsService>.Instance),
+            communication, NullLogger<ReferralLifecycleService>.Instance);
 
         var verificationService = new DotFawryPaymentVerificationService(
             commerceDb,

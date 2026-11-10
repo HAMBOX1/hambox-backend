@@ -21,6 +21,16 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["X-Frame-Options"] = "DENY";
             context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+            // Responses to authenticated API calls can carry staff-only data (cost prices, revealed license keys,
+            // exports). Never let a browser or shared proxy keep a copy; endpoints that set their own policy win.
+            if (context.Request.Path.StartsWithSegments("/api")
+                && context.Request.Headers.ContainsKey("Authorization")
+                && !context.Response.Headers.ContainsKey("Cache-Control"))
+            {
+                context.Response.Headers["Cache-Control"] = "no-store";
+            }
+
             return Task.CompletedTask;
         });
 

@@ -5,6 +5,7 @@ using HAMBOX.Modules.Identity.Application.Abstractions;
 using HAMBOX.Modules.Identity.Domain.Users;
 using HAMBOX.Modules.Identity.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HAMBOX.IntegrationTests.Auth;
@@ -259,7 +260,7 @@ public sealed class CookieAuthFlowTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Refresh_ReusedOldToken_IsRejected_AndCascadesToRevokeTheRotatedSuccessor()
+    public async Task Refresh_ReusedOldToken_WithinGraceWindow_IsAccepted_AndDoesNotRevokeTheRotatedSuccessor()
     {
         using var loginResponse = await LoginAsync();
         var originalRefreshCookie = ExtractSetCookieValue(loginResponse, RefreshCookieName);
@@ -270,13 +271,44 @@ public sealed class CookieAuthFlowTests : IAsyncLifetime
         var rotatedRefreshCookie = ExtractSetCookieValue(firstRefreshResponse, RefreshCookieName);
         var rotatedCsrfValue = ExtractSetCookieValue(firstRefreshResponse, CsrfCookieName) ?? csrfValue;
 
-        // Reuse the ORIGINAL (already-rotated-away) token — this is the stolen-cookie/replay scenario.
+        // A lost response / second tab presents the just-rotated-away token again: a harmless retry, not theft.
+        using var retryRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", originalRefreshCookie, csrfValue);
+        using var retryResponse = await _client.SendAsync(retryRequest);
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+
+        // ...and the legitimately-rotated successor must still work (no mass revocation).
+        using var rotatedRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", rotatedRefreshCookie, rotatedCsrfValue);
+        using var rotatedResponse = await _client.SendAsync(rotatedRequest);
+        Assert.Equal(HttpStatusCode.OK, rotatedResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_ReusedOldToken_AfterGraceWindow_IsRejected_AndCascadesToRevokeTheRotatedSuccessor()
+    {
+        using var loginResponse = await LoginAsync();
+        var originalRefreshCookie = ExtractSetCookieValue(loginResponse, RefreshCookieName);
+        var csrfValue = ExtractSetCookieValue(loginResponse, CsrfCookieName);
+
+        using var firstRefreshRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", originalRefreshCookie, csrfValue);
+        using var firstRefreshResponse = await _client.SendAsync(firstRefreshRequest);
+        var rotatedRefreshCookie = ExtractSetCookieValue(firstRefreshResponse, RefreshCookieName);
+        var rotatedCsrfValue = ExtractSetCookieValue(firstRefreshResponse, CsrfCookieName) ?? csrfValue;
+
+        // Age the rotation past the 2-minute grace window so the replay is treated as stolen-cookie reuse.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            var originalHash = HAMBOX.Modules.Identity.Domain.Tokens.RefreshToken.GetLookupHash(originalRefreshCookie!);
+            var original = await db.RefreshTokens.SingleAsync(t => t.Token == originalHash);
+            db.Entry(original).Property(nameof(original.RevokedOnUtc)).CurrentValue = DateTimeOffset.UtcNow.AddMinutes(-3);
+            await db.SaveChangesAsync();
+        }
+
         using var reuseRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", originalRefreshCookie, csrfValue);
         using var reuseResponse = await _client.SendAsync(reuseRequest);
         Assert.Equal(HttpStatusCode.BadRequest, reuseResponse.StatusCode);
 
-        // Reuse detection must cascade: the legitimately-rotated successor token is now revoked too,
-        // per RefreshTokenCommandHandler's existing (untouched) RevokeAllUserTokensAsync behavior.
+        // Reuse detection must cascade: the legitimately-rotated successor token is now revoked too.
         using var rotatedRequest = BuildRequest(HttpMethod.Post, "api/auth/refresh", rotatedRefreshCookie, rotatedCsrfValue);
         using var rotatedResponse = await _client.SendAsync(rotatedRequest);
         Assert.Equal(HttpStatusCode.BadRequest, rotatedResponse.StatusCode);

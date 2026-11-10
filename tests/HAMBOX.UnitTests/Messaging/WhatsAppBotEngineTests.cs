@@ -54,8 +54,8 @@ public sealed class WhatsAppBotEngineTests
 
         var sender = new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
-            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
-            new GetProductByIdQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider()),
+            new GetProductsQueryHandler(catalogDb, guestUser, HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrentUserPermissions.None, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
+            new GetProductByIdQueryHandler(catalogDb, guestUser, HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrentUserPermissions.None, new FakeMembershipAccessProvider()),
             new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, guestUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),
             new GetCartQueryHandler(commerceDb, guestUser, cartResponseBuilder));
@@ -130,8 +130,8 @@ public sealed class WhatsAppBotEngineTests
 
         var sender = new MultiHandlerFakeSender(
             new GetCategoryTreeQueryHandler(catalogDb),
-            new GetProductsQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
-            new GetProductByIdQueryHandler(catalogDb, guestUser, new FakeMembershipAccessProvider()),
+            new GetProductsQueryHandler(catalogDb, guestUser, HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrentUserPermissions.None, new FakeMembershipAccessProvider(), new FakeFulfillmentRouter(), NullLogger<GetProductsQueryHandler>.Instance),
+            new GetProductByIdQueryHandler(catalogDb, guestUser, HAMBOX.UnitTests.Commerce.TestDoubles.FakeCurrentUserPermissions.None, new FakeMembershipAccessProvider()),
             new GetStorefrontProductConfigurationsQueryHandler(catalogDb, inventoryEngine, new FakeFulfillmentRouter(), new HAMBOX.UnitTests.Commerce.TestDoubles.FakeCommerceSettingsProvider()),
             new AddCartItemCommandHandler(commerceDb, catalogDb, guestUser, inventoryEngine, new FakeFulfillmentRouter(), cartResponseBuilder, new FakeMembershipAccessProvider()),
             new GetCartQueryHandler(commerceDb, guestUser, cartResponseBuilder));

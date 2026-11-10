@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -69,7 +70,7 @@ internal sealed class ExportProductsQueryHandler : IRequestHandler<ExportProduct
         foreach (var product in products)
         {
             builder.AppendLine(
-                $"{EscapeCsv(product.NameEn)},{EscapeCsv(product.CategoryName)},{product.Price},{product.Status},{stockByProduct.GetValueOrDefault(product.Id, 0)}");
+                $"{CsvCell.Escape(product.NameEn)},{CsvCell.Escape(product.CategoryName)},{product.Price},{product.Status},{stockByProduct.GetValueOrDefault(product.Id, 0)}");
         }
 
         var bytes = Encoding.UTF8.GetBytes(builder.ToString());
@@ -78,7 +79,4 @@ internal sealed class ExportProductsQueryHandler : IRequestHandler<ExportProduct
             "text/csv",
             bytes));
     }
-
-    private static string EscapeCsv(string value) =>
-        value.Contains(',') || value.Contains('"') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
 }

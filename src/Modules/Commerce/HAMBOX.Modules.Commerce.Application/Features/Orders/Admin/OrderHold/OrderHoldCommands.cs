@@ -32,6 +32,12 @@ internal sealed class HoldAdminOrderCommandHandler(
             return Result.Failure(CommerceErrors.OrderNotFound);
         }
 
+        if (order.IsOnHold)
+        {
+            // A second hold would overwrite the first reason, or a system manual-review hold.
+            return Result.Failure(CommerceErrors.OrderAlreadyOnHold);
+        }
+
         try
         {
             order.PlaceOnHold(OrderHoldKind.AdminHold, request.Reason);

@@ -21,7 +21,7 @@ internal sealed class SetProductVariantPricesCommandHandler(ICatalogDbContext db
         var field = request.Field?.Trim().ToLowerInvariant();
         if (field is not ("cost" or "member") || request.Value is < 0)
         {
-            return Result.Failure<int>(CatalogErrors.VariantNotFound);
+            return Result.Failure<int>(CatalogErrors.VariantPriceFieldInvalid);
         }
 
         var variants = await db.ProductVariants

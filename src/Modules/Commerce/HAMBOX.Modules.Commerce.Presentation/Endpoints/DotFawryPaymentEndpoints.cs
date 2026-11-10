@@ -43,7 +43,7 @@ internal static class DotFawryPaymentEndpoints
                 : "en";
 
             var result = await sender.Send(new InitiateDotFawryCheckoutCommand(
-                request.Email, request.Country, request.PhoneNumber, request.CustomerName, request.Wallet,
+                CheckoutEmail.Resolve(httpContext.User, request.Email), request.Country, request.PhoneNumber, request.CustomerName, request.Wallet,
                 ipAddress, userAgent, language));
 
             if (result.IsSuccess)

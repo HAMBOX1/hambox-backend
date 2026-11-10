@@ -24,6 +24,12 @@ internal sealed class ReplyToTicketCommandHandler(
             return Result.Failure<TicketMessageDto>(SupportErrors.TicketNotFound);
         }
 
+        // A customer can only write on their own ticket (agents are authorized at the endpoint by permission).
+        if (request.AuthorRole == TicketMessageAuthorRole.Customer && ticket.CustomerUserId != request.AuthorUserId)
+        {
+            return Result.Failure<TicketMessageDto>(SupportErrors.NotYourTicket);
+        }
+
         var message = TicketMessage.Create(
             ticket.Id, request.AuthorUserId, request.AuthorRole, request.Body, request.IsInternal, request.SavedReplyId);
         dbContext.TicketMessages.Add(message);

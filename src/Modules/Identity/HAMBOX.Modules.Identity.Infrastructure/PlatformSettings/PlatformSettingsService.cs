@@ -450,6 +450,7 @@ internal sealed class PlatformSettingsService(
             var t when t == typeof(PromotionsSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<PromotionsSettingsPayload>(mergedJson),
             var t when t == typeof(MembershipsSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<MembershipsSettingsPayload>(mergedJson),
             var t when t == typeof(ReferralSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<ReferralSettingsPayload>(mergedJson),
+            var t when t == typeof(PurchasePointsSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<PurchasePointsSettingsPayload>(mergedJson),
             var t when t == typeof(InventorySettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<InventorySettingsPayload>(mergedJson),
             var t when t == typeof(QueueSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<QueueSettingsPayload>(mergedJson),
             var t when t == typeof(RetryPoliciesSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<RetryPoliciesSettingsPayload>(mergedJson),

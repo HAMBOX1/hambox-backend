@@ -75,6 +75,11 @@ public interface ICommerceDbContext
     DbSet<ReferralAuditLog> ReferralAuditLogs { get; }
 
     /// <summary>
+    /// Gets the purchase-points ledger database set (append-only).
+    /// </summary>
+    DbSet<PointsTransaction> PointsTransactions { get; }
+
+    /// <summary>
     /// Gets the order license keys database set.
     /// </summary>
     DbSet<OrderLicenseKey> OrderLicenseKeys { get; }

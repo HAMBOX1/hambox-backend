@@ -338,7 +338,7 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
         new("DescriptionAr", false, "Product description in Arabic. Falls back to DescriptionEn."),
         new("Price", false, "Base price in USD (the sole stored currency). Leave blank to default to 0; must not be negative if set."),
         new("CategorySlug", false, "Name of an existing (or in-file) category — pick from the dropdown, or type a brand-new name and it will be created automatically. A raw slug from an older template still works too. Leave blank to file the product under 'Uncategorized'.", DropdownKind.Category),
-        new("Status", false, "Draft, Active, Inactive, or Archived. Defaults to Draft.", DropdownKind.ProductStatus),
+        new("Status", false, "Draft, Inactive, or Archived. Defaults to Draft. An imported product is never made live (it has no variants yet): 'Active' stays Draft until you publish it.", DropdownKind.ProductStatus),
         new("StockQuantity", false, "Initial stock quantity. Defaults to 100."),
         new("AdditionalCategorySlugs", false, "Comma-separated category names for cross-listing, e.g. 'Sale, Featured'. Any name that doesn't already exist is created automatically. The dropdown picks one at a time — type or paste the rest separated by commas.", DropdownKind.CategoryMulti),
         new("CollectionNames", false, "Comma-separated internal collection names, e.g. 'Featured,Supplier Bamboo'. Never customer-facing. Any name that doesn't already exist is created automatically. The dropdown picks one at a time — type or paste the rest separated by commas.", DropdownKind.CollectionMulti),

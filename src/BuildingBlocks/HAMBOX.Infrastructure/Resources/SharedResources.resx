@@ -36,6 +36,12 @@
   <data name="Errors.Internal.Detail" xml:space="preserve">
     <value>An unexpected error occurred. Please try again later.</value>
   </data>
+  <data name="Errors.BadRequest.Title" xml:space="preserve">
+    <value>Bad Request</value>
+  </data>
+  <data name="Errors.BadRequest.Detail" xml:space="preserve">
+    <value>The request is invalid or is missing required parameters.</value>
+  </data>
   <data name="Errors.IdempotencyConflict.Title" xml:space="preserve">
     <value>Request Already In Progress</value>
   </data>

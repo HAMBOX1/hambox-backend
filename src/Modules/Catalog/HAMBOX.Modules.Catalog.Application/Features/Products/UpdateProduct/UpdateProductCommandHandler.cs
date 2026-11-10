@@ -90,6 +90,17 @@ internal sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProduc
         product.ScheduleRelease(request.PublicReleaseOnUtc);
         product.RecordAdminEdit(_currentUserService.UserId, _currentUserService.DisplayName);
 
+        var goingLive = request.Status == ProductStatus.Active && product.Status != ProductStatus.Active;
+        var livePriceBroken = product.Status == ProductStatus.Active && request.Price <= 0;
+        if (goingLive || livePriceBroken)
+        {
+            var publishable = await ProductPublishGuard.CheckAsync(_dbContext, product, cancellationToken);
+            if (publishable.IsFailure)
+            {
+                return publishable;
+            }
+        }
+
         if (request.Status != product.Status)
         {
             try

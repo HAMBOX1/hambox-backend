@@ -1,3 +1,4 @@
+using HAMBOX.Application.Security;
 using System.Text.Json;
 using HAMBOX.Modules.Support.Application.Abstractions;
 using HAMBOX.Modules.Support.Application.Errors;
@@ -25,7 +26,7 @@ internal sealed class UpdateKnowledgeArticleCommandHandler(ISupportDbContext dbC
         }
 
         var relatedJson = request.RelatedArticleIds is { Count: > 0 } ? JsonSerializer.Serialize(request.RelatedArticleIds) : null;
-        article.Update(request.CategoryId, request.Title, request.Body, request.Visibility, relatedJson);
+        article.Update(request.CategoryId, request.Title, RichTextSanitizer.Sanitize(request.Body) ?? string.Empty, request.Visibility, relatedJson);
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Success();

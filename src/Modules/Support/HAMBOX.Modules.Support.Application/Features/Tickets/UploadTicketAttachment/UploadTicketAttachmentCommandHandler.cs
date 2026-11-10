@@ -16,10 +16,18 @@ internal sealed class UploadTicketAttachmentCommandHandler(
 {
     public async Task<Result<TicketAttachmentDto>> Handle(UploadTicketAttachmentCommand request, CancellationToken cancellationToken)
     {
-        var ticketExists = await dbContext.Tickets.AnyAsync(t => t.Id == request.TicketId, cancellationToken);
-        if (!ticketExists)
+        var ticketOwner = await dbContext.Tickets
+            .Where(t => t.Id == request.TicketId)
+            .Select(t => t.CustomerUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (ticketOwner is null)
         {
             return Result.Failure<TicketAttachmentDto>(SupportErrors.TicketNotFound);
+        }
+
+        if (request.RequireTicketOwnership && ticketOwner != request.UploadedByUserId)
+        {
+            return Result.Failure<TicketAttachmentDto>(SupportErrors.NotYourTicket);
         }
 
         if (request.FileSizeBytes > fileStorage.MaxFileSizeBytes)

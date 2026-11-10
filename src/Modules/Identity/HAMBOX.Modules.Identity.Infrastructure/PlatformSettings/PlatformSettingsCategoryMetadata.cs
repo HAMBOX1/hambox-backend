@@ -22,6 +22,7 @@ internal static class PlatformSettingsCategoryMetadata
         new("promotions", "Promotions", "Commerce"),
         new("memberships", "Memberships", "Commerce"),
         new("referral", "Referral", "Commerce"),
+        new("purchasePoints", "Purchase Points", "Commerce"),
         new("inventory", "Inventory", "Operations"),
         new("queue", "Queue", "Operations"),
         new("retryPolicies", "Retry Policies", "Operations"),

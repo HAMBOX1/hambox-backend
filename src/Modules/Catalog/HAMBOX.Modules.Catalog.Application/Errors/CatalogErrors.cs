@@ -66,6 +66,38 @@ public static class CatalogErrors
         "Products.InvalidPriceAdjustment",
         "The price adjustment would result in a negative price.");
 
+    public static readonly Error ExportCodesNotPermitted = new(
+        "Catalog.ExportCodesNotPermitted",
+        "Exporting digital codes requires the permission to reveal inventory codes.");
+
+    public static readonly Error ExportCostsNotPermitted = new(
+        "Catalog.ExportCostsNotPermitted",
+        "Exporting supplier buying prices requires the permission to view costs.");
+
+    public static readonly Error TooManyVariantCombinations = new(
+        "Inventory.TooManyVariantCombinations",
+        "These option groups would create more than 5,000 variants. Remove some options or groups, then generate again.");
+
+    public static readonly Error ProductNameTooLong = new(
+        "Products.NameTooLong",
+        "The product name would be longer than 200 characters. Use a shorter suffix.");
+
+    public static readonly Error ProductBadgeTooLong = new(
+        "Products.BadgeTooLong",
+        "A storefront badge can be at most 60 characters.");
+
+    public static readonly Error ProductPriceTooHigh = new(
+        "Products.PriceTooHigh",
+        "The price exceeds the maximum allowed amount.");
+
+    public static readonly Error ProductNotPublishablePrice = new(
+        "Products.NotPublishablePrice",
+        "A product needs a price greater than zero before it can go live.");
+
+    public static readonly Error ProductNotPublishableNoVariant = new(
+        "Products.NotPublishableNoVariant",
+        "A product needs at least one variant (with stock or delivery set up) before it can go live.");
+
     public static readonly Error RevealReasonRequired = new(
         "Inventory.RevealReasonRequired",
         "Enter a reason (at least 3 characters) to reveal this code.");
@@ -92,9 +124,9 @@ public static class CatalogErrors
     /// stock is entirely driven by digital inventory codes, so a bare StockQuantity has no
     /// migration path and needs an explicit confirmation before it's discarded.
     /// </summary>
-    public static Error ProductMergeStockLossRequiresConfirmation(IReadOnlyList<Guid> productIds) => new(
+    public static Error ProductMergeStockLossRequiresConfirmation(IReadOnlyList<string> productNames) => new(
         "Products.MergeStockLossRequiresConfirmation",
-        $"These products have stock recorded that cannot be carried over automatically and will be lost: {string.Join(", ", productIds)}. Confirm to proceed anyway.");
+        $"These products have stock recorded that cannot be carried over automatically and will be lost: {string.Join(", ", productNames)}. Confirm to proceed anyway.");
 
     /// <summary>
     /// Gets the error for when a product is asked to be parked as a pending merge into itself.
@@ -170,6 +202,22 @@ public static class CatalogErrors
     public static readonly Error ProductImageLimitReached = new(
         "Products.ImageLimitReached",
         "The product has reached the maximum number of images.");
+
+    public static readonly Error VariantSkuExists = new(
+        "Inventory.VariantSkuExists",
+        "Another variant already uses this SKU. SKUs must be unique.");
+
+    public static readonly Error OptionGroupKeyExists = new(
+        "Inventory.OptionGroupKeyExists",
+        "This product already has an option group with that key.");
+
+    public static readonly Error OptionValueExists = new(
+        "Inventory.OptionValueExists",
+        "This option group already has an option with that value.");
+
+    public static readonly Error VariantPriceFieldInvalid = new(
+        "Inventory.VariantPriceFieldInvalid",
+        "Choose the cost or member price, and enter a value of zero or more.");
 
     public static readonly Error VariantNotFound = new(
         "Inventory.VariantNotFound",

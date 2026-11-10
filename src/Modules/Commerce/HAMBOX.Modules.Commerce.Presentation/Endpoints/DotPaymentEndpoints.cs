@@ -44,7 +44,7 @@ internal static class DotPaymentEndpoints
                 : "en";
 
             var result = await sender.Send(new InitiateDotCheckoutCommand(
-                request.Email, request.Country, request.Wallet, ipAddress, userAgent, language));
+                CheckoutEmail.Resolve(httpContext.User, request.Email), request.Country, request.Wallet, ipAddress, userAgent, language));
 
             if (result.IsSuccess)
             {
