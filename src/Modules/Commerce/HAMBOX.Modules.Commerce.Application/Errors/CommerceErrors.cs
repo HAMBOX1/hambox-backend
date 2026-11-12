@@ -180,6 +180,14 @@ public static class CommerceErrors
         "Promotions.NotFound",
         "The promotion was not found.");
 
+    public static readonly Error PromotionTargetsEmpty = new(
+        "Promotions.TargetsEmpty",
+        "Choose at least one product or category.");
+
+    public static readonly Error PromotionTargetsTooMany = new(
+        "Promotions.TargetsTooMany",
+        "Too many products at once. Apply the promo code to at most 5,000 products per request.");
+
     public static readonly Error CouponNotFound = new(
         "Coupons.NotFound",
         "The coupon code was not found.");

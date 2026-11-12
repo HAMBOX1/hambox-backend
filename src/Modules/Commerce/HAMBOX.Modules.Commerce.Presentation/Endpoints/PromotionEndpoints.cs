@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts.Promotions;
+using HAMBOX.Modules.Commerce.Application.Features.Promotions.AddPromotionTargets;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.CreateCoupon;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.CreatePromotion;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.DeletePromotion;
@@ -73,6 +74,19 @@ internal static class PromotionEndpoints
             return MapResult(result);
         })
         .WithName("UpdatePromotion")
+        .RequirePermission(PermissionConstants.Promotions.Edit);
+
+        // Adds products / whole categories to a promotion's targets — the product page's "Add promo" and bulk
+        // "Apply promo code" use this instead of opening the promotion and searching a long product list.
+        group.MapPost("{id:guid}/targets", async Task<IResult> (
+            Guid id,
+            [FromBody] AddPromotionTargetsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new AddPromotionTargetsCommand(id, request));
+            return MapResult(result);
+        })
+        .WithName("AddPromotionTargets")
         .RequirePermission(PermissionConstants.Promotions.Edit);
 
         group.MapDelete("{id:guid}", async Task<IResult> (Guid id, ISender sender) =>

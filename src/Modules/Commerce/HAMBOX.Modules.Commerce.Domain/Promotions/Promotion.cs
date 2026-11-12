@@ -197,6 +197,26 @@ public sealed class Promotion : AggregateRoot, ISoftDeletable
         return condition;
     }
 
+    /// <summary>
+    /// Adds the given products/categories as targets, skipping any that are already targeted. Returns only the
+    /// newly created targets so the caller can register them with the context.
+    /// </summary>
+    public IReadOnlyList<PromotionTarget> AddTargetsIfMissing(IEnumerable<(PromotionTargetType Type, Guid TargetId)> targets)
+    {
+        var added = new List<PromotionTarget>();
+        foreach (var (type, targetId) in targets.Distinct())
+        {
+            if (_targets.Any(t => t.TargetType == type && t.TargetId == targetId))
+            {
+                continue;
+            }
+
+            added.Add(AddTarget(type, targetId));
+        }
+
+        return added;
+    }
+
     public PromotionTarget AddTarget(PromotionTargetType targetType, Guid targetId)
     {
         var target = PromotionTarget.Create(Id, targetType, targetId);

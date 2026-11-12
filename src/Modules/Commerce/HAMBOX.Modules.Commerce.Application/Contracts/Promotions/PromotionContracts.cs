@@ -85,6 +85,16 @@ public sealed record UpdatePromotionRequest(
     IReadOnlyList<PromotionConditionDto>? Conditions,
     IReadOnlyList<PromotionTargetDto>? Targets);
 
+/// <summary>Adds products and/or whole categories to a promotion's targets (what its discount applies to).</summary>
+public sealed record AddPromotionTargetsRequest(
+    IReadOnlyList<Guid>? ProductIds,
+    IReadOnlyList<Guid>? CategoryIds);
+
+public sealed record AddPromotionTargetsResultDto(
+    int ProductsAdded,
+    int CategoriesAdded,
+    int AlreadyTargeted);
+
 public sealed record GenerateCouponsRequest(
     int Count,
     string? Prefix,
