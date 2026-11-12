@@ -415,6 +415,29 @@ internal static class InventoryEndpoints
             ISender sender) => await Send(sender, new BulkDeleteInventoryCodesCommand(variantId, body.CodeIds ?? [])))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Delete);
 
+        // Plain-text download of the real codes (the CSV above is masked). Same permission and audit trail as revealing a
+        // code; the reason is optional here because the admin is just taking their own stock out as a file.
+        group.MapGet("/variants/{variantId:guid}/codes/export-text", async (
+            Guid variantId,
+            [FromQuery] string? status,
+            [FromQuery] string? reason,
+            HttpContext httpContext,
+            ISender sender) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = string.IsNullOrWhiteSpace(httpContext.Request.Headers["User-Agent"]) ? "unknown" : httpContext.Request.Headers["User-Agent"].ToString();
+            var result = await sender.Send(new ExportInventoryCodesTextQuery(variantId, status, reason, ipAddress, userAgent));
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(Problem(result));
+            }
+
+            httpContext.Response.Headers["X-Code-Count"] = result.Value.CodeCount.ToString();
+            httpContext.Response.Headers["X-Picture-Count"] = result.Value.PictureCount.ToString();
+            return Results.File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+        })
+        .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
+
         group.MapGet("/variants/{variantId:guid}/codes/export", async (
             Guid variantId,
             [FromQuery] string? status,
