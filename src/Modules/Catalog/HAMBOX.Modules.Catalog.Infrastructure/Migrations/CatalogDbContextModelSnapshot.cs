@@ -1557,6 +1557,9 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(100);
 
+                    b.Property<string>("UsageInstructionsHtml")
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId")

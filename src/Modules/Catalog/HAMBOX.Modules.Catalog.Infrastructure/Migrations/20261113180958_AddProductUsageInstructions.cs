@@ -1,0 +1,30 @@
+﻿using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddProductUsageInstructions : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<string>(
+                name: "UsageInstructionsHtml",
+                schema: "catalog",
+                table: "Products",
+                type: "nvarchar(max)",
+                nullable: true);
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropColumn(
+                name: "UsageInstructionsHtml",
+                schema: "catalog",
+                table: "Products");
+        }
+    }
+}

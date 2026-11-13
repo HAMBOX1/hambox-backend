@@ -75,6 +75,7 @@ internal static class CatalogMapper
             LastEditedOnUtc: isAdminContext ? product.LastEditedOnUtc : null,
             CategoryDescriptionHtml: categoryDescriptionHtml,
             BadgeTextEn: product.BadgeTextEn,
-            BadgeTextAr: product.BadgeTextAr);
+            BadgeTextAr: product.BadgeTextAr,
+            UsageInstructionsHtml: product.UsageInstructionsHtml);
     }
 }

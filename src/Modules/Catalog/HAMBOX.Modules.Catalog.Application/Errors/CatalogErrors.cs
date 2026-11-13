@@ -24,6 +24,10 @@ public static class CatalogErrors
     /// <summary>
     /// Gets the error for when a product is not found.
     /// </summary>
+    public static readonly Error UsageInstructionsTooLong = new(
+        "Products.UsageInstructionsTooLong",
+        "The \"How to use\" text is too long. Keep it under 20,000 characters.");
+
     public static readonly Error ProductNotFound = new(
         "Products.NotFound",
         "The product with the specified identifier was not found.");

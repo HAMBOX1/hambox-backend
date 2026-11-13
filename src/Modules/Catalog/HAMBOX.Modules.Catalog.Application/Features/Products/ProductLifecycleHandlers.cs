@@ -19,6 +19,9 @@ public sealed record SetPendingMergeCommand(Guid ProductId, Guid TargetProductId
 public sealed record ClearPendingMergeCommand(Guid ProductId) : IRequest<Result>;
 public sealed record SetProductFavoriteCommand(Guid ProductId, bool IsFavorite) : IRequest<Result>;
 
+/// <summary>Sets the product's public "How to use" text shown on its storefront page (null or empty clears it).</summary>
+public sealed record SetProductUsageInstructionsCommand(Guid ProductId, string? Html) : IRequest<Result>;
+
 public sealed record ProductPurchaseControlsDto(int? MaxQuantityPerOrder, int? MaxQuantityPerUserPerDay, bool RequiresManualReview);
 
 public sealed record SetProductPurchaseControlsCommand(Guid ProductId, ProductPurchaseControlsDto Controls) : IRequest<Result>;
@@ -458,5 +461,35 @@ internal sealed class GetProductPurchaseControlsQueryHandler : IRequestHandler<G
             ? Result.Failure<ProductPurchaseControlsDto>(CatalogErrors.ProductNotFound)
             : Result.Success(new ProductPurchaseControlsDto(
                 product.MaxQuantityPerOrder, product.MaxQuantityPerUserPerDay, product.RequiresManualReview));
+    }
+}
+
+internal sealed class SetProductUsageInstructionsCommandHandler : IRequestHandler<SetProductUsageInstructionsCommand, Result>
+{
+    /// <summary>Plenty for a how-to guide, and a hard stop on a pasted book.</summary>
+    public const int MaxLength = 20_000;
+
+    private readonly ICatalogDbContext _db;
+
+    public SetProductUsageInstructionsCommandHandler(ICatalogDbContext db) => _db = db;
+
+    public async Task<Result> Handle(SetProductUsageInstructionsCommand request, CancellationToken cancellationToken)
+    {
+        if (request.Html is { Length: > MaxLength })
+        {
+            return Result.Failure(CatalogErrors.UsageInstructionsTooLong);
+        }
+
+        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        // Rich text from the admin editor is shown to every visitor, so it goes through the same allow-list sanitizer as
+        // option and category instructions: no scripts, no event handlers, no unsafe links.
+        product.SetUsageInstructions(Services.ProductOptionDescriptionSanitizer.Sanitize(request.Html));
+        await _db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 }

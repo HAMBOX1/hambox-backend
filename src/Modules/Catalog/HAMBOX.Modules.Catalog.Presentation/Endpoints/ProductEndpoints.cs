@@ -227,6 +227,12 @@ internal static class ProductEndpoints
             .WithName("SetProductFavorite")
             .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
+        // PUT /api/v1/products/{id}/usage-instructions — the product's own public "How to use" text.
+        group.MapPut("{id:guid}/usage-instructions", async (Guid id, [FromBody] SetProductUsageInstructionsRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new SetProductUsageInstructionsCommand(id, request.Html)))
+            .WithName("SetProductUsageInstructions")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         // GET/PUT /api/v1/products/{id}/purchase-controls — per-order / per-customer-per-day caps and the
         // "sensitive product, review every order" flag (audit R22).
         group.MapGet("{id:guid}/purchase-controls", async (Guid id, ISender sender) =>
@@ -395,3 +401,5 @@ internal sealed record MergeProductsRequest(
     IReadOnlyDictionary<Guid, string>? VariantLabels = null);
 internal sealed record SetPendingMergeRequest(Guid TargetProductId);
 internal sealed record SetProductFavoriteRequest(bool IsFavorite);
+
+internal sealed record SetProductUsageInstructionsRequest(string? Html);

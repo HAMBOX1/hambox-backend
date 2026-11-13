@@ -73,7 +73,8 @@ public sealed record ProductDto(
     ProductPriceTiersDto? PriceTiers = null,
     string? RepresentativeSku = null,
     string? BadgeTextEn = null,
-    string? BadgeTextAr = null);
+    string? BadgeTextAr = null,
+    string? UsageInstructionsHtml = null);
 
 /// <summary>
 /// Admin-only price overview across a product's variants (min–max; equal when there is a single price) so the

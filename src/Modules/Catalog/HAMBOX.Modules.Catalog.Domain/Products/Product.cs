@@ -196,6 +196,19 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
 
     public string? BadgeTextAr { get; private set; }
 
+    /// <summary>
+    /// The product's own "How to use" text (rich, already sanitized HTML) shown on its storefront page in place of the
+    /// generic redeem steps. Written by the admin per product; null means the page keeps the default steps. Unlike
+    /// <c>ProductInstructions</c> (which only owners of the product can read after buying), this is public.
+    /// </summary>
+    public string? UsageInstructionsHtml { get; private set; }
+
+    /// <summary>Sets (or, with null/empty, clears) the product's "How to use" text. The caller sanitizes the HTML.</summary>
+    public void SetUsageInstructions(string? html)
+    {
+        UsageInstructionsHtml = string.IsNullOrWhiteSpace(html) ? null : html;
+    }
+
     /// <summary>Largest quantity of this product one order may contain (null = unlimited). Enforced at every checkout path.</summary>
     public int? MaxQuantityPerOrder { get; private set; }
 
