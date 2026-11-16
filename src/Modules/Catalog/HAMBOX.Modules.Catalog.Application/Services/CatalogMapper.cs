@@ -76,6 +76,7 @@ internal static class CatalogMapper
             CategoryDescriptionHtml: categoryDescriptionHtml,
             BadgeTextEn: product.BadgeTextEn,
             BadgeTextAr: product.BadgeTextAr,
-            UsageInstructionsHtml: product.UsageInstructionsHtml);
+            UsageInstructionsHtml: product.UsageInstructionsHtml,
+            BadgeColor: product.BadgeColor);
     }
 }

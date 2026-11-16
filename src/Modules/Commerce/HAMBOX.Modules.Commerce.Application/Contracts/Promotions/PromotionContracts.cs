@@ -26,7 +26,8 @@ public sealed record PromotionListItemDto(
     DateTime? EndDateUtc,
     int TotalRedemptions,
     int CouponCount,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    bool ShowOnProductPages = false);
 
 public sealed record PromotionDetailDto(
     Guid Id,

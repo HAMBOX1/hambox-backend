@@ -74,7 +74,8 @@ public sealed record ProductDto(
     string? RepresentativeSku = null,
     string? BadgeTextEn = null,
     string? BadgeTextAr = null,
-    string? UsageInstructionsHtml = null);
+    string? UsageInstructionsHtml = null,
+    string? BadgeColor = null);
 
 /// <summary>
 /// Admin-only price overview across a product's variants (min–max; equal when there is a single price) so the

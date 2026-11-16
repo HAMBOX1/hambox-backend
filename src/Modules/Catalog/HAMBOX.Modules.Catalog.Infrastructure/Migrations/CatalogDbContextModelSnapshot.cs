@@ -115,6 +115,10 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("IconUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("ImageStorageKey")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1449,6 +1453,10 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BadgeColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
 
                     b.Property<string>("BadgeTextAr")
                         .HasMaxLength(60)

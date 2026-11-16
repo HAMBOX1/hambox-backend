@@ -29,7 +29,8 @@ public sealed record BulkProductsRequest(
     Guid? TargetCollectionId = null,
     FulfillmentMode? TargetFulfillmentMode = null,
     string? BadgeTextEn = null,
-    string? BadgeTextAr = null);
+    string? BadgeTextAr = null,
+    string? BadgeColor = null);
 
 public sealed record BulkProductsResultDto(int SuccessCount, int ErrorCount, IReadOnlyList<string> Errors);
 

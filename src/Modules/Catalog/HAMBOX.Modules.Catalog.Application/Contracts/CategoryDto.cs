@@ -17,4 +17,5 @@ public sealed record CategoryDto(
     bool IsActive,
     Guid? ParentId,
     string? ImageUrl = null,
-    string? DescriptionHtml = null);
+    string? DescriptionHtml = null,
+    string? IconUrl = null);

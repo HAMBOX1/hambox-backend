@@ -9,6 +9,7 @@ using HAMBOX.Modules.Commerce.Application.Features.Promotions.GenerateCoupons;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.GetPromotionById;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.GetPromotionRedemptions;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.GetPromotions;
+using HAMBOX.Modules.Commerce.Application.Features.Promotions.ProductCoupons;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.GetPromotionStatistics;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.SetPromotionStatus;
 using HAMBOX.Modules.Commerce.Application.Features.Promotions.UpdatePromotion;
@@ -88,6 +89,30 @@ internal static class PromotionEndpoints
         })
         .WithName("AddPromotionTargets")
         .RequirePermission(PermissionConstants.Promotions.Edit);
+
+        // Whether a code is shown to customers on the product pages it applies to (set from the product page's promo dialog).
+        group.MapPost("{id:guid}/product-display", async Task<IResult> (
+            Guid id,
+            [FromBody] SetPromotionProductDisplayRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new SetPromotionProductDisplayCommand(id, request.Show));
+            return MapResult(result);
+        })
+        .WithName("SetPromotionProductDisplay")
+        .RequirePermission(PermissionConstants.Promotions.Edit);
+
+        // Storefront: the promo codes to show on one product's page. Open to guests.
+        group.MapGet("product-coupons", async Task<IResult> (
+            [FromQuery] Guid productId,
+            [FromQuery] Guid? categoryId,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new GetProductCouponsQuery(productId, categoryId));
+            return MapResult(result);
+        })
+        .WithName("GetProductCoupons")
+        .AllowAnonymous();
 
         group.MapDelete("{id:guid}", async Task<IResult> (Guid id, ISender sender) =>
         {

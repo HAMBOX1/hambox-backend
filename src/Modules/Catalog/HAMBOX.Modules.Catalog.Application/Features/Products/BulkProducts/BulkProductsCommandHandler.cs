@@ -127,7 +127,7 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             case "set-margin":
                 return await SetMarginAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
             case "set-badge":
-                return await SetBadgeAsync(resolved.Value, request.BadgeTextEn, request.BadgeTextAr, cancellationToken);
+                return await SetBadgeAsync(resolved.Value, request.BadgeTextEn, request.BadgeTextAr, request.BadgeColor, cancellationToken);
             case "set-old-price":
                 return await SetOldPriceAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
         }
@@ -338,7 +338,7 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
     }
 
     private async Task<Result<BulkProductsResultDto>> SetBadgeAsync(
-        IReadOnlyList<Guid> productIds, string? textEn, string? textAr, CancellationToken ct)
+        IReadOnlyList<Guid> productIds, string? textEn, string? textAr, string? color, CancellationToken ct)
     {
         var success = 0;
         var errors = new List<string>();
@@ -356,7 +356,7 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
 
             foreach (var product in products)
             {
-                product.SetBadge(textEn, textAr);
+                product.SetBadge(textEn, textAr, color);
                 success++;
             }
 

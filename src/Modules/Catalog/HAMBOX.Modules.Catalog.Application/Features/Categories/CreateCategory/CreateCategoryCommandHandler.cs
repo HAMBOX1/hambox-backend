@@ -44,6 +44,7 @@ internal sealed class CreateCategoryCommandHandler : IRequestHandler<CreateCateg
 
         var category = Category.Create(request.NameAr, request.NameEn, request.Slug, request.ParentId);
         category.SetSortOrder(siblingCount);
+        category.SetIcon(request.IconUrl);
         category.SetDescription(ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml));
         category.SetEffectiveImageUrl(
             await CategoryImageResolution.ResolveParentEffectiveImageAsync(_dbContext, request.ParentId, cancellationToken));

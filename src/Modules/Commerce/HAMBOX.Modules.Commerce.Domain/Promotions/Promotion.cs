@@ -50,6 +50,9 @@ public sealed class Promotion : AggregateRoot, ISoftDeletable
     public DateTime? EndDateUtc { get; private set; }
     public int TotalRedemptions { get; private set; }
 
+    /// <summary>When true, the code (of a coupon-code promotion) is shown to customers on the product pages it applies to.</summary>
+    public bool ShowOnProductPages { get; private set; }
+
     /// <inheritdoc />
     public bool IsDeleted { get; private set; }
 
@@ -111,6 +114,8 @@ public sealed class Promotion : AggregateRoot, ISoftDeletable
     }
 
     public void SetStatus(PromotionStatus status) => Status = status;
+
+    public void SetShowOnProductPages(bool show) => ShowOnProductPages = show;
 
     public void Publish()
     {

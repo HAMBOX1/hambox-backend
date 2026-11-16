@@ -196,6 +196,9 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
 
     public string? BadgeTextAr { get; private set; }
 
+    /// <summary>The colour (#RRGGBB) the admin picked for the note under the price; null keeps the store's default green.</summary>
+    public string? BadgeColor { get; private set; }
+
     /// <summary>
     /// The product's own "How to use" text (rich, already sanitized HTML) shown on its storefront page in place of the
     /// generic redeem steps. Written by the admin per product; null means the page keeps the default steps. Unlike
@@ -245,10 +248,23 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     }
 
     /// <summary>Sets (or, with empty text, clears) the badge shown on the storefront.</summary>
-    public void SetBadge(string? textEn, string? textAr)
+    public void SetBadge(string? textEn, string? textAr, string? color = null)
     {
         BadgeTextEn = string.IsNullOrWhiteSpace(textEn) ? null : textEn.Trim();
         BadgeTextAr = string.IsNullOrWhiteSpace(textAr) ? null : textAr.Trim();
+        BadgeColor = BadgeTextEn is null && BadgeTextAr is null ? null : NormalizeHexColor(color);
+    }
+
+    /// <summary>Accepts only a #RRGGBB colour (anything else means "default"), so a note can never inject style text.</summary>
+    public static string? NormalizeHexColor(string? color)
+    {
+        var value = color?.Trim();
+        if (string.IsNullOrEmpty(value) || value.Length != 7 || value[0] != '#')
+        {
+            return null;
+        }
+
+        return value.Skip(1).All(Uri.IsHexDigit) ? value.ToLowerInvariant() : null;
     }
 
     /// <summary>

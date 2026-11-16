@@ -79,6 +79,12 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public string? ImageStorageKey { get; private set; }
 
     /// <summary>
+    /// A small icon for the category (e.g. a platform logo) shown on its product cards. Separate from <see cref="ImageUrl"/>,
+    /// which also stands in as the product picture when a product has none.
+    /// </summary>
+    public string? IconUrl { get; private set; }
+
+    /// <summary>
     /// Gets the optional, already-sanitized rich-text instructions shown to customers browsing this
     /// category (e.g. "these codes only work on US-region accounts"). Sanitization happens in the
     /// Application layer before this is set — see <c>ProductOptionDescriptionSanitizer</c>.
@@ -181,6 +187,12 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     public void SetDescription(string? descriptionHtml)
     {
         DescriptionHtml = descriptionHtml;
+    }
+
+    /// <summary>Sets (or clears, with null) the small card icon.</summary>
+    public void SetIcon(string? iconUrl)
+    {
+        IconUrl = string.IsNullOrWhiteSpace(iconUrl) ? null : iconUrl.Trim();
     }
 
     /// <summary>

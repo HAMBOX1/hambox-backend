@@ -18,7 +18,8 @@ internal static class PromotionMapper
             promotion.EndDateUtc,
             promotion.TotalRedemptions,
             promotion.CouponCodes.Count,
-            promotion.CreatedOnUtc);
+            promotion.CreatedOnUtc,
+            promotion.ShowOnProductPages);
 
     public static PromotionDetailDto ToDetail(Promotion promotion) =>
         new(

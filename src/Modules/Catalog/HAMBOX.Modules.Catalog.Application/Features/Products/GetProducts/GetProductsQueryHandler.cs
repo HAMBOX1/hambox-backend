@@ -134,6 +134,7 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                 p.IsFavorite,
                 p.BadgeTextEn,
                 p.BadgeTextAr,
+                p.BadgeColor,
             })
             .ToListAsync(cancellationToken);
 
@@ -179,7 +180,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
                     PendingMergeIntoProductName: r.PendingMergeIntoProductName,
                     IsFavorite: IsStaff && r.IsFavorite,
                     BadgeTextEn: r.BadgeTextEn,
-                    BadgeTextAr: r.BadgeTextAr);
+                    BadgeTextAr: r.BadgeTextAr,
+                    BadgeColor: r.BadgeColor);
             })
             .ToList();
 

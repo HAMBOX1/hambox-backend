@@ -20,6 +20,7 @@ internal sealed class PromotionConfiguration : IEntityTypeConfiguration<Promotio
         builder.Property(p => p.Status).HasConversion<int>();
         builder.Property(p => p.IsPublished).IsRequired();
         builder.Property(p => p.TotalRedemptions).IsRequired();
+        builder.Property(p => p.ShowOnProductPages).HasDefaultValue(false);
 
         builder.HasMany(p => p.Conditions)
             .WithOne()
