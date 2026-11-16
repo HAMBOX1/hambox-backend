@@ -317,4 +317,64 @@ public sealed class BulkProductOperationsTests
         Assert.Equal(1, result.Value.ErrorCount);
         Assert.Equal(25m, (await db.ProductVariants.FirstAsync(v => v.ProductId == products[0].Id)).ComparePrice);
     }
+
+    [Fact]
+    public async Task SetMargin_AlsoPricesVariantsThatHaveTheirOwnSalePrice_FromTheirOwnCost()
+    {
+        var (db, category, _, _) = await SeedAsync(0);
+        var product = Product.Create("منتج", "Product", "d", "d", 50m, category.Id);
+        var own = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20], priceOverride: 30m);
+        own.SetCostPrice(45m);
+        var inheriting = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20]);
+        inheriting.SetCostPrice(90m);
+        db.Products.Add(product);
+        db.ProductVariants.AddRange(own, inheriting);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).Handle(Command([product.Id], "set-margin", value: 10m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.SuccessCount);
+        Assert.Equal(0, result.Value.ErrorCount);
+        Assert.Equal(50m, (await db.ProductVariants.FindAsync(own.Id))!.PriceOverride);
+        Assert.Equal(100m, (await db.Products.FindAsync(product.Id))!.Price);
+    }
+
+    [Fact]
+    public async Task SetMargin_LeavesVariantsWithoutACostAlone_ButStillPricesTheOnesThatHaveOne()
+    {
+        var (db, category, _, _) = await SeedAsync(0);
+        var product = Product.Create("منتج", "Product", "d", "d", 50m, category.Id);
+        var priced = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20], priceOverride: 30m);
+        priced.SetCostPrice(18m);
+        var noCost = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20], priceOverride: 77m);
+        db.Products.Add(product);
+        db.ProductVariants.AddRange(priced, noCost);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).Handle(Command([product.Id], "set-margin", value: 10m), CancellationToken.None);
+
+        Assert.Equal(1, result.Value.SuccessCount);
+        Assert.Equal(20m, (await db.ProductVariants.FindAsync(priced.Id))!.PriceOverride);
+        Assert.Equal(77m, (await db.ProductVariants.FindAsync(noCost.Id))!.PriceOverride);
+        Assert.Equal(50m, (await db.Products.FindAsync(product.Id))!.Price);
+    }
+
+    [Fact]
+    public async Task AdjustPrice_AlsoMovesVariantsThatHaveTheirOwnSalePrice()
+    {
+        var (db, category, _, _) = await SeedAsync(0);
+        var product = Product.Create("منتج", "Product", "d", "d", 100m, category.Id);
+        var own = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20], priceOverride: 40m);
+        db.Products.Add(product);
+        db.ProductVariants.Add(own);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).Handle(
+            Command([product.Id], "adjust-price", mode: PriceAdjustmentMode.IncreasePercent, value: 10m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(110m, (await db.Products.FindAsync(product.Id))!.Price);
+        Assert.Equal(44m, (await db.ProductVariants.FindAsync(own.Id))!.PriceOverride);
+    }
 }

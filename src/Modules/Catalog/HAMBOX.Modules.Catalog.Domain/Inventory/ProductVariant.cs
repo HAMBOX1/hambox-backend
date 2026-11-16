@@ -119,6 +119,9 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         MemberPrice = memberPrice;
     }
 
+    /// <summary>Sets just this variant's own sale price (bulk price / margin edits), leaving every other field alone.</summary>
+    public void SetPriceOverride(decimal? priceOverride) => PriceOverride = priceOverride;
+
     /// <summary>Sets (or, with null, clears) just the old price shown struck through next to the sale price.</summary>
     public void SetComparePrice(decimal? comparePrice) => ComparePrice = comparePrice;
 

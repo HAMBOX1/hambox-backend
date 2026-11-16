@@ -256,23 +256,42 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             var ids = chunk.ToList();
             var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
             var found = products.Select(p => p.Id).ToHashSet();
+            // Variants that carry their own sale price are adjusted too, otherwise they would silently keep the old price.
+            var ownPriced = (await _db.ProductVariants
+                    .Where(v => ids.Contains(v.ProductId) && !v.IsDeleted && v.PriceOverride != null)
+                    .ToListAsync(ct))
+                .ToLookup(v => v.ProductId);
 
             foreach (var id in ids.Where(id => !found.Contains(id)))
             {
                 errors.Add($"{id}: {CatalogErrors.ProductNotFound.Description}");
             }
 
+            decimal Adjusted(decimal current) => mode switch
+            {
+                PriceAdjustmentMode.IncreasePercent => current * (1 + value / 100m),
+                PriceAdjustmentMode.DecreasePercent => current * (1 - value / 100m),
+                PriceAdjustmentMode.SetFixed => value,
+                _ => current,
+            };
+
             foreach (var product in products)
             {
-                var newPrice = mode switch
-                {
-                    PriceAdjustmentMode.IncreasePercent => product.Price * (1 + value / 100m),
-                    PriceAdjustmentMode.DecreasePercent => product.Price * (1 - value / 100m),
-                    PriceAdjustmentMode.SetFixed => value,
-                    _ => product.Price,
-                };
+                var newPrice = Adjusted(product.Price);
 
                 var priceError = ValidateNewPrice(product, newPrice);
+                if (priceError is null)
+                {
+                    foreach (var variant in ownPriced[product.Id])
+                    {
+                        priceError = ValidateNewPrice(product, Adjusted(variant.PriceOverride!.Value));
+                        if (priceError is not null)
+                        {
+                            break;
+                        }
+                    }
+                }
+
                 if (priceError is not null)
                 {
                     errors.Add($"{product.Id}: {priceError.Description}");
@@ -280,6 +299,11 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 }
 
                 product.ChangePrice(decimal.Round(newPrice, 2));
+                foreach (var variant in ownPriced[product.Id])
+                {
+                    variant.SetPriceOverride(decimal.Round(Adjusted(variant.PriceOverride!.Value), 2));
+                }
+
                 success++;
             }
 
@@ -379,7 +403,6 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
             var variants = await _db.ProductVariants
                 .Where(v => ids.Contains(v.ProductId) && !v.IsDeleted)
-                .Select(v => new { v.ProductId, v.CostPrice, v.PriceOverride })
                 .ToListAsync(ct);
             var byProduct = variants.ToLookup(v => v.ProductId);
 
@@ -390,28 +413,44 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
 
             foreach (var product in products)
             {
-                var costs = byProduct[product.Id].Where(v => v.CostPrice.HasValue).Select(v => v.CostPrice!.Value).ToList();
-                if (costs.Count == 0)
+                // A variant with its own sale price is priced from its own cost; the rest follow the product's price,
+                // which comes from the cheapest cost among them. Variants with no cost price are left as they are.
+                var own = byProduct[product.Id].Where(v => v.PriceOverride.HasValue && v.CostPrice.HasValue).ToList();
+                var inheriting = byProduct[product.Id]
+                    .Where(v => !v.PriceOverride.HasValue && v.CostPrice.HasValue)
+                    .Select(v => v.CostPrice!.Value)
+                    .ToList();
+                if (own.Count == 0 && inheriting.Count == 0)
                 {
                     errors.Add($"{product.Id}: No cost price is set, so a margin cannot be applied.");
                     continue;
                 }
 
-                if (byProduct[product.Id].Any(v => v.PriceOverride.HasValue))
+                var productPrice = inheriting.Count > 0 ? decimal.Round(inheriting.Min() / factor, 2) : (decimal?)null;
+                var variantPrices = own.Select(v => (Variant: v, Price: decimal.Round(v.CostPrice!.Value / factor, 2))).ToList();
+
+                var marginError = productPrice is { } p1 ? ValidateNewPrice(product, p1) : null;
+                foreach (var (_, price) in variantPrices)
                 {
-                    errors.Add($"{product.Id}: Its variants have their own sale prices; edit those instead.");
-                    continue;
+                    marginError ??= ValidateNewPrice(product, price);
                 }
 
-                var marginPrice = costs.Min() / factor;
-                var marginError = ValidateNewPrice(product, marginPrice);
                 if (marginError is not null)
                 {
                     errors.Add($"{product.Id}: {marginError.Description}");
                     continue;
                 }
 
-                product.ChangePrice(decimal.Round(marginPrice, 2));
+                if (productPrice is { } newProductPrice)
+                {
+                    product.ChangePrice(newProductPrice);
+                }
+
+                foreach (var (variant, price) in variantPrices)
+                {
+                    variant.SetPriceOverride(price);
+                }
+
                 success++;
             }
 
