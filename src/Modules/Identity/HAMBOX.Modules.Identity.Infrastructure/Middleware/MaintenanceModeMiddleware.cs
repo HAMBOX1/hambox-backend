@@ -26,7 +26,10 @@ public sealed class MaintenanceModeMiddleware(RequestDelegate next)
         && !path.Contains("/settings", StringComparison.OrdinalIgnoreCase)
         && !path.Contains("/auth", StringComparison.OrdinalIgnoreCase)
         && !path.Contains("/health", StringComparison.OrdinalIgnoreCase)
-        && !path.Contains("/platform-settings", StringComparison.OrdinalIgnoreCase))
+        && !path.Contains("/platform-settings", StringComparison.OrdinalIgnoreCase)
+        // The active theme is only the store's colours and fonts (public styling, no data): it loads even on a gated
+        // store so the Coming soon page and an administrator's preview look like the real store.
+        && !path.EndsWith("/themes/active", StringComparison.OrdinalIgnoreCase))
     {
       var maintenance = await settingsProvider.GetMaintenanceAsync(context.RequestAborted);
 
