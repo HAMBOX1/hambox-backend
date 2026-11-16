@@ -2037,6 +2037,10 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("EndsOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -2054,6 +2058,11 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("ShowCountdown")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");

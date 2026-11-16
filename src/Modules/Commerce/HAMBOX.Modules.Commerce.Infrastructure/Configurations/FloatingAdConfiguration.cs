@@ -17,6 +17,8 @@ internal sealed class FloatingAdConfiguration : IEntityTypeConfiguration<Floatin
         builder.Property(a => a.ButtonLabelEn).HasMaxLength(100);
         builder.Property(a => a.ButtonLabelAr).HasMaxLength(100);
         builder.Property(a => a.LinkUrl).HasMaxLength(500);
+        builder.Property(a => a.ImageUrl).HasMaxLength(500);
+        builder.Property(a => a.ShowCountdown).HasDefaultValue(false);
         builder.Property(a => a.Audience).HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(a => new { a.IsActive, a.SortOrder });
     }

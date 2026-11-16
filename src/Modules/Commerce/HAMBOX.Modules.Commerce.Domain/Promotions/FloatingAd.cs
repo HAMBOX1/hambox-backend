@@ -66,6 +66,12 @@ public sealed class FloatingAd : Entity
     /// <summary>After a visitor closes the ad it stays hidden for this many hours.</summary>
     public int DismissHours { get; private set; } = 24;
 
+    /// <summary>Optional picture shown at the top of the card (an uploaded file path or an https address).</summary>
+    public string? ImageUrl { get; private set; }
+
+    /// <summary>When true the card shows a live countdown to <see cref="EndsOnUtc"/> (which must then be set).</summary>
+    public bool ShowCountdown { get; private set; }
+
     public static FloatingAd Create(
         string titleEn,
         string? titleAr,
@@ -79,10 +85,12 @@ public sealed class FloatingAd : Entity
         DateTimeOffset? startsOnUtc,
         DateTimeOffset? endsOnUtc,
         int sortOrder,
-        int dismissHours)
+        int dismissHours,
+        string? imageUrl = null,
+        bool showCountdown = false)
     {
         var ad = new FloatingAd(Guid.NewGuid());
-        ad.Update(titleEn, titleAr, messageEn, messageAr, buttonLabelEn, buttonLabelAr, linkUrl, audience, isActive, startsOnUtc, endsOnUtc, sortOrder, dismissHours);
+        ad.Update(titleEn, titleAr, messageEn, messageAr, buttonLabelEn, buttonLabelAr, linkUrl, audience, isActive, startsOnUtc, endsOnUtc, sortOrder, dismissHours, imageUrl, showCountdown);
         return ad;
     }
 
@@ -99,7 +107,9 @@ public sealed class FloatingAd : Entity
         DateTimeOffset? startsOnUtc,
         DateTimeOffset? endsOnUtc,
         int sortOrder,
-        int dismissHours)
+        int dismissHours,
+        string? imageUrl = null,
+        bool showCountdown = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
 
@@ -116,6 +126,8 @@ public sealed class FloatingAd : Entity
         EndsOnUtc = endsOnUtc;
         SortOrder = sortOrder;
         DismissHours = Math.Clamp(dismissHours, 1, 24 * 30);
+        ImageUrl = Clean(imageUrl);
+        ShowCountdown = showCountdown && endsOnUtc is not null;
     }
 
     public void SetActive(bool isActive) => IsActive = isActive;

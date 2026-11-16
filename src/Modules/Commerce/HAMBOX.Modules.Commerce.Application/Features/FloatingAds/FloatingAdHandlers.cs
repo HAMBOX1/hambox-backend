@@ -24,7 +24,9 @@ public sealed record FloatingAdAdminDto(
     DateTimeOffset? StartsOnUtc,
     DateTimeOffset? EndsOnUtc,
     int SortOrder,
-    int DismissHours);
+    int DismissHours,
+    string? ImageUrl = null,
+    bool ShowCountdown = false);
 
 /// <summary>The fields an admin sends when creating or updating an ad.</summary>
 public sealed record FloatingAdInput(
@@ -40,7 +42,9 @@ public sealed record FloatingAdInput(
     DateTimeOffset? StartsOnUtc,
     DateTimeOffset? EndsOnUtc,
     int SortOrder,
-    int DismissHours);
+    int DismissHours,
+    string? ImageUrl = null,
+    bool ShowCountdown = false);
 
 /// <summary>An ad as the storefront shows it.</summary>
 public sealed record FloatingAdPublicDto(
@@ -52,7 +56,9 @@ public sealed record FloatingAdPublicDto(
     string? ButtonLabelEn,
     string? ButtonLabelAr,
     string? LinkUrl,
-    int DismissHours);
+    int DismissHours,
+    string? ImageUrl = null,
+    DateTimeOffset? CountdownEndsOnUtc = null);
 
 internal static class FloatingAdErrors
 {
@@ -67,13 +73,21 @@ internal static class FloatingAdErrors
         "The end date must be after the start date.");
 
     public static readonly Error TitleRequired = new("FloatingAds.TitleRequired", "A title is required.");
+
+    public static readonly Error InvalidImage = new(
+        "FloatingAds.InvalidImage",
+        "The picture must be an uploaded file or a full https:// address.");
+
+    public static readonly Error CountdownNeedsEndDate = new(
+        "FloatingAds.CountdownNeedsEndDate",
+        "To show a countdown, set the date and time the offer ends.");
 }
 
 internal static class FloatingAdMapping
 {
     public static FloatingAdAdminDto ToAdminDto(FloatingAd ad) => new(
         ad.Id, ad.TitleEn, ad.TitleAr, ad.MessageEn, ad.MessageAr, ad.ButtonLabelEn, ad.ButtonLabelAr, ad.LinkUrl,
-        ad.Audience.ToString(), ad.IsActive, ad.StartsOnUtc, ad.EndsOnUtc, ad.SortOrder, ad.DismissHours);
+        ad.Audience.ToString(), ad.IsActive, ad.StartsOnUtc, ad.EndsOnUtc, ad.SortOrder, ad.DismissHours, ad.ImageUrl, ad.ShowCountdown);
 
     /// <summary>Returns the first problem with the input, or null when it can be saved.</summary>
     public static Error? Validate(FloatingAdInput input)
@@ -86,6 +100,19 @@ internal static class FloatingAdMapping
         if (input.StartsOnUtc is { } start && input.EndsOnUtc is { } end && end <= start)
         {
             return FloatingAdErrors.InvalidDates;
+        }
+
+        if (input.ShowCountdown && input.EndsOnUtc is null)
+        {
+            return FloatingAdErrors.CountdownNeedsEndDate;
+        }
+
+        var image = input.ImageUrl?.Trim();
+        if (!string.IsNullOrEmpty(image)
+            && !(image.StartsWith('/') && !image.StartsWith("//", StringComparison.Ordinal))
+            && !image.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return FloatingAdErrors.InvalidImage;
         }
 
         var link = input.LinkUrl?.Trim();
@@ -132,7 +159,8 @@ internal sealed class CreateFloatingAdCommandHandler(ICommerceDbContext db)
 
         var ad = FloatingAd.Create(
             input.TitleEn, input.TitleAr, input.MessageEn, input.MessageAr, input.ButtonLabelEn, input.ButtonLabelAr,
-            input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours);
+            input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
+            input.ImageUrl, input.ShowCountdown);
 
         db.FloatingAds.Add(ad);
         await db.SaveChangesAsync(cancellationToken);
@@ -161,7 +189,8 @@ internal sealed class UpdateFloatingAdCommandHandler(ICommerceDbContext db)
 
         ad.Update(
             input.TitleEn, input.TitleAr, input.MessageEn, input.MessageAr, input.ButtonLabelEn, input.ButtonLabelAr,
-            input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours);
+            input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
+            input.ImageUrl, input.ShowCountdown);
 
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success(FloatingAdMapping.ToAdminDto(ad));
@@ -250,7 +279,8 @@ internal sealed class GetActiveFloatingAdsQueryHandler(
                 _ => false,
             })
             .Select(a => new FloatingAdPublicDto(
-                a.Id, a.TitleEn, a.TitleAr, a.MessageEn, a.MessageAr, a.ButtonLabelEn, a.ButtonLabelAr, a.LinkUrl, a.DismissHours))
+                a.Id, a.TitleEn, a.TitleAr, a.MessageEn, a.MessageAr, a.ButtonLabelEn, a.ButtonLabelAr, a.LinkUrl, a.DismissHours,
+                a.ImageUrl, a.ShowCountdown ? a.EndsOnUtc : null))
             .ToList();
 
         return Result.Success<IReadOnlyList<FloatingAdPublicDto>>(visible);
