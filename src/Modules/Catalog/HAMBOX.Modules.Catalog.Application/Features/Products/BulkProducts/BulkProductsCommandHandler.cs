@@ -30,6 +30,9 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
     /// <summary>Matches the Product.BadgeTextEn/Ar column length.</summary>
     private const int ProductBadgeMaxLength = 60;
 
+    /// <summary>Highest "-N%" a bulk old price may show; keeps the old price from becoming absurdly large.</summary>
+    private const decimal MaxOldPriceDiscountPercent = 95m;
+
     private readonly ICatalogDbContext _db;
     private readonly ISender _sender;
     private readonly ICurrentUserService _currentUser;
@@ -93,6 +96,12 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPriceAdjustment);
         }
 
+        // "set-old-price": PriceValue is the discount the customer should see (e.g. 20 = "-20%"); 0 removes the old price.
+        if (action == "set-old-price" && (request.PriceValue is null || request.PriceValue < 0 || request.PriceValue > MaxOldPriceDiscountPercent))
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPriceAdjustment);
+        }
+
         var selection = new BulkProductSelection(
             request.ProductIds, request.SearchTerm, request.Status, request.CategoryId, request.SelectAllMatching);
 
@@ -119,6 +128,8 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 return await SetMarginAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
             case "set-badge":
                 return await SetBadgeAsync(resolved.Value, request.BadgeTextEn, request.BadgeTextAr, cancellationToken);
+            case "set-old-price":
+                return await SetOldPriceAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
         }
 
         var success = 0;
@@ -401,6 +412,87 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 }
 
                 product.ChangePrice(decimal.Round(marginPrice, 2));
+                success++;
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return Result.Success(new BulkProductsResultDto(success, errors.Count, errors));
+    }
+
+    /// <summary>
+    /// Gives every variant of the selected products an old (compare-at) price so that the storefront shows it struck
+    /// through with the chosen "-N%": old price = sale price ÷ (1 − N/100). A percent of 0 removes the old price. The sale
+    /// price a variant is sold at (its own, else the product's) is never changed.
+    /// </summary>
+    private async Task<Result<BulkProductsResultDto>> SetOldPriceAsync(
+        IReadOnlyList<Guid> productIds, decimal discountPercent, CancellationToken ct)
+    {
+        var success = 0;
+        var errors = new List<string>();
+        var factor = 1m - discountPercent / 100m;
+
+        foreach (var chunk in productIds.Chunk(BatchSize))
+        {
+            var ids = chunk.ToList();
+            var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+            var variants = await _db.ProductVariants.Where(v => ids.Contains(v.ProductId) && !v.IsDeleted).ToListAsync(ct);
+            var byProduct = variants.ToLookup(v => v.ProductId);
+
+            foreach (var id in ids.Where(id => products.All(p => p.Id != id)))
+            {
+                errors.Add($"{id}: {CatalogErrors.ProductNotFound.Description}");
+            }
+
+            foreach (var product in products)
+            {
+                var productVariants = byProduct[product.Id].ToList();
+                if (productVariants.Count == 0)
+                {
+                    errors.Add($"{product.Id}: It has no variants to put an old price on.");
+                    continue;
+                }
+
+                // Work every variant out first, so a product is either fully updated or left untouched.
+                var planned = new List<(ProductVariant Variant, decimal? OldPrice)>();
+                string? problem = null;
+                foreach (var variant in productVariants)
+                {
+                    if (discountPercent == 0m)
+                    {
+                        planned.Add((variant, null));
+                        continue;
+                    }
+
+                    var salePrice = variant.PriceOverride ?? product.Price;
+                    var oldPrice = decimal.Round(salePrice / factor, 2);
+                    if (salePrice <= 0)
+                    {
+                        problem = "A variant has no sale price yet.";
+                        break;
+                    }
+
+                    if (oldPrice > ProductPublishGuard.MaxPrice)
+                    {
+                        problem = CatalogErrors.ProductPriceTooHigh.Description;
+                        break;
+                    }
+
+                    planned.Add((variant, oldPrice));
+                }
+
+                if (problem is not null)
+                {
+                    errors.Add($"{product.Id}: {problem}");
+                    continue;
+                }
+
+                foreach (var (variant, oldPrice) in planned)
+                {
+                    variant.SetComparePrice(oldPrice);
+                }
+
                 success++;
             }
 

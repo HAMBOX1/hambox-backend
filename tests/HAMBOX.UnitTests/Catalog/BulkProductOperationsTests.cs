@@ -238,4 +238,83 @@ public sealed class BulkProductOperationsTests
 
         Assert.True(result.IsFailure);
     }
+
+    // ─── old price ("-N%") ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task SetOldPrice_ShowsTheChosenDiscount_WithoutChangingTheSalePrice()
+    {
+        var (db, _, _, products) = await SeedAsync(2, price: 80m);
+
+        var result = await Handler(db).Handle(
+            Command(products.Select(p => p.Id).ToList(), "set-old-price", value: 20m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.SuccessCount);
+        // 80 sold at "-20%" means the old price was 100 (80 = 100 x 0.8).
+        Assert.All(await db.ProductVariants.ToListAsync(), v => Assert.Equal(100m, v.ComparePrice));
+        Assert.All(await db.Products.ToListAsync(), p => Assert.Equal(80m, p.Price));
+    }
+
+    [Fact]
+    public async Task SetOldPrice_UsesAVariantsOwnSalePrice_WhenItHasOne()
+    {
+        var (db, category, _, _) = await SeedAsync(0);
+        var product = Product.Create("منتج", "Product", "d", "d", 50m, category.Id);
+        var cheap = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20], priceOverride: 30m);
+        var normal = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20]);
+        db.Products.Add(product);
+        db.ProductVariants.AddRange(cheap, normal);
+        await db.SaveChangesAsync();
+
+        await Handler(db).Handle(Command([product.Id], "set-old-price", value: 50m), CancellationToken.None);
+
+        Assert.Equal(60m, (await db.ProductVariants.FindAsync(cheap.Id))!.ComparePrice);
+        Assert.Equal(100m, (await db.ProductVariants.FindAsync(normal.Id))!.ComparePrice);
+    }
+
+    [Fact]
+    public async Task SetOldPrice_ZeroRemovesTheOldPrice()
+    {
+        var (db, _, _, products) = await SeedAsync(1, price: 40m);
+        var ids = products.Select(p => p.Id).ToList();
+        await Handler(db).Handle(Command(ids, "set-old-price", value: 20m), CancellationToken.None);
+        Assert.NotNull((await db.ProductVariants.FirstAsync()).ComparePrice);
+
+        var result = await Handler(db).Handle(Command(ids, "set-old-price", value: 0m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null((await db.ProductVariants.FirstAsync()).ComparePrice);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(96)]
+    public async Task SetOldPrice_RefusesADiscountOutsideTheAllowedRange(int percent)
+    {
+        var (db, _, _, products) = await SeedAsync(1);
+
+        var result = await Handler(db).Handle(
+            Command(products.Select(p => p.Id).ToList(), "set-old-price", value: percent), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Null((await db.ProductVariants.FirstAsync()).ComparePrice);
+    }
+
+    [Fact]
+    public async Task SetOldPrice_ReportsAProductWithNoVariants_AndStillUpdatesTheRest()
+    {
+        var (db, category, _, products) = await SeedAsync(1, price: 20m);
+        var bare = Product.Create("منتج", "No variants", "d", "d", 20m, category.Id);
+        db.Products.Add(bare);
+        await db.SaveChangesAsync();
+
+        var result = await Handler(db).Handle(
+            Command([products[0].Id, bare.Id], "set-old-price", value: 20m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.SuccessCount);
+        Assert.Equal(1, result.Value.ErrorCount);
+        Assert.Equal(25m, (await db.ProductVariants.FirstAsync(v => v.ProductId == products[0].Id)).ComparePrice);
+    }
 }

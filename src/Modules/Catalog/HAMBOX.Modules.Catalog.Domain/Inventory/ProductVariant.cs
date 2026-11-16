@@ -119,6 +119,9 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
         MemberPrice = memberPrice;
     }
 
+    /// <summary>Sets (or, with null, clears) just the old price shown struck through next to the sale price.</summary>
+    public void SetComparePrice(decimal? comparePrice) => ComparePrice = comparePrice;
+
     /// <summary>Sets just the (informational) cost price, leaving every other field untouched.</summary>
     public void SetCostPrice(decimal? costPrice) => CostPrice = costPrice;
 
