@@ -72,7 +72,13 @@ internal static class PlatformSettingsDefaultsFactory
             Timezone: "UTC",
             DefaultLanguage: "en",
             DefaultCurrency: configuration.GetSection(CurrencySettings.SectionName).Get<CurrencySettings>()?.BaseCurrency ?? "USD",
-            StoreStatus: "Open");
+            StoreStatus: "Open",
+            // How the products page can be viewed: comfortable / compact / dense (small cards) / list. Everyone gets all four
+            // until the admin narrows what regular customers see; Elite (membership) customers can switch freely.
+            RegularProductViews: ["comfortable", "compact", "dense", "list"],
+            RegularDefaultProductView: "comfortable",
+            EliteProductViews: ["comfortable", "compact", "dense", "list"],
+            EliteDefaultProductView: "comfortable");
 
     private static BrandingSettingsPayload CreateBranding(IConfiguration configuration) =>
         new(

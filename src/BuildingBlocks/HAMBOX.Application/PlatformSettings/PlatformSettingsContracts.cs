@@ -65,7 +65,11 @@ public sealed record GeneralSettingsPayload(
     string Timezone,
     string DefaultLanguage,
     string DefaultCurrency,
-    string StoreStatus);
+    string StoreStatus,
+    string[]? RegularProductViews = null,
+    string? RegularDefaultProductView = null,
+    string[]? EliteProductViews = null,
+    string? EliteDefaultProductView = null);
 
 public sealed record BrandingSettingsPayload(
     string? LogoUrl,
