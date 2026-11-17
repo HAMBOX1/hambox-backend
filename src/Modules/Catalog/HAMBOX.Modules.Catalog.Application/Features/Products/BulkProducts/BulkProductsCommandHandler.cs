@@ -91,6 +91,11 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
             return Result.Failure<BulkProductsResultDto>(CatalogErrors.ProductBulkActionNotSupported(action));
         }
 
+        if (action == "set-purchase-controls" && (request.MaxQuantityPerOrder is <= 0 || request.MaxQuantityPerUserPerDay is <= 0))
+        {
+            return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPurchaseLimit);
+        }
+
         if (action == "set-margin" && (request.PriceValue is null || request.PriceValue < 0 || request.PriceValue >= 100))
         {
             return Result.Failure<BulkProductsResultDto>(CatalogErrors.InvalidPriceAdjustment);
@@ -128,6 +133,8 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 return await SetMarginAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
             case "set-badge":
                 return await SetBadgeAsync(resolved.Value, request.BadgeTextEn, request.BadgeTextAr, request.BadgeColor, cancellationToken);
+            case "set-purchase-controls":
+                return await SetPurchaseControlsAsync(resolved.Value, request, cancellationToken);
             case "set-old-price":
                 return await SetOldPriceAsync(resolved.Value, request.PriceValue!.Value, cancellationToken);
         }
@@ -353,6 +360,37 @@ internal sealed class BulkProductsCommandHandler : IRequestHandler<BulkProductsC
                 {
                     errors.Add($"{id}: This product has no variants to change.");
                 }
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return Result.Success(new BulkProductsResultDto(success, errors.Count, errors));
+    }
+
+    /// <summary>Writes the same purchase caps / manual-review / Elite-exemption settings to every selected product.</summary>
+    private async Task<Result<BulkProductsResultDto>> SetPurchaseControlsAsync(
+        IReadOnlyList<Guid> productIds, BulkProductsRequest request, CancellationToken ct)
+    {
+        var success = 0;
+        var errors = new List<string>();
+
+        foreach (var chunk in productIds.Chunk(BatchSize))
+        {
+            var ids = chunk.ToList();
+            var products = await _db.Products.Where(p => ids.Contains(p.Id)).ToListAsync(ct);
+            var found = products.Select(p => p.Id).ToHashSet();
+
+            foreach (var id in ids.Where(id => !found.Contains(id)))
+            {
+                errors.Add($"{id}: {CatalogErrors.ProductNotFound.Description}");
+            }
+
+            foreach (var product in products)
+            {
+                product.SetPurchaseControls(
+                    request.MaxQuantityPerOrder, request.MaxQuantityPerUserPerDay, request.RequiresManualReview, request.ExemptMembers);
+                success++;
             }
 
             await _db.SaveChangesAsync(ct);

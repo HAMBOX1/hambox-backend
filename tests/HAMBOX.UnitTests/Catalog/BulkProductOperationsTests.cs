@@ -377,4 +377,43 @@ public sealed class BulkProductOperationsTests
         Assert.Equal(110m, (await db.Products.FindAsync(product.Id))!.Price);
         Assert.Equal(44m, (await db.ProductVariants.FindAsync(own.Id))!.PriceOverride);
     }
+
+    [Fact]
+    public async Task SetPurchaseControls_WritesTheSameLimitsToEverySelectedProduct()
+    {
+        var (db, _, _, products) = await SeedAsync(3);
+        var request = new BulkProductsRequest(
+            products.Select(p => p.Id).ToList(), null, null, null, false, "set-purchase-controls", null, null, null,
+            MaxQuantityPerOrder: 5, MaxQuantityPerUserPerDay: 10, RequiresManualReview: true, ExemptMembers: true);
+
+        var result = await Handler(db).Handle(new BulkProductsCommand(request), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.SuccessCount);
+        foreach (var product in await db.Products.ToListAsync())
+        {
+            Assert.Equal(5, product.MaxQuantityPerOrder);
+            Assert.Equal(10, product.MaxQuantityPerUserPerDay);
+            Assert.True(product.RequiresManualReview);
+            Assert.True(product.ExemptMembersFromPurchaseLimits);
+        }
+    }
+
+    [Fact]
+    public async Task SetPurchaseControls_EmptyCapsClearTheLimits_AndANonPositiveCapIsRefused()
+    {
+        var (db, _, _, products) = await SeedAsync(1);
+        var ids = products.Select(p => p.Id).ToList();
+        await Handler(db).Handle(new BulkProductsCommand(new BulkProductsRequest(
+            ids, null, null, null, false, "set-purchase-controls", null, null, null, MaxQuantityPerOrder: 5)), CancellationToken.None);
+
+        var cleared = await Handler(db).Handle(new BulkProductsCommand(new BulkProductsRequest(
+            ids, null, null, null, false, "set-purchase-controls", null, null, null)), CancellationToken.None);
+        var refused = await Handler(db).Handle(new BulkProductsCommand(new BulkProductsRequest(
+            ids, null, null, null, false, "set-purchase-controls", null, null, null, MaxQuantityPerOrder: 0)), CancellationToken.None);
+
+        Assert.True(cleared.IsSuccess);
+        Assert.Null((await db.Products.FirstAsync()).MaxQuantityPerOrder);
+        Assert.True(refused.IsFailure);
+    }
 }

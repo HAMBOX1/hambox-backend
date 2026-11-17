@@ -22,7 +22,7 @@ public sealed record SetProductFavoriteCommand(Guid ProductId, bool IsFavorite) 
 /// <summary>Sets the product's public "How to use" text shown on its storefront page (null or empty clears it).</summary>
 public sealed record SetProductUsageInstructionsCommand(Guid ProductId, string? Html) : IRequest<Result>;
 
-public sealed record ProductPurchaseControlsDto(int? MaxQuantityPerOrder, int? MaxQuantityPerUserPerDay, bool RequiresManualReview);
+public sealed record ProductPurchaseControlsDto(int? MaxQuantityPerOrder, int? MaxQuantityPerUserPerDay, bool RequiresManualReview, bool ExemptMembers = false);
 
 public sealed record SetProductPurchaseControlsCommand(Guid ProductId, ProductPurchaseControlsDto Controls) : IRequest<Result>;
 
@@ -441,7 +441,7 @@ internal sealed class SetProductPurchaseControlsCommandHandler : IRequestHandler
             return Result.Failure(CatalogErrors.InvalidPurchaseLimit);
         }
 
-        product.SetPurchaseControls(controls.MaxQuantityPerOrder, controls.MaxQuantityPerUserPerDay, controls.RequiresManualReview);
+        product.SetPurchaseControls(controls.MaxQuantityPerOrder, controls.MaxQuantityPerUserPerDay, controls.RequiresManualReview, controls.ExemptMembers);
 
         await _db.SaveChangesAsync(cancellationToken);
         return Result.Success();
@@ -460,7 +460,7 @@ internal sealed class GetProductPurchaseControlsQueryHandler : IRequestHandler<G
         return product is null
             ? Result.Failure<ProductPurchaseControlsDto>(CatalogErrors.ProductNotFound)
             : Result.Success(new ProductPurchaseControlsDto(
-                product.MaxQuantityPerOrder, product.MaxQuantityPerUserPerDay, product.RequiresManualReview));
+                product.MaxQuantityPerOrder, product.MaxQuantityPerUserPerDay, product.RequiresManualReview, product.ExemptMembersFromPurchaseLimits));
     }
 }
 

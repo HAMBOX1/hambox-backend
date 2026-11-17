@@ -89,6 +89,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.MaxQuantityPerOrder);
         builder.Property(p => p.MaxQuantityPerUserPerDay);
+        builder.Property(p => p.ExemptMembersFromPurchaseLimits).HasDefaultValue(false);
         builder.Property(p => p.RequiresManualReview)
             .IsRequired()
             .HasDefaultValue(false);

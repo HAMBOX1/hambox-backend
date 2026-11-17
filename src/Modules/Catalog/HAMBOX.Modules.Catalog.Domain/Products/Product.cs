@@ -221,7 +221,10 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// <summary>Sensitive product: every paid order containing it waits for an admin to approve before anything is delivered.</summary>
     public bool RequiresManualReview { get; private set; }
 
-    public void SetPurchaseControls(int? maxQuantityPerOrder, int? maxQuantityPerUserPerDay, bool requiresManualReview)
+    /// <summary>Customers with an active membership (Elite) are not held to this product's caps or manual review.</summary>
+    public bool ExemptMembersFromPurchaseLimits { get; private set; }
+
+    public void SetPurchaseControls(int? maxQuantityPerOrder, int? maxQuantityPerUserPerDay, bool requiresManualReview, bool exemptMembers = false)
     {
         if (maxQuantityPerOrder is <= 0)
         {
@@ -236,6 +239,7 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
         MaxQuantityPerOrder = maxQuantityPerOrder;
         MaxQuantityPerUserPerDay = maxQuantityPerUserPerDay;
         RequiresManualReview = requiresManualReview;
+        ExemptMembersFromPurchaseLimits = exemptMembers;
     }
 
     /// <summary>

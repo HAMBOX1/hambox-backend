@@ -1,3 +1,4 @@
+using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
@@ -16,7 +17,8 @@ namespace HAMBOX.Modules.Commerce.Application.Services;
 /// </summary>
 public sealed class PurchaseControlService(
     ICommerceDbContext commerceDb,
-    HAMBOX.Application.Abstractions.IPlatformSettingsProvider? platformSettings = null)
+    HAMBOX.Application.Abstractions.IPlatformSettingsProvider? platformSettings = null,
+    IMembershipAccessProvider? membership = null)
 {
     /// <summary>This many orders (any state but cancelled/failed) created in the last hour trips the velocity flag.</summary>
     public const int VelocityOrdersPerHour = 5;
@@ -36,10 +38,17 @@ public sealed class PurchaseControlService(
             .ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
 
         List<Guid>? dailyLimited = null;
+        bool? isMember = null;
 
         foreach (var (productId, requested) in requestedByProduct)
         {
             if (!products.TryGetValue(productId, out var product))
+            {
+                continue;
+            }
+
+            // A product can exempt customers with an active membership (Elite) from its caps.
+            if (product.ExemptMembersFromPurchaseLimits && (isMember ??= await IsMemberAsync(userId, cancellationToken)))
             {
                 continue;
             }
@@ -99,8 +108,11 @@ public sealed class PurchaseControlService(
         IReadOnlyDictionary<Guid, Product> products,
         CancellationToken cancellationToken)
     {
+        var isMember = order.Items.Any(i => i.ProductId is Guid pid && products.TryGetValue(pid, out var p) && p.RequiresManualReview && p.ExemptMembersFromPurchaseLimits)
+            && await IsMemberAsync(order.UserId, cancellationToken);
         var sensitive = order.Items
-            .Where(i => i.ProductId is Guid pid && products.TryGetValue(pid, out var p) && p.RequiresManualReview)
+            .Where(i => i.ProductId is Guid pid && products.TryGetValue(pid, out var p) && p.RequiresManualReview
+                && !(isMember && p.ExemptMembersFromPurchaseLimits))
             .Select(i => products[i.ProductId!.Value].NameEn)
             .Distinct()
             .ToList();
@@ -154,6 +166,25 @@ public sealed class PurchaseControlService(
         }
 
         return reason;
+    }
+
+    /// <summary>True for a customer with an active, bought membership (a fallback to the free default plan is not one).</summary>
+    private async Task<bool> IsMemberAsync(string? userId, CancellationToken cancellationToken)
+    {
+        if (membership is null || string.IsNullOrEmpty(userId))
+        {
+            return false;
+        }
+
+        try
+        {
+            var access = await membership.GetAccessInfoAsync(userId, cancellationToken);
+            return access.HasActiveMembership && access.SubscriptionId is not null;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>The risk thresholds are platform settings (Commerce → purchase limits); the constants are the fallback.</summary>
