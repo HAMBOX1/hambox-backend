@@ -34,9 +34,9 @@ internal static class FilterSheetEndpoints
                 [FromQuery] string? format,
                 [FromQuery] Guid? categoryId,
                 [FromQuery] string? productIds,
-                [FromQuery] bool template,
                 ISender sender,
-                IFilterSheetCodec codec) =>
+                IFilterSheetCodec codec,
+                [FromQuery] bool template = false) =>
             {
                 var ids = string.IsNullOrWhiteSpace(productIds)
                     ? null
