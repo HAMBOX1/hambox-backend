@@ -38,6 +38,30 @@ public sealed record CategoryFilterConfigDto(
 /// <summary>Shared lookup used by both the storefront facets and the admin editor.</summary>
 internal static class CategoryFilterResolver
 {
+    /// <summary>The category and every category below it (a platform and its sub-categories); empty for no category.</summary>
+    public static async Task<IReadOnlyList<Guid>> DescendantScopeAsync(
+        ICatalogDbContext db,
+        Guid? categoryId,
+        CancellationToken cancellationToken)
+    {
+        if (categoryId is not { } root)
+        {
+            return [];
+        }
+
+        var parents = await db.Categories.AsNoTracking()
+            .Where(c => c.ParentId != null)
+            .Select(c => new { c.Id, ParentId = c.ParentId!.Value })
+            .ToListAsync(cancellationToken);
+        var scope = new List<Guid> { root };
+        for (var i = 0; i < scope.Count; i++)
+        {
+            scope.AddRange(parents.Where(p => p.ParentId == scope[i] && !scope.Contains(p.Id)).Select(p => p.Id));
+        }
+
+        return scope;
+    }
+
     /// <summary>The category and all of its ancestors (e.g. Xbox Games and Xbox), nearest first; empty for no category.</summary>
     public static async Task<IReadOnlyList<Guid>> AncestorChainAsync(
         ICatalogDbContext db,

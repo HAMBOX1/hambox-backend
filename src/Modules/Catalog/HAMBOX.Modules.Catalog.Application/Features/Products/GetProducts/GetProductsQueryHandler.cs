@@ -53,6 +53,11 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         // pinned to Active regardless of the status they ask for.
         var status = IsStaff ? request.Status : ProductStatus.Active;
 
+        // The storefront treats a platform as everything under it; the admin catalog list keeps the exact category.
+        var scope = IsStaff
+            ? null
+            : await Categories.CategoryFilters.CategoryFilterResolver.DescendantScopeAsync(_dbContext, request.CategoryId, cancellationToken);
+
         var query = ProductQueryFilters.ApplyBaseFilters(
             _dbContext.Products.AsNoTracking(),
             request.SearchTerm,
@@ -60,7 +65,8 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
             status,
             request.CollectionId,
             includePendingMerge: pendingMergeOnly,
-            db: _dbContext);
+            db: _dbContext,
+            categoryScope: scope);
 
         if (pendingMergeOnly)
         {

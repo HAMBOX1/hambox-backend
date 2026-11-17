@@ -11,4 +11,4 @@ docker cp /opt/hambox/tmp/deploy-apply-custom-filters.sql hambox-sqlserver:/tmp/
 docker exec hambox-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -No -d "$DB_NAME" -I -b -i /tmp/deploy-apply-custom-filters.sql
 echo "SQL applied"
 
-docker exec hambox-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -No -d "$DB_NAME" -h -1 -W -Q "SELECT COUNT(*) AS tables_created FROM sys.tables WHERE name IN (N"FilterDefinitions", N"FilterValues", N"ProductFilterValues");"
+docker exec hambox-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -No -d "$DB_NAME" -h -1 -W -Q "SELECT COUNT(*) FROM sys.tables WHERE name LIKE '%Filter%'"

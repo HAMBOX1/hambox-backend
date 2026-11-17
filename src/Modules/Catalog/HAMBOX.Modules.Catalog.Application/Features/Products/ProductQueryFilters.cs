@@ -66,7 +66,8 @@ internal static class ProductQueryFilters
         ProductStatus? status,
         Guid? collectionId = null,
         bool includePendingMerge = false,
-        ICatalogDbContext? db = null)
+        ICatalogDbContext? db = null,
+        IReadOnlyCollection<Guid>? categoryScope = null)
     {
         // Products parked as a pending merge (see the Merge Products feature) are duplicates
         // awaiting an admin decision — hide them from both the storefront and the default admin
@@ -88,7 +89,14 @@ internal static class ProductQueryFilters
             query = query.Where(p => p.Status == status.Value);
         }
 
-        if (categoryId.HasValue)
+        if (categoryScope is { Count: > 0 })
+        {
+            // A platform (a parent category) covers the categories under it.
+            query = query.Where(p =>
+                categoryScope.Contains(p.CategoryId) ||
+                p.AdditionalCategories.Any(pc => categoryScope.Contains(pc.CategoryId)));
+        }
+        else if (categoryId.HasValue)
         {
             query = query.Where(p =>
                 p.CategoryId == categoryId.Value ||

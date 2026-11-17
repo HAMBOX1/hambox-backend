@@ -13,6 +13,8 @@ namespace HAMBOX.Modules.Catalog.Application.Features.Products.GetProductFacets;
 internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
     : IRequestHandler<GetProductFacetsQuery, Result<IReadOnlyList<ProductFacetGroupDto>>>
 {
+    private IReadOnlyCollection<Guid>? categoryScope;
+
     public async Task<Result<IReadOnlyList<ProductFacetGroupDto>>> Handle(
         GetProductFacetsQuery request, CancellationToken cancellationToken)
     {
@@ -30,6 +32,7 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
         // Custom filters the admin created: only the active ones, and only where they are meant to appear
         // (a filter limited to some platforms / categories is hidden elsewhere).
         var scopeChain = await CategoryFilterResolver.AncestorChainAsync(db, request.CategoryId, cancellationToken);
+        categoryScope = await CategoryFilterResolver.DescendantScopeAsync(db, request.CategoryId, cancellationToken);
         var customFilters = (await db.FilterDefinitions.AsNoTracking()
                 .Include(d => d.Values)
                 .Where(d => d.IsActive)
@@ -72,7 +75,7 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
             // after one of them is selected (standard faceted-nav behavior).
             var matchingProducts = ProductQueryFilters.ApplyAttributeFilters(
                 ProductQueryFilters.ApplyBaseFilters(
-                    db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db),
+                    db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db, categoryScope: categoryScope),
                 db,
                 request.AttributeFilters,
                 excludeKey: groupKey);
@@ -148,7 +151,7 @@ internal sealed class GetProductFacetsQueryHandler(ICatalogDbContext db)
     {
         var matchingProducts = ProductQueryFilters.ApplyAttributeFilters(
             ProductQueryFilters.ApplyBaseFilters(
-                db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db),
+                db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db, categoryScope: categoryScope),
             db,
             request.AttributeFilters,
             excludeKey: groupKey);

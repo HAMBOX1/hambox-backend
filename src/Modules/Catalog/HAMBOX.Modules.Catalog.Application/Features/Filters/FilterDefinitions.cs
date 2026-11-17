@@ -401,7 +401,8 @@ internal sealed class GetProductPriceRangeQueryHandler(ICatalogDbContext db)
     {
         var query = Products.ProductQueryFilters.ApplyAttributeFilters(
             Products.ProductQueryFilters.ApplyBaseFilters(
-                db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db),
+                db.Products.AsNoTracking(), request.SearchTerm, request.CategoryId, ProductStatus.Active, db: db,
+                categoryScope: await Categories.CategoryFilters.CategoryFilterResolver.DescendantScopeAsync(db, request.CategoryId, cancellationToken)),
             db,
             request.AttributeFilters);
 

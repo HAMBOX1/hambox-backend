@@ -222,4 +222,35 @@ public sealed class CustomFilterTests
         Assert.Equal(10m, result.Value.Min);
         Assert.Equal(30m, result.Value.Max);
     }
+
+    [Fact]
+    public async Task APlatformCoversItsSubCategories_ButNotOtherPlatforms()
+    {
+        var db = TestCatalogDbContextFactory.Create();
+        var xbox = Category.Create("إكس", "Xbox", $"xbox-{Guid.NewGuid():N}");
+        var games = Category.Create("ألعاب", "Xbox Games", $"games-{Guid.NewGuid():N}", xbox.Id);
+        var playstation = Category.Create("بس", "PlayStation", $"ps-{Guid.NewGuid():N}");
+        db.Categories.AddRange(xbox, games, playstation);
+        var inGames = Product.Create("أ", "Halo", "d", "d", 10m, games.Id);
+        var inPlaystation = Product.Create("ب", "Spider-Man", "d", "d", 20m, playstation.Id);
+        db.Products.AddRange(inGames, inPlaystation);
+        foreach (var product in new[] { inGames, inPlaystation })
+        {
+            product.Activate();
+            var variant = ProductVariant.Create(product.Id, $"SKU-{Guid.NewGuid():N}"[..20]);
+            variant.Activate();
+            db.ProductVariants.Add(variant);
+        }
+
+        await db.SaveChangesAsync();
+
+        var platformRange = await new GetProductPriceRangeQueryHandler(db).Handle(
+            new GetProductPriceRangeQuery(null, xbox.Id, null), CancellationToken.None);
+        var allRange = await new GetProductPriceRangeQueryHandler(db).Handle(
+            new GetProductPriceRangeQuery(null, null, null), CancellationToken.None);
+
+        Assert.Equal(10m, platformRange.Value.Min);
+        Assert.Equal(10m, platformRange.Value.Max);
+        Assert.Equal(20m, allRange.Value.Max);
+    }
 }
