@@ -78,6 +78,7 @@ public interface ICatalogDbContext
     DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition> FilterDefinitions { get; }
     DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue> FilterValues { get; }
     DbSet<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue> ProductFilterValues { get; }
+    DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog> FilterImportLogs { get; }
     DbSet<InventoryReservation> InventoryReservations { get; }
     DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
     DbSet<SearchQueryLog> SearchQueryLogs { get; }

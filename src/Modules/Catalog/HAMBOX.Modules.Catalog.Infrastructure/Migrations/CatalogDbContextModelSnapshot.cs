@@ -493,6 +493,67 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("FilterDefinitions", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AppliedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ChangedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("RowCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UndoJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("UndoneOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppliedOnUtc");
+
+                    b.HasIndex("Kind", "FileHash");
+
+                    b.ToTable("FilterImportLogs", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterValue", b =>
                 {
                     b.Property<Guid>("Id")

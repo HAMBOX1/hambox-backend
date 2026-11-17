@@ -49,6 +49,7 @@ public static class CatalogInfrastructureExtensions
         services.AddSingleton<ICatalogPackageSecretProtector, CatalogPackageSecretProtector>();
         services.AddSingleton<IPackageCryptoService, PackageCryptoService>();
         services.AddScoped<IHamboxPackageWriter, HamboxPackageWriter>();
+        services.AddSingleton<HAMBOX.Modules.Catalog.Application.Abstractions.IFilterSheetCodec, FilterSheetCodec>();
         services.AddScoped<IHamboxPackageReader, HamboxPackageReader>();
         services.AddScoped<ICatalogImportParser, CatalogImportParser>();
         services.AddSingleton<IImportTemplateGenerator, CatalogImportTemplateGenerator>();

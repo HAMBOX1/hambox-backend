@@ -34,6 +34,23 @@ internal sealed class FilterValueConfiguration : IEntityTypeConfiguration<Filter
     }
 }
 
+internal sealed class FilterImportLogConfiguration : IEntityTypeConfiguration<FilterImportLog>
+{
+    public void Configure(EntityTypeBuilder<FilterImportLog> builder)
+    {
+        builder.ToTable("FilterImportLogs");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Kind).IsRequired().HasMaxLength(20);
+        builder.Property(x => x.Mode).IsRequired().HasMaxLength(20);
+        builder.Property(x => x.FileName).IsRequired().HasMaxLength(200);
+        builder.Property(x => x.FileHash).IsRequired().HasMaxLength(64);
+        builder.Property(x => x.UndoJson).IsRequired();
+        builder.Property(x => x.CreatedBy).HasMaxLength(100);
+        builder.HasIndex(x => new { x.Kind, x.FileHash });
+        builder.HasIndex(x => x.AppliedOnUtc);
+    }
+}
+
 internal sealed class ProductFilterValueConfiguration : IEntityTypeConfiguration<ProductFilterValue>
 {
     public void Configure(EntityTypeBuilder<ProductFilterValue> builder)

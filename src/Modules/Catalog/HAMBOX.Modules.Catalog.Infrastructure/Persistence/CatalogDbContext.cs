@@ -77,6 +77,7 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition> FilterDefinitions => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition>();
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue> FilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue>();
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue> ProductFilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue>();
+    public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog> FilterImportLogs => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
