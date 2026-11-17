@@ -406,12 +406,20 @@ internal sealed class GetProductPriceRangeQueryHandler(ICatalogDbContext db)
             db,
             request.AttributeFilters);
 
-        var prices = await query
-            .Select(p => db.ProductVariants
-                .Where(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
-                .Min(v => (decimal?)(v.PriceOverride ?? p.Price)) ?? p.Price)
-            .ToListAsync(cancellationToken);
+        // Variants sell at their own price, else the product's. (Two plain queries: SQL Server cannot aggregate over a
+        // value taken from the outer product row inside a correlated subquery.)
+        var variantPrices = db.ProductVariants.AsNoTracking()
+            .Where(v => !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
+            .Join(query, v => v.ProductId, p => p.Id, (v, p) => v.PriceOverride ?? p.Price);
+        var noVariantPrices = query
+            .Where(p => !db.ProductVariants.Any(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible))
+            .Select(p => p.Price);
 
-        return Result.Success(prices.Count == 0 ? new PriceRangeDto(null, null) : new PriceRangeDto(prices.Min(), prices.Max()));
+        var min = new[] { await variantPrices.MinAsync(x => (decimal?)x, cancellationToken), await noVariantPrices.MinAsync(x => (decimal?)x, cancellationToken) }
+            .Where(x => x.HasValue).Select(x => x!.Value).ToList();
+        var max = new[] { await variantPrices.MaxAsync(x => (decimal?)x, cancellationToken), await noVariantPrices.MaxAsync(x => (decimal?)x, cancellationToken) }
+            .Where(x => x.HasValue).Select(x => x!.Value).ToList();
+
+        return Result.Success(min.Count == 0 ? new PriceRangeDto(null, null) : new PriceRangeDto(min.Min(), max.Max()));
     }
 }

@@ -88,12 +88,13 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
         {
             var minPrice = request.MinPrice;
             var maxPrice = request.MaxPrice;
-            query = query.Where(p => (_dbContext.ProductVariants
-                    .Where(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
-                    .Min(v => (decimal?)(v.PriceOverride ?? p.Price)) ?? p.Price) >= (minPrice ?? 0m)
-                && (maxPrice == null || (_dbContext.ProductVariants
-                    .Where(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
-                    .Min(v => (decimal?)(v.PriceOverride ?? p.Price)) ?? p.Price) <= maxPrice));
+            // A product is in range when one of its buyable variants sells inside it (a product without variants: its own price).
+            query = query.Where(p =>
+                _dbContext.ProductVariants.Any(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible
+                    && (v.PriceOverride ?? p.Price) >= (minPrice ?? 0m)
+                    && (maxPrice == null || (v.PriceOverride ?? p.Price) <= maxPrice))
+                || (!_dbContext.ProductVariants.Any(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
+                    && p.Price >= (minPrice ?? 0m) && (maxPrice == null || p.Price <= maxPrice)));
         }
 
         // Sorting by cost, margin or stock would leak supplier economics through the ordering alone, so those
