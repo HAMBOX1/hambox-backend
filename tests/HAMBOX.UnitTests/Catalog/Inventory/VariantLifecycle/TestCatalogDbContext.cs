@@ -53,6 +53,7 @@ public sealed class TestCatalogDbContext(DbContextOptions<TestCatalogDbContext> 
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue> FilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue>();
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue> ProductFilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue>();
     public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog> FilterImportLogs => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterImportLog>();
+    public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterListHistory> FilterListHistories => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterListHistory>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();
     public DbSet<ProductViewEvent> ProductViewEvents => Set<ProductViewEvent>();
     public DbSet<CatalogPackageJob> CatalogPackageJobs => Set<CatalogPackageJob>();

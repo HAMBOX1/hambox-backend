@@ -47,6 +47,26 @@ internal static class CategoryFilterEndpoints
         .WithName("SaveCategoryFilterConfig")
         .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
 
+        group.MapGet("{categoryId:guid}/history", async (Guid categoryId, ISender sender) =>
+        {
+            var result = await sender.Send(new GetFilterListHistoryQuery(categoryId));
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = result.Error.Description });
+        })
+        .WithName("GetCategoryFilterHistory")
+        .RequirePermission(PermissionConstants.Catalog.Categories.View);
+
+        group.MapPost("{categoryId:guid}/history/{historyId:guid}/restore", async (Guid categoryId, Guid historyId, ISender sender) =>
+        {
+            var result = await sender.Send(new RestoreFilterListCommand(categoryId, historyId));
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.BadRequest(new ProblemDetails { Title = "Bad Request", Detail = result.Error.Description });
+        })
+        .WithName("RestoreCategoryFilterVersion")
+        .RequirePermission(PermissionConstants.Catalog.Categories.Edit);
+
         group.MapDelete("{categoryId:guid}", async (Guid categoryId, ISender sender) =>
         {
             var result = await sender.Send(new ResetCategoryFilterConfigCommand(categoryId));

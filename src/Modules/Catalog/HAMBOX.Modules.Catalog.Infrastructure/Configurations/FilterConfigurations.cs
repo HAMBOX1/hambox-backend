@@ -51,6 +51,19 @@ internal sealed class FilterImportLogConfiguration : IEntityTypeConfiguration<Fi
     }
 }
 
+internal sealed class FilterListHistoryConfiguration : IEntityTypeConfiguration<FilterListHistory>
+{
+    public void Configure(EntityTypeBuilder<FilterListHistory> builder)
+    {
+        builder.ToTable("FilterListHistories");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Action).IsRequired().HasMaxLength(20);
+        builder.Property(x => x.SnapshotJson).IsRequired();
+        builder.Property(x => x.ChangedBy).HasMaxLength(100);
+        builder.HasIndex(x => new { x.CategoryId, x.ChangedOnUtc });
+    }
+}
+
 internal sealed class ProductFilterValueConfiguration : IEntityTypeConfiguration<ProductFilterValue>
 {
     public void Configure(EntityTypeBuilder<ProductFilterValue> builder)

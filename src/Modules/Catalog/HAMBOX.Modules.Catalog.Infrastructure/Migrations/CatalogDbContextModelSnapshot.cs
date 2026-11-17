@@ -554,6 +554,47 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("FilterImportLogs", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterListHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ChangedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("ChangedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ItemCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId", "ChangedOnUtc");
+
+                    b.ToTable("FilterListHistories", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterValue", b =>
                 {
                     b.Property<Guid>("Id")

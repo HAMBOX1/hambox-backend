@@ -1,5 +1,7 @@
+using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Domain.Categories;
+using HAMBOX.Modules.Catalog.Domain.Filters;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -254,7 +256,7 @@ public sealed record CategoryFilterInput(
 public sealed record SaveCategoryFilterConfigCommand(Guid CategoryId, IReadOnlyList<CategoryFilterInput> Items)
     : IRequest<Result>;
 
-internal sealed class SaveCategoryFilterConfigCommandHandler(ICatalogDbContext db)
+internal sealed class SaveCategoryFilterConfigCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<SaveCategoryFilterConfigCommand, Result>
 {
     public async Task<Result> Handle(SaveCategoryFilterConfigCommand request, CancellationToken cancellationToken)
@@ -262,6 +264,7 @@ internal sealed class SaveCategoryFilterConfigCommandHandler(ICatalogDbContext d
         var existing = await db.CategoryFacetSettings
             .Where(s => s.CategoryId == request.CategoryId)
             .ToListAsync(cancellationToken);
+        FilterListSnapshots.Record(db, request.CategoryId, "Saved", existing, currentUser.UserId);
         db.CategoryFacetSettings.RemoveRange(existing);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -293,7 +296,7 @@ internal sealed class SaveCategoryFilterConfigCommandHandler(ICatalogDbContext d
 /// <summary>Removes a category's own list so it goes back to inheriting.</summary>
 public sealed record ResetCategoryFilterConfigCommand(Guid CategoryId) : IRequest<Result>;
 
-internal sealed class ResetCategoryFilterConfigCommandHandler(ICatalogDbContext db)
+internal sealed class ResetCategoryFilterConfigCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<ResetCategoryFilterConfigCommand, Result>
 {
     public async Task<Result> Handle(ResetCategoryFilterConfigCommand request, CancellationToken cancellationToken)
@@ -301,7 +304,83 @@ internal sealed class ResetCategoryFilterConfigCommandHandler(ICatalogDbContext 
         var existing = await db.CategoryFacetSettings
             .Where(s => s.CategoryId == request.CategoryId)
             .ToListAsync(cancellationToken);
+        FilterListSnapshots.Record(db, request.CategoryId, "Reset", existing, currentUser.UserId);
         db.CategoryFacetSettings.RemoveRange(existing);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
+/// <summary>One earlier version of a category's filter list.</summary>
+public sealed record FilterListHistoryDto(Guid Id, string Action, int ItemCount, string? ChangedBy, DateTimeOffset ChangedOnUtc);
+
+internal static class FilterListSnapshots
+{
+    /// <summary>Remembers the list as it is now (before the change about to be saved). An empty list is not worth a version.</summary>
+    public static void Record(ICatalogDbContext db, Guid categoryId, string action, IReadOnlyCollection<CategoryFacetSetting> current, string? userId)
+    {
+        if (current.Count == 0)
+        {
+            return;
+        }
+
+        var snapshot = current.OrderBy(s => s.SortOrder)
+            .Select(s => new CategoryFilterInput(s.GroupKey, s.DisplayNameEn, s.DisplayNameAr, s.IsVisible, s.DependsOnGroupKey, s.GetDependsOnValues()))
+            .ToList();
+        db.FilterListHistories.Add(FilterListHistory.Create(
+            categoryId, action, System.Text.Json.JsonSerializer.Serialize(snapshot), snapshot.Count, userId));
+    }
+}
+
+public sealed record GetFilterListHistoryQuery(Guid CategoryId) : IRequest<Result<IReadOnlyList<FilterListHistoryDto>>>;
+
+internal sealed class GetFilterListHistoryQueryHandler(ICatalogDbContext db)
+    : IRequestHandler<GetFilterListHistoryQuery, Result<IReadOnlyList<FilterListHistoryDto>>>
+{
+    public async Task<Result<IReadOnlyList<FilterListHistoryDto>>> Handle(GetFilterListHistoryQuery request, CancellationToken cancellationToken)
+    {
+        var rows = await db.FilterListHistories.AsNoTracking()
+            .Where(h => h.CategoryId == request.CategoryId)
+            .OrderByDescending(h => h.ChangedOnUtc)
+            .Take(30)
+            .ToListAsync(cancellationToken);
+        return Result.Success<IReadOnlyList<FilterListHistoryDto>>(
+            rows.Select(h => new FilterListHistoryDto(h.Id, h.Action, h.ItemCount, h.ChangedBy, h.ChangedOnUtc)).ToList());
+    }
+}
+
+/// <summary>Brings an earlier version of the list back (the current one is kept as a version too, so this can be undone).</summary>
+public sealed record RestoreFilterListCommand(Guid CategoryId, Guid HistoryId) : IRequest<Result>;
+
+internal sealed class RestoreFilterListCommandHandler(ICatalogDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<RestoreFilterListCommand, Result>
+{
+    private static readonly SharedKernel.Errors.Error NotFound = new("Filters.VersionNotFound", "This version was not found.");
+
+    public async Task<Result> Handle(RestoreFilterListCommand request, CancellationToken cancellationToken)
+    {
+        var version = await db.FilterListHistories.AsNoTracking()
+            .FirstOrDefaultAsync(h => h.Id == request.HistoryId && h.CategoryId == request.CategoryId, cancellationToken);
+        if (version is null)
+        {
+            return Result.Failure(NotFound);
+        }
+
+        var items = System.Text.Json.JsonSerializer.Deserialize<List<CategoryFilterInput>>(
+            version.SnapshotJson, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) ?? [];
+
+        var existing = await db.CategoryFacetSettings.Where(s => s.CategoryId == request.CategoryId).ToListAsync(cancellationToken);
+        FilterListSnapshots.Record(db, request.CategoryId, "Restored", existing, currentUser.UserId);
+        db.CategoryFacetSettings.RemoveRange(existing);
+
+        var order = 0;
+        foreach (var item in items)
+        {
+            db.CategoryFacetSettings.Add(CategoryFacetSetting.Create(
+                request.CategoryId, item.GroupKey, item.DisplayNameEn, item.DisplayNameAr, order++, item.IsVisible,
+                item.DependsOnGroupKey, item.DependsOnValues));
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
