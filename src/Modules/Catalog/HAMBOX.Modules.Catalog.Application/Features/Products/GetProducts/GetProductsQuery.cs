@@ -16,4 +16,6 @@ public record GetProductsQuery(
     IReadOnlyDictionary<string, IReadOnlyList<string>>? AttributeFilters = null,
     Guid? CollectionId = null,
     bool PendingMergeOnly = false,
-    bool FavoritesOnly = false) : IRequest<Result<PagedResult<ProductDto>>>;
+    bool FavoritesOnly = false,
+    decimal? MinPrice = null,
+    decimal? MaxPrice = null) : IRequest<Result<PagedResult<ProductDto>>>;

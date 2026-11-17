@@ -77,6 +77,19 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
 
         query = ProductQueryFilters.ApplyAttributeFilters(query, _dbContext, request.AttributeFilters);
 
+        // Price range: a product's price is the cheapest of its active variants (their own price, else the product's).
+        if (request.MinPrice is not null || request.MaxPrice is not null)
+        {
+            var minPrice = request.MinPrice;
+            var maxPrice = request.MaxPrice;
+            query = query.Where(p => (_dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
+                    .Min(v => (decimal?)(v.PriceOverride ?? p.Price)) ?? p.Price) >= (minPrice ?? 0m)
+                && (maxPrice == null || (_dbContext.ProductVariants
+                    .Where(v => v.ProductId == p.Id && !v.IsDeleted && v.Status == ProductVariantStatus.Active && v.IsVisible)
+                    .Min(v => (decimal?)(v.PriceOverride ?? p.Price)) ?? p.Price) <= maxPrice));
+        }
+
         // Sorting by cost, margin or stock would leak supplier economics through the ordering alone, so those
         // keys are admin-only; everyone else falls back to the default order.
         var sortBy = request.SortBy;
@@ -344,6 +357,10 @@ internal sealed class GetProductsQueryHandler : IRequestHandler<GetProductsQuery
     {
         return sortBy switch
         {
+            ProductSortBy.Oldest => query.OrderBy(p => p.CreatedOnUtc),
+            ProductSortBy.Popular => query
+                .OrderByDescending(p => _dbContext.ProductViewEvents.Count(e => e.ProductId == p.Id))
+                .ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.PriceAsc => query.OrderBy(p => p.Price).ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.PriceDesc => query.OrderByDescending(p => p.Price).ThenByDescending(p => p.CreatedOnUtc),
             ProductSortBy.NameAsc => query.OrderBy(p => p.NameEn).ThenByDescending(p => p.CreatedOnUtc),

@@ -73,6 +73,11 @@ public interface ICatalogDbContext
 
     /// <summary>Admin-defined storefront filter lists, per category (plus a store-wide default).</summary>
     DbSet<CategoryFacetSetting> CategoryFacetSettings { get; }
+
+    /// <summary>Filters the admin created by hand, their values, and the products tagged with them.</summary>
+    DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition> FilterDefinitions { get; }
+    DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue> FilterValues { get; }
+    DbSet<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue> ProductFilterValues { get; }
     DbSet<InventoryReservation> InventoryReservations { get; }
     DbSet<InventoryAuditLog> InventoryAuditLogs { get; }
     DbSet<SearchQueryLog> SearchQueryLogs { get; }

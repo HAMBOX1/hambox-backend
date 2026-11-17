@@ -52,13 +52,15 @@ internal static class ProductEndpoints
             [FromQuery] string? attributes,
             [FromQuery] Guid? collectionId,
             ISender sender,
+            [FromQuery] decimal? minPrice = null,
+            [FromQuery] decimal? maxPrice = null,
             [FromQuery] bool pendingMergeOnly = false,
             [FromQuery] bool favoritesOnly = false) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize == -1 ? -1 : (pageSize <= 0 ? 10 : pageSize); // -1 is the "show all" sentinel, resolved server-side in GetProductsQueryHandler
             var query = new GetProductsQuery(
-                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId, pendingMergeOnly, favoritesOnly);
+                pageNumber, pageSize, searchTerm, status, categoryId, sortBy, ParseAttributeFilters(attributes), collectionId, pendingMergeOnly, favoritesOnly, minPrice, maxPrice);
             var result = await sender.Send(query);
 
             if (result.IsSuccess)
@@ -75,6 +77,20 @@ internal static class ProductEndpoints
             });
         })
         .WithName("GetProducts")
+        .AllowAnonymous();
+
+        // GET /api/v1/products/price-range
+        group.MapGet("price-range", async Task<IResult> (
+            [FromQuery] string? searchTerm,
+            [FromQuery] Guid? categoryId,
+            [FromQuery] string? attributes,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new HAMBOX.Modules.Catalog.Application.Features.Filters.GetProductPriceRangeQuery(
+                searchTerm, categoryId, ParseAttributeFilters(attributes)));
+            return result.IsSuccess ? TypedResults.Ok(result.Value) : TypedResults.BadRequest();
+        })
+        .WithName("GetProductPriceRange")
         .AllowAnonymous();
 
         // GET /api/v1/products/facets

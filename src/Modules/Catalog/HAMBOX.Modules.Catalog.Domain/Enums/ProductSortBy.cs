@@ -20,4 +20,6 @@ public enum ProductSortBy
     CostDesc = 12,
     MarginAsc = 13,
     MarginDesc = 14,
+    Oldest = 15,
+    Popular = 16,
 }

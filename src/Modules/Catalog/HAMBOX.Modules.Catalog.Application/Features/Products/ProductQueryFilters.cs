@@ -152,6 +152,27 @@ internal static class ProductQueryFilters
         string normalizedKey,
         IReadOnlyCollection<string> normalizedValues)
     {
+        // Products tagged (by the admin) with a value of a custom filter that has this key.
+        var tagged = db.ProductFilterValues.AsNoTracking()
+            .Join(
+                db.FilterDefinitions.AsNoTracking().Where(d => d.IsActive && d.Key == normalizedKey),
+                pf => pf.FilterId,
+                d => d.Id,
+                (pf, _) => pf)
+            .Join(
+                db.FilterValues.AsNoTracking().Where(v => normalizedValues.Contains(v.Value)),
+                pf => pf.FilterValueId,
+                v => v.Id,
+                (pf, _) => pf.ProductId);
+
+        return OptionGroupMatches(db, normalizedKey, normalizedValues).Union(tagged);
+    }
+
+    private static IQueryable<Guid> OptionGroupMatches(
+        ICatalogDbContext db,
+        string normalizedKey,
+        IReadOnlyCollection<string> normalizedValues)
+    {
         return db.ProductVariantOptions.AsNoTracking()
             .Join(
                 db.ProductVariants.AsNoTracking().Where(v => v.Status == ProductVariantStatus.Active && v.IsVisible),

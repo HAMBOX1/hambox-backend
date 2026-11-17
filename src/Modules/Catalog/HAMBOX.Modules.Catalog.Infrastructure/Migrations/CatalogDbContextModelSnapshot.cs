@@ -436,6 +436,139 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.ToTable("ProductDrafts", "catalog");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("DefaultExpanded")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsMultiSelect")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NameAr")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ScopeCategoryIds")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("ShowWhenEmpty")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("FilterDefinitions", "catalog");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("FilterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LabelAr")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LabelEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FilterId", "Value")
+                        .IsUnique();
+
+                    b.ToTable("FilterValues", "catalog");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("FilterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("FilterValueId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FilterValueId");
+
+                    b.HasIndex("FilterId", "ProductId");
+
+                    b.HasIndex("ProductId", "FilterValueId")
+                        .IsUnique();
+
+                    b.ToTable("ProductFilterValues", "catalog");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Images.ProductImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1621,6 +1754,15 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterValue", b =>
+                {
+                    b.HasOne("HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition", null)
+                        .WithMany("Values")
+                        .HasForeignKey("FilterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Images.ProductImage", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
@@ -1676,6 +1818,11 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.HasOne("HAMBOX.Modules.Catalog.Domain.Products.Product", null)
                         .WithMany()
                         .HasForeignKey("PendingMergeIntoProductId");
+                });
+
+            modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition", b =>
+                {
+                    b.Navigation("Values");
                 });
 
             modelBuilder.Entity("HAMBOX.Modules.Catalog.Domain.Inventory.OptionGroupTemplate", b =>

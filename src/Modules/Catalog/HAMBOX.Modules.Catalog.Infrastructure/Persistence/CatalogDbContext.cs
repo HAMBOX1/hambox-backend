@@ -74,6 +74,9 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options,
     public DbSet<DigitalInventoryCode> DigitalInventoryCodes => Set<DigitalInventoryCode>();
     public DbSet<DeletedInventoryCode> DeletedInventoryCodes => Set<DeletedInventoryCode>();
     public DbSet<CategoryFacetSetting> CategoryFacetSettings => Set<CategoryFacetSetting>();
+    public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition> FilterDefinitions => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterDefinition>();
+    public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue> FilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.FilterValue>();
+    public DbSet<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue> ProductFilterValues => Set<HAMBOX.Modules.Catalog.Domain.Filters.ProductFilterValue>();
     public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
     public DbSet<InventoryAuditLog> InventoryAuditLogs => Set<InventoryAuditLog>();
     public DbSet<SearchQueryLog> SearchQueryLogs => Set<SearchQueryLog>();

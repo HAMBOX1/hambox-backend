@@ -29,6 +29,7 @@ public static class CatalogEndpointExtensions
         app.MapProductEndpoints(apiVersionSet);
         app.MapProductImageEndpoints(apiVersionSet);
         app.MapCategoryFilterEndpoints(apiVersionSet);
+        app.MapFilterDefinitionEndpoints(apiVersionSet);
         app.MapProductInstructionsEndpoints(apiVersionSet);
         app.MapStorefrontEndpoints(apiVersionSet);
         app.MapInventoryEndpoints(apiVersionSet);

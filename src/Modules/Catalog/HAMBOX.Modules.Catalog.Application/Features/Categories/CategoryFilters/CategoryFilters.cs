@@ -38,6 +38,26 @@ public sealed record CategoryFilterConfigDto(
 /// <summary>Shared lookup used by both the storefront facets and the admin editor.</summary>
 internal static class CategoryFilterResolver
 {
+    /// <summary>The category and all of its ancestors (e.g. Xbox Games and Xbox), nearest first; empty for no category.</summary>
+    public static async Task<IReadOnlyList<Guid>> AncestorChainAsync(
+        ICatalogDbContext db,
+        Guid? categoryId,
+        CancellationToken cancellationToken)
+    {
+        var chain = new List<Guid>();
+        var current = categoryId;
+        while (current is { } id && !chain.Contains(id))
+        {
+            chain.Add(id);
+            current = await db.Categories.AsNoTracking()
+                .Where(c => c.Id == id)
+                .Select(c => c.ParentId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return chain;
+    }
+
     /// <summary>
     /// Finds which category's list applies to <paramref name="categoryId"/>: its own, else the nearest ancestor's,
     /// else the store-wide default; null when nothing has been configured (legacy "show everything").
@@ -132,10 +152,23 @@ internal sealed class GetCategoryFilterConfigQueryHandler(ICatalogDbContext db)
             .Select(g => new { Key = g.Key, Name = g.Max(x => x.DisplayName)!, Products = g.Select(x => x.ProductId).Distinct().Count() })
             .ToListAsync(cancellationToken);
 
-        var allGroups = await db.ProductOptionGroups.AsNoTracking()
-            .GroupBy(g => g.Key)
-            .Select(g => new { Key = g.Key, Name = g.Max(x => x.DisplayName)! })
+        var allGroups = (await db.ProductOptionGroups.AsNoTracking()
+                .GroupBy(g => g.Key)
+                .Select(g => new { Key = g.Key, Name = g.Max(x => x.DisplayName)! })
+                .ToListAsync(cancellationToken))
+            .Concat((await db.FilterDefinitions.AsNoTracking().Where(d => d.IsActive).ToListAsync(cancellationToken))
+                .Select(d => new { Key = d.Key, Name = d.NameEn }))
+            .ToList();
+        var customUsage = await db.ProductFilterValues.AsNoTracking()
+            .Join(db.FilterDefinitions.AsNoTracking(), pf => pf.FilterId, d => d.Id, (pf, d) => new { d.Key, pf.ProductId })
+            .Where(x => productScope.Any(p => p.Id == x.ProductId))
+            .GroupBy(x => x.Key)
+            .Select(g => new { Key = g.Key, Products = g.Select(x => x.ProductId).Distinct().Count() })
             .ToListAsync(cancellationToken);
+        foreach (var u in customUsage)
+        {
+            usage.Add(new { Key = u.Key, Name = u.Key, Products = u.Products });
+        }
 
         var usageByKey = usage.ToDictionary(u => u.Key, u => u);
         var nameByKey = allGroups.ToDictionary(g => g.Key, g => g.Name);
@@ -174,6 +207,12 @@ internal sealed class GetCategoryFilterConfigQueryHandler(ICatalogDbContext db)
                     .OrderBy(v => v.Label, StringComparer.OrdinalIgnoreCase)
                     .ToList()))
             .ToList();
+
+        var customValues = (await db.FilterDefinitions.AsNoTracking().Include(d => d.Values).ToListAsync(cancellationToken))
+            .Select(d => new FilterGroupValuesDto(
+                d.Key,
+                d.Values.OrderBy(v => v.SortOrder).Select(v => new FilterGroupValueDto(v.Value, v.LabelEn)).ToList()));
+        groupValues = groupValues.Concat(customValues).ToList();
 
         return Result.Success(new CategoryFilterConfigDto(
             request.CategoryId, hasOwnList, inheritedFrom, inheritedFromDefault, items, available, groupValues));
