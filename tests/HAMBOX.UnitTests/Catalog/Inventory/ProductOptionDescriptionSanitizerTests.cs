@@ -132,7 +132,38 @@ public class ProductOptionDescriptionSanitizerTests
         Assert.DoesNotContain("javascript:", result, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<svg", result, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<img", result, StringComparison.OrdinalIgnoreCase);
+        // A plain picture is allowed now (uploaded instructions pictures); its handlers were already checked above.
         Assert.Contains("Argentina", result);
+    }
+
+    [Theory]
+    [InlineData("https://cdn.example.com/products/p1/instructions/step1.png")]
+    [InlineData("/uploads/products/p1/instructions/step1.png")]
+    public void Sanitize_UploadedPicture_IsKept(string src)
+    {
+        var result = ProductOptionDescriptionSanitizer.Sanitize($"<p>Step 1</p><img src=\"{src}\" alt=\"Step 1\">");
+
+        Assert.Contains($"src=\"{src}\"", result);
+        Assert.Contains("<img", result);
+    }
+
+    [Fact]
+    public void Sanitize_PictureOnlyDescription_IsNotTreatedAsEmpty()
+    {
+        var result = ProductOptionDescriptionSanitizer.Sanitize("<p><img src=\"https://cdn.example.com/a.png\"></p>");
+
+        Assert.NotNull(result);
+        Assert.Contains("<img", result);
+    }
+
+    [Fact]
+    public void Sanitize_InlineDataPictureAndPictureHandlers_AreRemoved()
+    {
+        var result = ProductOptionDescriptionSanitizer.Sanitize(
+            "<p>Hi</p><img src=\"data:image/png;base64,AAAA\"><img src=\"https://cdn.example.com/a.png\" onerror=\"alert(1)\">");
+
+        Assert.DoesNotContain("data:", result);
+        Assert.DoesNotContain("onerror", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://cdn.example.com/a.png", result);
     }
 }

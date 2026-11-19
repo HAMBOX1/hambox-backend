@@ -31,7 +31,7 @@ public static class ProductOptionDescriptionSanitizer
         // An empty allowed tag (e.g. "<p></p>" left behind after stripping disallowed content)
         // carries no visible text — treat it the same as an empty string, not as "has a description".
         var textOnly = TagPattern.Replace(sanitized, string.Empty);
-        return string.IsNullOrWhiteSpace(textOnly) ? null : sanitized;
+        return string.IsNullOrWhiteSpace(textOnly) && !sanitized.Contains("<img", StringComparison.OrdinalIgnoreCase) ? null : sanitized;
     }
 
     private static readonly Regex TagPattern = new("<[^>]*>", RegexOptions.Compiled);
@@ -56,7 +56,7 @@ public static class ProductOptionDescriptionSanitizer
                  {
                      "p", "br", "strong", "b", "em", "i", "u", "s",
                      "h1", "h2", "h3", "h4", "h5", "h6",
-                     "ul", "ol", "li", "a", "blockquote",
+                     "ul", "ol", "li", "a", "blockquote", "img",
                  })
         {
             sanitizer.AllowedTags.Add(tag);
@@ -64,6 +64,9 @@ public static class ProductOptionDescriptionSanitizer
 
         sanitizer.AllowedAttributes.Clear();
         sanitizer.AllowedAttributes.Add("href");
+        // Pictures uploaded from the editor are stored by address (http/https or a site path); inline data: pictures stay blocked.
+        sanitizer.AllowedAttributes.Add("src");
+        sanitizer.AllowedAttributes.Add("alt");
 
         sanitizer.AllowedCssProperties.Clear();
 
