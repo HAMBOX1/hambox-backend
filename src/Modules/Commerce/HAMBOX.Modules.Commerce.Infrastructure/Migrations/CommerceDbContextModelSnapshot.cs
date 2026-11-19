@@ -2059,6 +2059,32 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("OldPriceText")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Pages")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PositionDesktop")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("BottomLeft");
+
+                    b.Property<string>("PositionMobile")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Bottom");
+
+                    b.Property<string>("PriceText")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<bool>("ShowCountdown")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -2069,6 +2095,13 @@ namespace HAMBOX.Modules.Commerce.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("StartsOnUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Mini");
 
                     b.Property<string>("TitleAr")
                         .HasMaxLength(200)

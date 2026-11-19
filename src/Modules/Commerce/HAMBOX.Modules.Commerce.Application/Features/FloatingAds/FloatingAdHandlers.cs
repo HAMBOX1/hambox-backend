@@ -26,7 +26,13 @@ public sealed record FloatingAdAdminDto(
     int SortOrder,
     int DismissHours,
     string? ImageUrl = null,
-    bool ShowCountdown = false);
+    bool ShowCountdown = false,
+    string Style = "Mini",
+    string PositionDesktop = "BottomLeft",
+    string PositionMobile = "Bottom",
+    IReadOnlyList<string>? Pages = null,
+    string? PriceText = null,
+    string? OldPriceText = null);
 
 /// <summary>The fields an admin sends when creating or updating an ad.</summary>
 public sealed record FloatingAdInput(
@@ -44,7 +50,13 @@ public sealed record FloatingAdInput(
     int SortOrder,
     int DismissHours,
     string? ImageUrl = null,
-    bool ShowCountdown = false);
+    bool ShowCountdown = false,
+    string? Style = null,
+    string? PositionDesktop = null,
+    string? PositionMobile = null,
+    IReadOnlyList<string>? Pages = null,
+    string? PriceText = null,
+    string? OldPriceText = null);
 
 /// <summary>An ad as the storefront shows it.</summary>
 public sealed record FloatingAdPublicDto(
@@ -58,7 +70,13 @@ public sealed record FloatingAdPublicDto(
     string? LinkUrl,
     int DismissHours,
     string? ImageUrl = null,
-    DateTimeOffset? CountdownEndsOnUtc = null);
+    DateTimeOffset? CountdownEndsOnUtc = null,
+    string Style = "Mini",
+    string PositionDesktop = "BottomLeft",
+    string PositionMobile = "Bottom",
+    IReadOnlyList<string>? Pages = null,
+    string? PriceText = null,
+    string? OldPriceText = null);
 
 internal static class FloatingAdErrors
 {
@@ -87,7 +105,8 @@ internal static class FloatingAdMapping
 {
     public static FloatingAdAdminDto ToAdminDto(FloatingAd ad) => new(
         ad.Id, ad.TitleEn, ad.TitleAr, ad.MessageEn, ad.MessageAr, ad.ButtonLabelEn, ad.ButtonLabelAr, ad.LinkUrl,
-        ad.Audience.ToString(), ad.IsActive, ad.StartsOnUtc, ad.EndsOnUtc, ad.SortOrder, ad.DismissHours, ad.ImageUrl, ad.ShowCountdown);
+        ad.Audience.ToString(), ad.IsActive, ad.StartsOnUtc, ad.EndsOnUtc, ad.SortOrder, ad.DismissHours, ad.ImageUrl, ad.ShowCountdown,
+        ad.Style, ad.PositionDesktop, ad.PositionMobile, ad.GetPages(), ad.PriceText, ad.OldPriceText);
 
     /// <summary>Returns the first problem with the input, or null when it can be saved.</summary>
     public static Error? Validate(FloatingAdInput input)
@@ -161,6 +180,7 @@ internal sealed class CreateFloatingAdCommandHandler(ICommerceDbContext db)
             input.TitleEn, input.TitleAr, input.MessageEn, input.MessageAr, input.ButtonLabelEn, input.ButtonLabelAr,
             input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
             input.ImageUrl, input.ShowCountdown);
+        ad.SetPresentation(input.Style, input.PositionDesktop, input.PositionMobile, input.Pages, input.PriceText, input.OldPriceText);
 
         db.FloatingAds.Add(ad);
         await db.SaveChangesAsync(cancellationToken);
@@ -191,6 +211,7 @@ internal sealed class UpdateFloatingAdCommandHandler(ICommerceDbContext db)
             input.TitleEn, input.TitleAr, input.MessageEn, input.MessageAr, input.ButtonLabelEn, input.ButtonLabelAr,
             input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
             input.ImageUrl, input.ShowCountdown);
+        ad.SetPresentation(input.Style, input.PositionDesktop, input.PositionMobile, input.Pages, input.PriceText, input.OldPriceText);
 
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success(FloatingAdMapping.ToAdminDto(ad));
@@ -280,7 +301,8 @@ internal sealed class GetActiveFloatingAdsQueryHandler(
             })
             .Select(a => new FloatingAdPublicDto(
                 a.Id, a.TitleEn, a.TitleAr, a.MessageEn, a.MessageAr, a.ButtonLabelEn, a.ButtonLabelAr, a.LinkUrl, a.DismissHours,
-                a.ImageUrl, a.ShowCountdown ? a.EndsOnUtc : null))
+                a.ImageUrl, a.ShowCountdown ? a.EndsOnUtc : null,
+                a.Style, a.PositionDesktop, a.PositionMobile, a.GetPages(), a.PriceText, a.OldPriceText))
             .ToList();
 
         return Result.Success<IReadOnlyList<FloatingAdPublicDto>>(visible);

@@ -130,6 +130,59 @@ public sealed class FloatingAd : Entity
         ShowCountdown = showCountdown && endsOnUtc is not null;
     }
 
+    /// <summary>The card design: "Mini" (small card), "Product" (picture and price) or "Promo" (offer / discount).</summary>
+    public string Style { get; private set; } = DefaultStyle;
+
+    /// <summary>Where the card sits on a computer: "BottomLeft" or "BottomRight".</summary>
+    public string PositionDesktop { get; private set; } = DefaultPositionDesktop;
+
+    /// <summary>Where the card sits on a phone: "Bottom" (above the bottom bar) or "Top" (under the header).</summary>
+    public string PositionMobile { get; private set; } = DefaultPositionMobile;
+
+    /// <summary>Comma-separated page keys the ad appears on (see <see cref="PageKeys"/>); empty = every storefront page.</summary>
+    public string? Pages { get; private set; }
+
+    /// <summary>The price shown on a Product card (free text, e.g. "$19.99").</summary>
+    public string? PriceText { get; private set; }
+
+    /// <summary>The old price shown struck through next to <see cref="PriceText"/>.</summary>
+    public string? OldPriceText { get; private set; }
+
+    public const string DefaultStyle = "Mini";
+    public const string DefaultPositionDesktop = "BottomLeft";
+    public const string DefaultPositionMobile = "Bottom";
+
+    public static readonly IReadOnlyList<string> Styles = ["Mini", "Product", "Promo"];
+    public static readonly IReadOnlyList<string> DesktopPositions = ["BottomLeft", "BottomRight"];
+    public static readonly IReadOnlyList<string> MobilePositions = ["Bottom", "Top"];
+
+    /// <summary>The storefront pages an ad can be limited to.</summary>
+    public static readonly IReadOnlyList<string> PageKeys = ["home", "products", "product", "category"];
+
+    public IReadOnlyList<string> GetPages() =>
+        string.IsNullOrWhiteSpace(Pages) ? [] : Pages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>Sets how the card looks and where it appears. Unknown values fall back to the defaults.</summary>
+    public void SetPresentation(
+        string? style,
+        string? positionDesktop,
+        string? positionMobile,
+        IEnumerable<string>? pages,
+        string? priceText,
+        string? oldPriceText)
+    {
+        Style = Pick(style, Styles, DefaultStyle);
+        PositionDesktop = Pick(positionDesktop, DesktopPositions, DefaultPositionDesktop);
+        PositionMobile = Pick(positionMobile, MobilePositions, DefaultPositionMobile);
+        var chosen = (pages ?? []).Select(p => p.Trim().ToLowerInvariant()).Where(PageKeys.Contains).Distinct().ToList();
+        Pages = chosen.Count == 0 || chosen.Count == PageKeys.Count ? null : string.Join(',', chosen);
+        PriceText = Clean(priceText);
+        OldPriceText = Clean(oldPriceText);
+    }
+
+    private static string Pick(string? value, IReadOnlyList<string> allowed, string fallback) =>
+        allowed.FirstOrDefault(a => string.Equals(a, value?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? fallback;
+
     public void SetActive(bool isActive) => IsActive = isActive;
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

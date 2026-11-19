@@ -74,4 +74,33 @@ public sealed class FloatingAdImageAndCountdownTests
         Assert.Null(result.Value.ImageUrl);
         Assert.False(result.Value.ShowCountdown);
     }
+
+    [Fact]
+    public async Task TheCardDesignPositionsAndPagesAreSaved_AndUnknownValuesFallBackToTheDefaults()
+    {
+        var (db, _) = CommerceTestDbContextFactory.Create();
+        var create = new CreateFloatingAdCommandHandler(db);
+
+        var created = await create.Handle(new CreateFloatingAdCommand(Input() with
+        {
+            Style = "product",
+            PositionDesktop = "BottomRight",
+            PositionMobile = "Top",
+            Pages = ["Home", "product", "nonsense"],
+            PriceText = " $19.99 ",
+            OldPriceText = "$29.99",
+        }), CancellationToken.None);
+
+        Assert.Equal("Product", created.Value.Style);
+        Assert.Equal("BottomRight", created.Value.PositionDesktop);
+        Assert.Equal("Top", created.Value.PositionMobile);
+        Assert.Equal(["home", "product"], created.Value.Pages);
+        Assert.Equal("$19.99", created.Value.PriceText);
+
+        var fallback = await create.Handle(new CreateFloatingAdCommand(Input() with { Style = "<script>", PositionDesktop = "Center", PositionMobile = "x" }), CancellationToken.None);
+        Assert.Equal("Mini", fallback.Value.Style);
+        Assert.Equal("BottomLeft", fallback.Value.PositionDesktop);
+        Assert.Equal("Bottom", fallback.Value.PositionMobile);
+        Assert.Empty(fallback.Value.Pages!);
+    }
 }

@@ -19,6 +19,12 @@ internal sealed class FloatingAdConfiguration : IEntityTypeConfiguration<Floatin
         builder.Property(a => a.LinkUrl).HasMaxLength(500);
         builder.Property(a => a.ImageUrl).HasMaxLength(500);
         builder.Property(a => a.ShowCountdown).HasDefaultValue(false);
+        builder.Property(a => a.Style).HasMaxLength(20).HasDefaultValue(FloatingAd.DefaultStyle);
+        builder.Property(a => a.PositionDesktop).HasMaxLength(20).HasDefaultValue(FloatingAd.DefaultPositionDesktop);
+        builder.Property(a => a.PositionMobile).HasMaxLength(20).HasDefaultValue(FloatingAd.DefaultPositionMobile);
+        builder.Property(a => a.Pages).HasMaxLength(100);
+        builder.Property(a => a.PriceText).HasMaxLength(50);
+        builder.Property(a => a.OldPriceText).HasMaxLength(50);
         builder.Property(a => a.Audience).HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(a => new { a.IsActive, a.SortOrder });
     }
