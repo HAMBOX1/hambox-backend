@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using HAMBOX.Application.Abstractions;
@@ -71,7 +71,7 @@ internal sealed class ExportCatalogJobHandler(
                     break;
 
                 case CatalogPackageFormat.Xlsx:
-                    fileBytes = BuildProductsXlsx(package.Products);
+                    fileBytes = BuildCatalogXlsx(package);
                     fileName = $"catalog-export-{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
                     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                     break;
@@ -334,14 +334,14 @@ internal sealed class ExportCatalogJobHandler(
         return [.. result.Values];
     }
 
-    private static byte[] BuildProductsXlsx(IReadOnlyList<ParsedProductRow> products)
+    private static readonly string[] ProductHeaders =
+        ["ImportKey", "NameEn", "NameAr", "DescriptionEn", "DescriptionAr", "Price", "CategorySlug", "Status", "StockQuantity", "AdditionalCategorySlugs", "CollectionNames"];
+
+    private static void WriteProductsSheet(IXLWorksheet sheet, IReadOnlyList<ParsedProductRow> products)
     {
-        using var workbook = new XLWorkbook();
-        var sheet = workbook.Worksheets.Add("Products");
-        string[] headers = ["ImportKey", "NameEn", "NameAr", "DescriptionEn", "DescriptionAr", "Price", "CategorySlug", "Status", "StockQuantity", "AdditionalCategorySlugs", "CollectionNames"];
-        for (var i = 0; i < headers.Length; i++)
+        for (var i = 0; i < ProductHeaders.Length; i++)
         {
-            sheet.Cell(1, i + 1).Value = headers[i];
+            sheet.Cell(1, i + 1).Value = ProductHeaders[i];
             sheet.Cell(1, i + 1).Style.Font.Bold = true;
         }
 
@@ -361,7 +361,116 @@ internal sealed class ExportCatalogJobHandler(
             sheet.Cell(r + 2, 11).Value = string.Join(',', p.CollectionNames ?? []);
         }
 
+        sheet.SheetView.FreezeRows(1);
         sheet.Columns().AdjustToContents();
+    }
+
+    /// <summary>
+    /// The workbook the import reads back: a "Products" tab, one tab per category (named after the category, holding that
+    /// category's products), and the "Variant Groups" / "Variant Options" tabs of the products' option groups, plus an
+    /// "Instructions" tab. A product is on exactly one product tab (its category's tab, or "Products" when the category has
+    /// no usable tab name), so importing the file again never creates a product twice.
+    /// </summary>
+    internal static byte[] BuildCatalogXlsx(ParsedCatalogPackage package)
+    {
+        using var workbook = new XLWorkbook();
+
+        var categoryNameBySlug = package.Categories
+            .GroupBy(c => c.Slug, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().NameEn, StringComparer.OrdinalIgnoreCase);
+
+        var generalProducts = new List<ParsedProductRow>();
+        var productsByTab = new SortedDictionary<string, List<ParsedProductRow>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var product in package.Products)
+        {
+            var tab = categoryNameBySlug.TryGetValue(product.CategorySlug, out var categoryName)
+                ? CatalogSheetNames.TryCategoryTabName(categoryName)
+                : null;
+
+            if (tab is null || (!productsByTab.ContainsKey(tab) && productsByTab.Count >= 60))
+            {
+                generalProducts.Add(product);
+                continue;
+            }
+
+            if (!productsByTab.TryGetValue(tab, out var list))
+            {
+                list = [];
+                productsByTab[tab] = list;
+            }
+
+            list.Add(product);
+        }
+
+        WriteProductsSheet(workbook.Worksheets.Add("Products"), generalProducts);
+        foreach (var (tab, rows) in productsByTab)
+        {
+            WriteProductsSheet(workbook.Worksheets.Add(tab), rows);
+        }
+
+        var groupSheet = workbook.Worksheets.Add("Variant Groups");
+        string[] groupHeaders = ["ProductImportKey", "GroupKey", "DisplayName", "ParentGroupKey", "SortOrder", "IsRequired"];
+        for (var i = 0; i < groupHeaders.Length; i++)
+        {
+            groupSheet.Cell(1, i + 1).Value = groupHeaders[i];
+            groupSheet.Cell(1, i + 1).Style.Font.Bold = true;
+        }
+
+        for (var r = 0; r < package.OptionGroups.Count; r++)
+        {
+            var g = package.OptionGroups[r];
+            groupSheet.Cell(r + 2, 1).Value = g.ProductImportKey;
+            groupSheet.Cell(r + 2, 2).Value = g.Key;
+            groupSheet.Cell(r + 2, 3).Value = g.DisplayName;
+            groupSheet.Cell(r + 2, 4).Value = g.ParentKey ?? string.Empty;
+            groupSheet.Cell(r + 2, 5).Value = g.SortOrder;
+            groupSheet.Cell(r + 2, 6).Value = g.IsRequired ? "TRUE" : "FALSE";
+        }
+
+        groupSheet.SheetView.FreezeRows(1);
+        groupSheet.Columns().AdjustToContents();
+
+        var optionSheet = workbook.Worksheets.Add("Variant Options");
+        string[] optionHeaders = ["ProductImportKey", "GroupKey", "Value", "Label", "SortOrder"];
+        for (var i = 0; i < optionHeaders.Length; i++)
+        {
+            optionSheet.Cell(1, i + 1).Value = optionHeaders[i];
+            optionSheet.Cell(1, i + 1).Style.Font.Bold = true;
+        }
+
+        for (var r = 0; r < package.Options.Count; r++)
+        {
+            var o = package.Options[r];
+            optionSheet.Cell(r + 2, 1).Value = o.ProductImportKey;
+            optionSheet.Cell(r + 2, 2).Value = o.GroupKey;
+            optionSheet.Cell(r + 2, 3).Value = o.Value;
+            optionSheet.Cell(r + 2, 4).Value = o.Label;
+            optionSheet.Cell(r + 2, 5).Value = o.SortOrder;
+        }
+
+        optionSheet.SheetView.FreezeRows(1);
+        optionSheet.Columns().AdjustToContents();
+
+        var notes = workbook.Worksheets.Add("Instructions");
+        notes.Cell(1, 1).Value = "Sheet";
+        notes.Cell(1, 2).Value = "What it holds";
+        notes.Range(1, 1, 1, 2).Style.Font.Bold = true;
+        string[][] lines =
+        [
+            ["Products", "Products whose category has no tab of its own (and any new product you add without a category)."],
+            ["<Category tabs>", "One tab per category, named after the category, holding that category's products. A product on a category tab is filed under that category."],
+            ["Variant Groups", "The option groups of each product (Platform, Region, Duration...). ProductImportKey is the ImportKey of the product on its tab."],
+            ["Variant Options", "The values of each option group. GroupKey must match a GroupKey on the Variant Groups tab."],
+            ["Note", "Do not rename a category tab: its name is the category. Keep ImportKey as it is to update a product; leave it blank for a new one."],
+        ];
+        for (var i = 0; i < lines.Length; i++)
+        {
+            notes.Cell(i + 2, 1).Value = lines[i][0];
+            notes.Cell(i + 2, 2).Value = lines[i][1];
+        }
+
+        notes.Columns().AdjustToContents();
+
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();

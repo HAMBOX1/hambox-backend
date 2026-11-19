@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using ClosedXML.Excel;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
@@ -85,11 +85,7 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
 
     // Tabs that mean something other than "a category's products" — everything else in a Products workbook is read as
     // a category tab (see ReadProductRows). The names match CatalogImportTemplateGenerator plus the usual notes tabs.
-    private static readonly HashSet<string> NonCategorySheets = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Products", "Variant Groups", "Variant Options", "Variants", "Inventory Codes", "Inventory", "Codes",
-        "Categories", "Collections", "Instructions", "README", "Notes", "Lists", "Summary",
-    };
+    private static readonly HashSet<string> NonCategorySheets = CatalogSheetNames.Reserved;
 
     /// <summary>
     /// The product rows of a Products workbook. Besides the classic "Products" tab, any other tab that is not one of the

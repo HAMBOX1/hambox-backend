@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetImportLookups;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -66,12 +66,25 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
             _ => throw new ArgumentOutOfRangeException(nameof(entityType)),
         };
 
+        // The Products workbook also gets one empty tab per category: a product typed on the "Xbox" tab is filed under Xbox
+        // without filling the category column (the import reads the tab name as the category).
+        var categoryTabs = entityType == CatalogImportEntityType.Products
+            ? CatalogSheetNames.CategoryTabs(lookups.Categories.Select(c => c.Label))
+            : [];
+
         foreach (var (sheetName, columns, sampleRows) in sections)
         {
             BuildSheet(workbook, sheetName, columns, sampleRows, lookups);
+            if (sheetName == "Products")
+            {
+                foreach (var tab in categoryTabs)
+                {
+                    BuildSheet(workbook, tab, ProductColumns, [], lookups);
+                }
+            }
         }
 
-        AddInstructionsSheet(workbook, sections);
+        AddInstructionsSheet(workbook, sections, categoryTabs.Count > 0);
         listsSheet.Hide();
 
         using var stream = new MemoryStream();
@@ -244,7 +257,7 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
         return sheet;
     }
 
-    private static void AddInstructionsSheet(XLWorkbook workbook, (string SheetName, ColumnSpec[] Columns, string[][] Samples)[] sections)
+    private static void AddInstructionsSheet(XLWorkbook workbook, (string SheetName, ColumnSpec[] Columns, string[][] Samples)[] sections, bool hasCategoryTabs)
     {
         var instructions = workbook.Worksheets.Add("Instructions");
         instructions.Cell(1, 1).Value = "Sheet";
@@ -264,6 +277,16 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
                 instructions.Cell(row, 4).Value = column.Description;
                 row++;
             }
+        }
+
+        if (hasCategoryTabs)
+        {
+            instructions.Cell(row, 1).Value = "Note";
+            instructions.Cell(row, 4).Value =
+                "Category tabs: every tab named after a category (Xbox, Playstation...) holds that category's products, with the same columns as the Products tab. " +
+                "A product on a category tab is filed under that category — you do not need to fill CategorySlug there (if you do, it wins). " +
+                "Use the Products tab for anything else. Do not rename a category tab: its name is the category.";
+            row++;
         }
 
         if (sections.Any(s => s.SheetName == "Variants"))
