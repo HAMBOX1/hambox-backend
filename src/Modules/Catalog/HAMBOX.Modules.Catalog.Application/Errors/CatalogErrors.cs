@@ -276,6 +276,10 @@ public static class CatalogErrors
             "Inventory.IncompleteVariantCombination",
             $"This variant is missing a selection for: {string.Join(", ", missingGroupNames)}.");
 
+    public static readonly Error VariantIncomplete = new(
+        "Inventory.VariantIncomplete",
+        "This variant is missing a selection from one of the product's option groups, so it cannot be sold or receive stock. Complete its options first.");
+
     public static readonly Error VariantBulkEmpty = new(
         "Inventory.VariantBulkEmpty",
         "Select at least one variant for bulk actions.");

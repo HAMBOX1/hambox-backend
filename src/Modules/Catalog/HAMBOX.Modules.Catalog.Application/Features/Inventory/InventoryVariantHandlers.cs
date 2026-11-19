@@ -73,8 +73,40 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 .ToDictionaryAsync(entry => entry.VariantId, entry => entry.Count, cancellationToken);
 
         var canViewCosts = _permissions.Has(CatalogPermissions.ViewCosts);
+
+        // Which variants are complete (one option from every group that applies) and which share the very same options.
+        var groups = await _db.ProductOptionGroups
+            .AsNoTracking()
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == request.ProductId)
+            .ToListAsync(cancellationToken);
+        var validKeys = VariantCombinationHelper.BuildValidCombinationKeys(groups);
+        var firstSkuByKey = new Dictionary<string, string>();
+        var duplicateOfSku = new Dictionary<Guid, string>();
+        foreach (var variant in variants)
+        {
+            var optionIds = variant.SelectedOptions.Select(o => o.OptionId).ToList();
+            if (optionIds.Count == 0)
+            {
+                continue;
+            }
+
+            var key = VariantCombinationHelper.NormalizeCombinationKey(optionIds);
+            if (firstSkuByKey.TryGetValue(key, out var firstSku))
+            {
+                duplicateOfSku[variant.Id] = firstSku;
+            }
+            else
+            {
+                firstSkuByKey[key] = variant.Sku;
+            }
+        }
+
         var dtos = variants.Select(v =>
         {
+            var optionIdList = v.SelectedOptions.Select(o => o.OptionId).ToList();
+            var isComplete = VariantCompleteness.IsComplete(optionIdList, groups, validKeys);
+            var missing = isComplete ? null : VariantCombinationHelper.FindMissingGroups(optionIdList, groups).Select(g => g.DisplayName).ToList();
             stock.TryGetValue(v.Id, out var s);
             codeCounts.TryGetValue(v.Id, out var totalCodes);
             return new ProductVariantDto(
@@ -83,7 +115,8 @@ internal sealed class GetProductVariantsQueryHandler : IRequestHandler<GetProduc
                 s?.Available ?? 0, s?.Reserved ?? 0, s?.Sold ?? 0, totalCodes,
                 s?.IsLowStock ?? false, s?.IsOutOfStock ?? true,
                 v.SelectedOptions.Select(o => o.OptionId).ToList(), v.FulfillmentMode.ToString(),
-                canViewCosts ? v.CostPrice : null, v.MemberPrice, v.DescriptionHtml, v.ShowDescriptionInline);
+                canViewCosts ? v.CostPrice : null, v.MemberPrice, v.DescriptionHtml, v.ShowDescriptionInline,
+                isComplete, missing, duplicateOfSku.GetValueOrDefault(v.Id));
         }).ToList();
 
         return Result.Success<IReadOnlyList<ProductVariantDto>>(dtos);

@@ -34,14 +34,20 @@ internal sealed class ImportImageCodesCommandHandler(
             return Result.Failure<ImportCodesResultDto>(CatalogErrors.BatchNotFound);
         }
 
-        var variantStatus = await db.ProductVariants
+        var variantInfo = await db.ProductVariants
             .AsNoTracking()
+            .Include(v => v.SelectedOptions)
             .Where(v => v.Id == request.VariantId)
-            .Select(v => (ProductVariantStatus?)v.Status)
             .FirstOrDefaultAsync(cancellationToken);
-        if (variantStatus != ProductVariantStatus.Active)
+        if (variantInfo?.Status != ProductVariantStatus.Active)
         {
             return Result.Failure<ImportCodesResultDto>(CatalogErrors.VariantNotActive);
+        }
+
+        if (!await VariantCompleteness.IsCompleteAsync(
+                db, variantInfo.ProductId, variantInfo.SelectedOptions.Select(o => o.OptionId).ToList(), cancellationToken))
+        {
+            return Result.Failure<ImportCodesResultDto>(CatalogErrors.VariantIncomplete);
         }
 
         var imported = 0;

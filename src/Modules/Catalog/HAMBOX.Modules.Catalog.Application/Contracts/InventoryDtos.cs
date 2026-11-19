@@ -53,7 +53,15 @@ public sealed record ProductVariantDto(
     decimal? CostPrice = null,
     decimal? MemberPrice = null,
     string? DescriptionHtml = null,
-    bool ShowDescriptionInline = false);
+    bool ShowDescriptionInline = false,
+    bool IsComplete = true,
+    IReadOnlyList<string>? MissingGroups = null,
+    string? DuplicateOfSku = null);
+
+/// <summary>One possible complete combination of a product's options (one choice per group), and whether a variant already exists for it.</summary>
+public sealed record VariantCombinationDto(IReadOnlyList<Guid> OptionIds, IReadOnlyList<string> Labels, bool Exists);
+
+public sealed record VariantCombinationsDto(IReadOnlyList<VariantCombinationDto> Items, int ExistingCount, int MissingCount);
 
 public sealed record GenerateProductVariantsResultDto(
     int CreatedCount,

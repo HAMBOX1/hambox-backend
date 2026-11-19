@@ -196,15 +196,29 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
 {
     private readonly IInventoryEngine _engine;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICatalogDbContext _db;
 
-    public ImportInventoryCodesCommandHandler(IInventoryEngine engine, ICurrentUserService currentUser)
+    public ImportInventoryCodesCommandHandler(IInventoryEngine engine, ICurrentUserService currentUser, ICatalogDbContext db)
     {
         _engine = engine;
         _currentUser = currentUser;
+        _db = db;
     }
 
     public async Task<Result<ImportCodesResultDto>> Handle(ImportInventoryCodesCommand request, CancellationToken cancellationToken)
     {
+        // Stock only goes onto a complete combination; a half-choice (e.g. Region + Type without a Duration) is never stocked.
+        var target = await _db.ProductVariants
+            .AsNoTracking()
+            .Include(v => v.SelectedOptions)
+            .FirstOrDefaultAsync(v => v.Id == request.VariantId, cancellationToken);
+        if (target is not null
+            && !await VariantCompleteness.IsCompleteAsync(
+                _db, target.ProductId, target.SelectedOptions.Select(o => o.OptionId).ToList(), cancellationToken))
+        {
+            return Result.Failure<ImportCodesResultDto>(CatalogErrors.VariantIncomplete);
+        }
+
         var items = request.Codes
             .Select(c => new ImportCodeItem(c, Notes: string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim()))
             .ToList();

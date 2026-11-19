@@ -78,9 +78,16 @@ internal static class InventoryEndpoints
                 body.SortOrder, body.MembershipPlanId, body.LowStockThreshold, body.OptionIds)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
 
-        group.MapPost("/products/{productId:guid}/variants/generate", async (Guid productId, ISender sender) =>
-            await Send(sender, new GenerateProductVariantsCommand(productId)))
+        group.MapPost("/products/{productId:guid}/variants/generate", async (
+            Guid productId,
+            [FromBody] GenerateVariantsRequest? body,
+            ISender sender) =>
+            await Send(sender, new GenerateProductVariantsCommand(productId, body?.Combinations)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Create);
+
+        group.MapGet("/products/{productId:guid}/variants/combinations", async (Guid productId, ISender sender) =>
+            await Send(sender, new GetVariantCombinationsQuery(productId)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.View);
 
         group.MapPut("/products/{productId:guid}/variant-prices", async (
             Guid productId,
@@ -572,6 +579,7 @@ internal sealed record SetProductVariantPricesRequest(string Field, decimal? Val
 internal sealed record ImportCodesRequest(IReadOnlyList<string> Codes, string? Note = null);
 
 internal sealed record SetVariantFulfillmentModeRequest(FulfillmentMode FulfillmentMode);
+internal sealed record GenerateVariantsRequest(IReadOnlyList<IReadOnlyList<Guid>>? Combinations);
 internal sealed record SetVariantDescriptionRequest(string? DescriptionHtml, bool? ShowDescriptionInline = null);
 
 internal sealed record UpdateVariantRequest(

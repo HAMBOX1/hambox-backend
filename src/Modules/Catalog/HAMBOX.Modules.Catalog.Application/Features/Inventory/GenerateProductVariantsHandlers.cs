@@ -10,8 +10,52 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HAMBOX.Modules.Catalog.Application.Features.Inventory;
 
-public sealed record GenerateProductVariantsCommand(Guid ProductId)
+/// <param name="ProductId">The product.</param>
+/// <param name="Selected">
+/// The exact combinations to create (each an array of option ids). Null keeps the original behaviour of creating every
+/// missing combination. Only complete combinations of this product are accepted; ones that already exist are skipped.
+/// </param>
+public sealed record GenerateProductVariantsCommand(Guid ProductId, IReadOnlyList<IReadOnlyList<Guid>>? Selected = null)
     : IRequest<Result<GenerateProductVariantsResultDto>>;
+
+public sealed record GetVariantCombinationsQuery(Guid ProductId) : IRequest<Result<VariantCombinationsDto>>;
+
+internal sealed class GetVariantCombinationsQueryHandler(ICatalogDbContext db)
+    : IRequestHandler<GetVariantCombinationsQuery, Result<VariantCombinationsDto>>
+{
+    public async Task<Result<VariantCombinationsDto>> Handle(GetVariantCombinationsQuery request, CancellationToken cancellationToken)
+    {
+        var groups = await db.ProductOptionGroups
+            .AsNoTracking()
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == request.ProductId)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        if (VariantCombinationHelper.CountCombinations(groups) > VariantCombinationHelper.MaxVariantsPerProduct)
+        {
+            return Result.Failure<VariantCombinationsDto>(CatalogErrors.TooManyVariantCombinations);
+        }
+
+        var existingKeys = (await db.ProductVariants
+                .AsNoTracking()
+                .Include(v => v.SelectedOptions)
+                .Where(v => v.ProductId == request.ProductId && !v.IsDeleted)
+                .ToListAsync(cancellationToken))
+            .Select(v => VariantCombinationHelper.NormalizeCombinationKey(v.SelectedOptions.Select(o => o.OptionId)))
+            .ToHashSet();
+
+        var items = VariantCombinationHelper.Expand(groups)
+            .Select(path => new VariantCombinationDto(
+                path.ToList(),
+                VariantCompleteness.Labels(path, groups),
+                existingKeys.Contains(VariantCombinationHelper.NormalizeCombinationKey(path))))
+            .ToList();
+
+        var existing = items.Count(i => i.Exists);
+        return Result.Success(new VariantCombinationsDto(items, existing, items.Count - existing));
+    }
+}
 
 public sealed record BulkUpdateProductVariantsCommand(
     Guid ProductId,
@@ -72,6 +116,12 @@ internal sealed class GenerateProductVariantsCommandHandler
         }
 
         var combinations = VariantCombinationHelper.Expand(groups);
+        if (request.Selected is not null)
+        {
+            // Only the combinations the admin ticked, and only ones that really are complete combinations of this product.
+            var wanted = request.Selected.Select(VariantCombinationHelper.NormalizeCombinationKey).ToHashSet();
+            combinations = combinations.Where(c => wanted.Contains(VariantCombinationHelper.NormalizeCombinationKey(c))).ToList();
+        }
 
         var optionLookup = groups
             .SelectMany(group => group.Options)

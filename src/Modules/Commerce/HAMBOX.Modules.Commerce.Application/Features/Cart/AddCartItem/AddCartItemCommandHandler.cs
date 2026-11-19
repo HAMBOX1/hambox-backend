@@ -132,6 +132,19 @@ internal sealed class AddCartItemCommandHandler : IRequestHandler<AddCartItemCom
         // Same combined manual/supplier-readiness rule CartLineValidator uses at checkout, so a
         // supplier-backed variant with zero manual codes isn't rejected here only to be accepted
         // later at checkout (or vice versa).
+        // Only a complete combination can be bought: a variant that skips one of the product's option groups is just a
+        // half-choice, so it never goes into a cart (the storefront picker cannot select it either).
+        var addedVariant = await _catalogDbContext.ProductVariants
+            .AsNoTracking()
+            .Include(v => v.SelectedOptions)
+            .FirstOrDefaultAsync(v => v.Id == request.ProductVariantId!.Value, cancellationToken);
+        if (addedVariant is not null
+            && !await Catalog.Application.Features.Inventory.VariantCompleteness.IsCompleteAsync(
+                _catalogDbContext, addedVariant.ProductId, addedVariant.SelectedOptions.Select(o => o.OptionId).ToList(), cancellationToken))
+        {
+            return Result.Failure<Contracts.CartDto>(CatalogErrors.VariantIncomplete);
+        }
+
         var stock = await _inventoryEngine.GetVariantStockAsync(request.ProductVariantId!.Value, cancellationToken);
         var readiness = await _fulfillmentRouter.GetReadinessAsync(request.ProductVariantId!.Value, cancellationToken);
         if (!FulfillmentAvailability.IsAvailable(readiness.Mode, stock.Available >= newQuantity, readiness.SupplierReady))
