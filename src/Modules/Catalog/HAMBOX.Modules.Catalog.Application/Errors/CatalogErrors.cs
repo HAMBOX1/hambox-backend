@@ -1,4 +1,4 @@
-using HAMBOX.SharedKernel.Errors;
+﻿using HAMBOX.SharedKernel.Errors;
 
 namespace HAMBOX.Modules.Catalog.Application.Errors;
 
@@ -307,6 +307,10 @@ public static class CatalogErrors
     public static readonly Error EmptyOptionGroup = new(
         "Inventory.EmptyOptionGroup",
         "Every option group must contain at least one option value.");
+
+    public static readonly Error NoPictureStock = new(
+        "Inventory.NoPictureStock",
+        "This variant has no picture stock in that status to download.");
 
     public static readonly Error InvalidCodeStatus = new(
         "Inventory.InvalidCodeStatus",

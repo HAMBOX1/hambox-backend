@@ -1,4 +1,4 @@
-using Asp.Versioning.Builder;
+﻿using Asp.Versioning.Builder;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Application.Contracts;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
@@ -447,6 +447,28 @@ internal static class InventoryEndpoints
 
             httpContext.Response.Headers["X-Code-Count"] = result.Value.CodeCount.ToString();
             httpContext.Response.Headers["X-Picture-Count"] = result.Value.PictureCount.ToString();
+            return Results.File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
+        })
+        .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
+
+        // The pictures uploaded as stock, back as a .zip (the text download cannot carry them). Same permission and audit trail.
+        group.MapGet("/variants/{variantId:guid}/codes/export-pictures", async (
+            Guid variantId,
+            [FromQuery] string? status,
+            [FromQuery] string? reason,
+            HttpContext httpContext,
+            ISender sender) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var userAgent = string.IsNullOrWhiteSpace(httpContext.Request.Headers["User-Agent"]) ? "unknown" : httpContext.Request.Headers["User-Agent"].ToString();
+            var result = await sender.Send(new ExportInventoryPicturesQuery(variantId, status, reason, ipAddress, userAgent));
+            if (!result.IsSuccess)
+            {
+                return Results.BadRequest(Problem(result));
+            }
+
+            httpContext.Response.Headers["X-Picture-Count"] = result.Value.PictureCount.ToString();
+            httpContext.Response.Headers["X-Missing-Count"] = result.Value.MissingCount.ToString();
             return Results.File(result.Value.Content, result.Value.ContentType, result.Value.FileName);
         })
         .RequirePermission(PermissionConstants.Catalog.Inventory.RevealCodes);
