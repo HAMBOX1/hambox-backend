@@ -86,6 +86,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.BadgeTextAr).HasMaxLength(60);
         builder.Property(p => p.BadgeColor).HasMaxLength(7);
         builder.Property(p => p.UsageInstructionsHtml);
+        builder.Property(p => p.IsParentProduct).HasDefaultValue(false);
 
         builder.Property(p => p.MaxQuantityPerOrder);
         builder.Property(p => p.MaxQuantityPerUserPerDay);

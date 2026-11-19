@@ -22,6 +22,25 @@ public sealed record SetProductFavoriteCommand(Guid ProductId, bool IsFavorite) 
 /// <summary>Sets the product's public "How to use" text shown on its storefront page (null or empty clears it).</summary>
 public sealed record SetProductUsageInstructionsCommand(Guid ProductId, string? Html) : IRequest<Result>;
 
+/// <summary>Marks a product as a parent (a doorway to its variants) or back as a normal product.</summary>
+public sealed record SetProductParentCommand(Guid ProductId, bool IsParentProduct) : IRequest<Result>;
+
+internal sealed class SetProductParentCommandHandler(ICatalogDbContext db) : IRequestHandler<SetProductParentCommand, Result>
+{
+    public async Task<Result> Handle(SetProductParentCommand request, CancellationToken cancellationToken)
+    {
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+        if (product is null)
+        {
+            return Result.Failure(CatalogErrors.ProductNotFound);
+        }
+
+        product.SetParentProduct(request.IsParentProduct);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
 public sealed record ProductPurchaseControlsDto(int? MaxQuantityPerOrder, int? MaxQuantityPerUserPerDay, bool RequiresManualReview, bool ExemptMembers = false);
 
 public sealed record SetProductPurchaseControlsCommand(Guid ProductId, ProductPurchaseControlsDto Controls) : IRequest<Result>;

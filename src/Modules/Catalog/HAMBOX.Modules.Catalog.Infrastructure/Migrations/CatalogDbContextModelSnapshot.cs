@@ -1745,6 +1745,11 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsParentProduct")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("LastEditedByName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");

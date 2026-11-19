@@ -249,6 +249,12 @@ internal static class ProductEndpoints
             .WithName("SetProductUsageInstructions")
             .RequirePermission(PermissionConstants.Catalog.Products.Edit);
 
+        // PUT /api/v1/products/{id}/parent — mark the product as a parent (a doorway to its variants) or back to normal.
+        group.MapPut("{id:guid}/parent", async (Guid id, [FromBody] SetProductParentRequest request, ISender sender) =>
+            await SendEmptyResult(sender, new SetProductParentCommand(id, request.IsParentProduct)))
+            .WithName("SetProductParent")
+            .RequirePermission(PermissionConstants.Catalog.Products.Edit);
+
         // GET/PUT /api/v1/products/{id}/purchase-controls — per-order / per-customer-per-day caps and the
         // "sensitive product, review every order" flag (audit R22).
         group.MapGet("{id:guid}/purchase-controls", async (Guid id, ISender sender) =>
@@ -419,3 +425,4 @@ internal sealed record SetPendingMergeRequest(Guid TargetProductId);
 internal sealed record SetProductFavoriteRequest(bool IsFavorite);
 
 internal sealed record SetProductUsageInstructionsRequest(string? Html);
+internal sealed record SetProductParentRequest(bool IsParentProduct);

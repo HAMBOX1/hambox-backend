@@ -38,6 +38,7 @@ namespace HAMBOX.Modules.Catalog.Application.Contracts;
 /// <param name="PendingMergeIntoProductName">The English name of <see cref="PendingMergeIntoProductId"/>'s product, for display, if any.</param>
 /// <param name="IsFavorite">Admin-only bookmark for quickly finding this product again — always false for anonymous/storefront callers, never shown to customers.</param>
 /// <param name="CategoryDescriptionHtml">The primary category's own customer-facing instructions (set via the admin category form's "Customer instructions" field), if any — shown alongside this product's details. Populated on detail reads only.</param>
+/// <param name="IsParentProduct">True when the admin marked this product as a parent: the storefront shows its lowest variant price and an "Explore options" button instead of its own price, stock and Add to cart.</param>
 /// <param name="RepresentativeSku">The lowest-<c>SortOrder</c> non-deleted variant's SKU, for display only (there is no "default variant" concept) — null if the product has no variants. Admin-only, like <see cref="PriceTiers"/>; populated on list reads.</param>
 public sealed record ProductDto(
     Guid Id,
@@ -75,7 +76,8 @@ public sealed record ProductDto(
     string? BadgeTextEn = null,
     string? BadgeTextAr = null,
     string? UsageInstructionsHtml = null,
-    string? BadgeColor = null);
+    string? BadgeColor = null,
+    bool IsParentProduct = false);
 
 /// <summary>
 /// Admin-only price overview across a product's variants (min–max; equal when there is a single price) so the

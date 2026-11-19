@@ -189,6 +189,15 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     public bool IsFavorite { get; private set; }
 
     /// <summary>
+    /// A parent product is only a doorway to its variants: the storefront never shows its own price or stock (it shows the
+    /// lowest variant price and an "Explore options" button instead of Add to cart). It changes how the product is
+    /// presented only; its variants, prices and stock are untouched.
+    /// </summary>
+    public bool IsParentProduct { get; private set; }
+
+    public void SetParentProduct(bool isParent) => IsParentProduct = isParent;
+
+    /// <summary>
     /// Short text (or number) the storefront shows on this product's card and page — "+3 Elite points", "NEW",
     /// "Best seller". Chosen by the admin per product; null means no badge. See <see cref="SetBadge"/>.
     /// </summary>
