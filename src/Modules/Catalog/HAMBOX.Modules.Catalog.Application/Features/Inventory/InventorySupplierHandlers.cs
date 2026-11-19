@@ -1,4 +1,4 @@
-using HAMBOX.Application.Abstractions;
+﻿using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Contracts;
@@ -177,7 +177,17 @@ public sealed record ImportInventoryCodesCommand(
     IReadOnlyList<string> Codes,
     string? Note = null) : IRequest<Result<ImportCodesResultDto>>;
 
-public sealed record ImportCodeDuplicateDto(string Code, string ProductName, string VariantName, string? BatchName);
+/// <param name="ProductId">The product the existing code lives in (null when its product was deleted), so the admin can open it.</param>
+/// <param name="AddedOnUtc">When the existing code was added.</param>
+/// <param name="AddedBy">The admin who added it ("Name (email)"), when known.</param>
+public sealed record ImportCodeDuplicateDto(
+    string Code,
+    string ProductName,
+    string VariantName,
+    string? BatchName,
+    Guid? ProductId = null,
+    DateTimeOffset? AddedOnUtc = null,
+    string? AddedBy = null);
 
 /// <param name="Position">1-based line number in what was submitted.</param>
 /// <param name="MaskedCode">The code with its middle hidden — enough to recognise it, never the secret.</param>
@@ -197,12 +207,14 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
     private readonly IInventoryEngine _engine;
     private readonly ICurrentUserService _currentUser;
     private readonly ICatalogDbContext _db;
+    private readonly IUserDirectory _users;
 
-    public ImportInventoryCodesCommandHandler(IInventoryEngine engine, ICurrentUserService currentUser, ICatalogDbContext db)
+    public ImportInventoryCodesCommandHandler(IInventoryEngine engine, ICurrentUserService currentUser, ICatalogDbContext db, IUserDirectory users)
     {
         _engine = engine;
         _currentUser = currentUser;
         _db = db;
+        _users = users;
     }
 
     public async Task<Result<ImportCodesResultDto>> Handle(ImportInventoryCodesCommand request, CancellationToken cancellationToken)
@@ -232,9 +244,7 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
                 _currentUser.UserId,
                 cancellationToken);
 
-            var duplicates = result.DuplicateDetails
-                .Select(d => new ImportCodeDuplicateDto(d.Code, d.ProductName, d.VariantSku, d.BatchName))
-                .ToList();
+            var duplicates = await DescribeDuplicatesAsync(result.DuplicateDetails, cancellationToken);
 
             var rejected = (result.Rejections ?? [])
                 .Select(r => new ImportCodeRejectionDto(r.Position, r.MaskedCode, r.Reason, r.Detail))
@@ -251,6 +261,37 @@ internal sealed class ImportInventoryCodesCommandHandler : IRequestHandler<Impor
         {
             return Result.Failure<ImportCodesResultDto>(CatalogErrors.VariantNotActive);
         }
+    }
+
+    /// <summary>For each refused duplicate: which product it is in, when it was added and which admin added it.</summary>
+    private async Task<List<ImportCodeDuplicateDto>> DescribeDuplicatesAsync(
+        IReadOnlyList<ImportCodeDuplicate> details, CancellationToken cancellationToken)
+    {
+        if (details.Count == 0)
+        {
+            return [];
+        }
+
+        var hashes = details.Select(d => DigitalInventoryCode.ComputeHash(d.Code)).Distinct().ToList();
+        var existing = await (
+            from code in _db.DigitalInventoryCodes.AsNoTracking()
+            join variant in _db.ProductVariants.IgnoreQueryFilters().AsNoTracking() on code.VariantId equals variant.Id into variants
+            from variant in variants.DefaultIfEmpty()
+            where hashes.Contains(code.CodeHash)
+            select new { code.CodeHash, code.CreatedOnUtc, code.CreatedBy, ProductId = variant == null ? (Guid?)null : variant.ProductId })
+            .ToListAsync(cancellationToken);
+        var byHash = existing.GroupBy(e => e.CodeHash).ToDictionary(g => g.Key, g => g.First());
+
+        var names = await _users.GetDisplayNamesAsync(
+            existing.Select(e => e.CreatedBy).Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!).Distinct().ToList(),
+            cancellationToken);
+
+        return details.Select(d =>
+        {
+            byHash.TryGetValue(DigitalInventoryCode.ComputeHash(d.Code), out var info);
+            var addedBy = info?.CreatedBy is { } by && names.TryGetValue(by, out var name) ? name : info?.CreatedBy;
+            return new ImportCodeDuplicateDto(d.Code, d.ProductName, d.VariantSku, d.BatchName, info?.ProductId, info?.CreatedOnUtc, addedBy);
+        }).ToList();
     }
 }
 
