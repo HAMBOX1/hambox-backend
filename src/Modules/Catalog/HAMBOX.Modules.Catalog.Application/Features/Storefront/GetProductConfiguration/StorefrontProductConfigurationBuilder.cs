@@ -60,7 +60,9 @@ internal static class StorefrontProductConfigurationBuilder
                 s?.IsLowStock ?? false,
                 !isPurchasable,
                 optionIds,
-                isCompleteCombination);
+                isCompleteCombination,
+                v.DescriptionHtml,
+                v.ShowDescriptionInline);
         }).ToList();
 
         return new StorefrontProductConfigurationDto(product.Id, product.Price, optionGroupDtos, variantDtos);

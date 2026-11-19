@@ -114,6 +114,12 @@ internal static class InventoryEndpoints
                 body.LowStockThreshold, body.OptionIds, body.CostPrice, body.MemberPrice)))
             .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
 
+        group.MapPut("/variants/{variantId:guid}/description", async (
+            Guid variantId,
+            [FromBody] SetVariantDescriptionRequest body,
+            ISender sender) => await SendEmpty(sender, new SetVariantDescriptionCommand(variantId, body.DescriptionHtml, body.ShowDescriptionInline ?? false)))
+            .RequirePermission(PermissionConstants.Catalog.Inventory.Edit);
+
         group.MapPut("/variants/{variantId:guid}/fulfillment-mode", async (
             Guid variantId,
             [FromBody] SetVariantFulfillmentModeRequest body,
@@ -566,6 +572,7 @@ internal sealed record SetProductVariantPricesRequest(string Field, decimal? Val
 internal sealed record ImportCodesRequest(IReadOnlyList<string> Codes, string? Note = null);
 
 internal sealed record SetVariantFulfillmentModeRequest(FulfillmentMode FulfillmentMode);
+internal sealed record SetVariantDescriptionRequest(string? DescriptionHtml, bool? ShowDescriptionInline = null);
 
 internal sealed record UpdateVariantRequest(
     string Sku,

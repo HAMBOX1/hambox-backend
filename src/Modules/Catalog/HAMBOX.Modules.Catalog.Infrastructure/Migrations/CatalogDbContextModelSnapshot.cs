@@ -1516,6 +1516,9 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("DescriptionHtml")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("FulfillmentMode")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1555,6 +1558,11 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ShowDescriptionInline")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Sku")
                         .IsRequired()

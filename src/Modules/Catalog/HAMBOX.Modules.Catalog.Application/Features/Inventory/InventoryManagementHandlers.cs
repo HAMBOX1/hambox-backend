@@ -188,6 +188,25 @@ internal sealed class UpdateProductVariantCommandHandler : IRequestHandler<Updat
     }
 }
 
+/// <summary>Sets the note shoppers see on the product page while this variant is selected (empty clears it).</summary>
+public sealed record SetVariantDescriptionCommand(Guid VariantId, string? DescriptionHtml, bool ShowDescriptionInline) : IRequest<Result>;
+
+internal sealed class SetVariantDescriptionCommandHandler(ICatalogDbContext db) : IRequestHandler<SetVariantDescriptionCommand, Result>
+{
+    public async Task<Result> Handle(SetVariantDescriptionCommand request, CancellationToken cancellationToken)
+    {
+        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => v.Id == request.VariantId && !v.IsDeleted, cancellationToken);
+        if (variant is null)
+        {
+            return Result.Failure(CatalogErrors.VariantNotFound);
+        }
+
+        variant.SetDescription(ProductOptionDescriptionSanitizer.Sanitize(request.DescriptionHtml), request.ShowDescriptionInline);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Success();
+    }
+}
+
 internal sealed class SetVariantFulfillmentModeCommandHandler : IRequestHandler<SetVariantFulfillmentModeCommand, Result>
 {
     private readonly ICatalogDbContext _db;

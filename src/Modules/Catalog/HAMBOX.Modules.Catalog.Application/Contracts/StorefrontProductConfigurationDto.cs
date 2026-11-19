@@ -17,4 +17,6 @@ public sealed record StorefrontVariantDto(
     bool IsLowStock,
     bool IsOutOfStock,
     IReadOnlyList<Guid> OptionIds,
-    bool IsCompleteCombination);
+    bool IsCompleteCombination,
+    string? DescriptionHtml = null,
+    bool ShowDescriptionInline = false);

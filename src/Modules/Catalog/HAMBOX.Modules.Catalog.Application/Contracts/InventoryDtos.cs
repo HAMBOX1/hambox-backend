@@ -51,7 +51,9 @@ public sealed record ProductVariantDto(
     IReadOnlyList<Guid> OptionIds,
     string FulfillmentMode,
     decimal? CostPrice = null,
-    decimal? MemberPrice = null);
+    decimal? MemberPrice = null,
+    string? DescriptionHtml = null,
+    bool ShowDescriptionInline = false);
 
 public sealed record GenerateProductVariantsResultDto(
     int CreatedCount,

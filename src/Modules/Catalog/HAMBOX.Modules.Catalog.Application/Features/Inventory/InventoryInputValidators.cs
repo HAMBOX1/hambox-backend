@@ -68,6 +68,15 @@ public sealed class UpdateProductOptionGroupCommandValidator : AbstractValidator
     }
 }
 
+public sealed class SetVariantDescriptionCommandValidator : AbstractValidator<SetVariantDescriptionCommand>
+{
+    public SetVariantDescriptionCommandValidator()
+    {
+        RuleFor(x => x.VariantId).NotEmpty();
+        RuleFor(x => x.DescriptionHtml).MaximumLength(InventoryLimits.DescriptionHtml);
+    }
+}
+
 public sealed class UpdateProductOptionCommandValidator : AbstractValidator<UpdateProductOptionCommand>
 {
     public UpdateProductOptionCommandValidator()

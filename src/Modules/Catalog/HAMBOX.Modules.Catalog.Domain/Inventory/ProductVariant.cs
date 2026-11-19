@@ -66,6 +66,22 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
     /// <see cref="FulfillmentMode"/>.
     /// </summary>
     public int? ManualDeliveryCapacity { get; private set; }
+    /// <summary>
+    /// Sanitized rich-text note shown to shoppers on the product page while this exact variant is selected (e.g.
+    /// "Delivered within 5 minutes; needs a Turkish account"). Distinct from the private after-purchase guide kept in
+    /// <c>ProductInstructions</c>, which only buyers can read.
+    /// </summary>
+    public string? DescriptionHtml { get; private set; }
+
+    /// <summary>Show <see cref="DescriptionHtml"/> right under the options instead of behind "Important information".</summary>
+    public bool ShowDescriptionInline { get; private set; }
+
+    public void SetDescription(string? descriptionHtml, bool showInline)
+    {
+        DescriptionHtml = descriptionHtml;
+        ShowDescriptionInline = descriptionHtml is not null && showInline;
+    }
+
     public bool IsDeleted { get; private set; }
     public DateTimeOffset? DeletedOnUtc { get; private set; }
     public string? CreatedBy { get; set; }
