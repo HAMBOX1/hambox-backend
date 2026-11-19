@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport.GetImportLookups;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -59,9 +59,20 @@ public sealed class CatalogWorkbookTabsTests
     }
 
     [Fact]
+    public void TheCategoriesTemplate_HasACategoriesTab_AndATabPerExistingCategory()
+    {
+        var names = SheetNames(new CatalogImportTemplateGenerator().Generate(CatalogImportEntityType.Categories, Lookups("Xbox", "Playstation")));
+
+        Assert.Contains("Categories", names);
+        Assert.Contains("Xbox", names);
+        Assert.Contains("Playstation", names);
+        Assert.Contains("Instructions", names);
+    }
+
+    [Fact]
     public void TheOtherEntityTemplates_StayASingleSheet()
     {
-        var file = new CatalogImportTemplateGenerator().Generate(CatalogImportEntityType.Categories, Lookups("Xbox"));
+        var file = new CatalogImportTemplateGenerator().Generate(CatalogImportEntityType.Collections, Lookups("Xbox"));
 
         Assert.DoesNotContain("Xbox", SheetNames(file));
     }

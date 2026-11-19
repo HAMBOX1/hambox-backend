@@ -68,7 +68,7 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
 
         // The Products workbook also gets one empty tab per category: a product typed on the "Xbox" tab is filed under Xbox
         // without filling the category column (the import reads the tab name as the category).
-        var categoryTabs = entityType == CatalogImportEntityType.Products
+        var categoryTabs = entityType is CatalogImportEntityType.Products or CatalogImportEntityType.Categories
             ? CatalogSheetNames.CategoryTabs(lookups.Categories.Select(c => c.Label))
             : [];
 
@@ -80,6 +80,14 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
                 foreach (var tab in categoryTabs)
                 {
                     BuildSheet(workbook, tab, ProductColumns, [], lookups);
+                }
+            }
+            else if (sheetName == "Categories")
+            {
+                // One tab per existing category: a row on the "Xbox" tab is a sub-category of Xbox (no need to fill ParentSlug).
+                foreach (var tab in categoryTabs)
+                {
+                    BuildSheet(workbook, tab, CategoryColumns, [], lookups);
                 }
             }
         }
@@ -279,7 +287,16 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
             }
         }
 
-        if (hasCategoryTabs)
+        if (hasCategoryTabs && sections.Any(s => s.SheetName == "Categories"))
+        {
+            instructions.Cell(row, 1).Value = "Note";
+            instructions.Cell(row, 4).Value =
+                "Category tabs: a tab named after an existing category (Xbox, Playstation...) holds that category's sub-categories, with the same columns as the Categories tab. " +
+                "A row there is filed under that category — you do not need to fill ParentSlug (if you do, it wins). Do not rename those tabs.";
+            row++;
+        }
+
+        if (hasCategoryTabs && sections.Any(s => s.SheetName == "Products"))
         {
             instructions.Cell(row, 1).Value = "Note";
             instructions.Cell(row, 4).Value =

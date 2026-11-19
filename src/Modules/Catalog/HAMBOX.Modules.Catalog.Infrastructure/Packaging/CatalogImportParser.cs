@@ -54,6 +54,11 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
                 []);
         }
 
+        if (entityType == CatalogImportEntityType.Categories)
+        {
+            return ToPackage(entityType, ReadCategoryRows(workbook), [], [], [], []);
+        }
+
         var sheet = FindSheet(workbook, entityType.ToString()) ?? workbook.Worksheets.FirstOrDefault();
         return ToPackage(entityType, ReadSheetRows(sheet), [], [], [], []);
     }
@@ -110,6 +115,37 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
                 if (string.IsNullOrWhiteSpace(Get(row, "CategorySlug")))
                 {
                     row["CategorySlug"] = category;
+                }
+
+                rows.Add(row);
+            }
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The category rows of a Categories workbook: the "Categories" tab, plus one tab per parent category (the tab name is the
+    /// parent), so a row there does not need a ParentSlug cell (a filled one still wins). A workbook with only a "Categories"
+    /// tab, or a single tab of any name, reads exactly as before.
+    /// </summary>
+    private static List<Dictionary<string, string>> ReadCategoryRows(XLWorkbook workbook)
+    {
+        var primary = FindSheet(workbook, "Categories");
+        if (primary is null && workbook.Worksheets.Count <= 1)
+        {
+            return ReadSheetRows(workbook.Worksheets.FirstOrDefault());
+        }
+
+        var rows = ReadSheetRows(primary);
+        foreach (var sheet in workbook.Worksheets.Where(s => !NonCategorySheets.Contains(s.Name.Trim())))
+        {
+            var parent = sheet.Name.Trim();
+            foreach (var row in ReadSheetRows(sheet))
+            {
+                if (string.IsNullOrWhiteSpace(Get(row, "ParentSlug")))
+                {
+                    row["ParentSlug"] = parent;
                 }
 
                 rows.Add(row);

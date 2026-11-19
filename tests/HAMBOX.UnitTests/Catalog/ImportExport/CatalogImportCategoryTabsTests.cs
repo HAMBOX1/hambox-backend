@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Catalog.Infrastructure.Packaging;
@@ -97,5 +97,41 @@ public sealed class CatalogImportCategoryTabsTests
         var package = await ParseAsync(workbook);
 
         Assert.Equal("games", Assert.Single(package.Products).CategorySlug);
+    }
+
+    private static async Task<ParsedCatalogPackage> ParseCategoriesAsync(XLWorkbook workbook)
+    {
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+        var parser = new CatalogImportParser(new HamboxPackageReader(Crypto));
+        return await parser.ParseAsync(stream, CatalogPackageFormat.Xlsx, CatalogImportEntityType.Categories, null, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ACategoriesWorkbook_ReadsEachExtraTabAsTheChildrenOfThatCategory()
+    {
+        using var workbook = new XLWorkbook();
+        string[] headers = ["Slug", "NameEn", "ParentSlug"];
+        AddSheet(workbook, "Categories", headers, ["gift-cards", "Gift Cards", ""]);
+        AddSheet(workbook, "Xbox", headers, ["xbox-gp", "Game Pass", ""], ["xbox-live", "Live", "Other Parent"]);
+
+        var package = await ParseCategoriesAsync(workbook);
+
+        Assert.Equal(3, package.Categories.Count);
+        Assert.Null(package.Categories.Single(c => c.Slug == "gift-cards").ParentSlug);
+        Assert.Equal("Xbox", package.Categories.Single(c => c.Slug == "xbox-gp").ParentSlug);
+        Assert.Equal("Other Parent", package.Categories.Single(c => c.Slug == "xbox-live").ParentSlug);
+    }
+
+    [Fact]
+    public async Task ASingleSheetCategoriesWorkbook_ReadsAsBefore()
+    {
+        using var workbook = new XLWorkbook();
+        AddSheet(workbook, "Whatever", ["Slug", "NameEn"], ["a", "A"], ["b", "B"]);
+
+        var package = await ParseCategoriesAsync(workbook);
+
+        Assert.Equal(2, package.Categories.Count);
     }
 }
