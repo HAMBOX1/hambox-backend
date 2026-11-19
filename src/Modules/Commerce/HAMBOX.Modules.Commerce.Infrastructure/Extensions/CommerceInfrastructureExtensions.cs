@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Application.Idempotency;
 using HAMBOX.Infrastructure.Persistence.Interceptors;
@@ -31,6 +31,7 @@ public static class CommerceInfrastructureExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddScoped<HAMBOX.Application.Abstractions.ICustomerActivityReader, CustomerActivityReader>();
         var connectionString = configuration.GetConnectionString("Database");
         services.AddDbContext<CommerceDbContext>((sp, options) =>
             options.UseSqlServer(connectionString,

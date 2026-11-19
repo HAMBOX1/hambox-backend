@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using HAMBOX.Modules.Identity.Presentation.Endpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -26,6 +26,7 @@ public static class IdentityEndpointExtensions
         builder.MapRoleEndpoints(apiVersionSet);
         builder.MapSettingsEndpoints(apiVersionSet);
         builder.MapSecurityEndpoints(apiVersionSet);
+        builder.MapCustomerEndpoints(apiVersionSet);
         return builder;
     }
 }
