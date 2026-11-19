@@ -1,4 +1,4 @@
-using HAMBOX.Application.Abstractions;
+﻿using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
@@ -32,11 +32,21 @@ internal sealed class CustomerActivityReader(ICommerceDbContext db) : ICustomerA
             })
             .ToDictionaryAsync(x => x.UserId, cancellationToken);
 
-        var points = await db.PointsTransactions.AsNoTracking()
-            .Where(p => ids.Contains(p.UserId))
-            .GroupBy(p => p.UserId)
-            .Select(g => new { UserId = g.Key, Balance = g.Sum(p => p.Points) })
-            .ToDictionaryAsync(x => x.UserId, x => x.Balance, cancellationToken);
+        // The purchase-points ledger is a newer table: where its migration has not been applied yet there is simply no
+        // balance to show (SQL error 208 = invalid object name), so the Customers screen still loads.
+        Dictionary<string, int> points;
+        try
+        {
+            points = await db.PointsTransactions.AsNoTracking()
+                .Where(p => ids.Contains(p.UserId))
+                .GroupBy(p => p.UserId)
+                .Select(g => new { UserId = g.Key, Balance = g.Sum(p => p.Points) })
+                .ToDictionaryAsync(x => x.UserId, x => x.Balance, cancellationToken);
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 208)
+        {
+            points = [];
+        }
 
         var referrals = await db.ReferralProfiles.AsNoTracking()
             .Where(r => ids.Contains(r.UserId))
