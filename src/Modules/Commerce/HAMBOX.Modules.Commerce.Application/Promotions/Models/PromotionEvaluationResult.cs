@@ -10,7 +10,9 @@ public sealed record PromotionEvaluationResult(
     decimal Total,
     int ItemCount,
     IReadOnlyList<AppliedPromotionDto> AppliedPromotions,
-    IReadOnlyList<string> ValidationErrors)
+    IReadOnlyList<string> ValidationErrors,
+    int StarsRedeemed = 0,
+    decimal StarsDiscount = 0m)
 {
     public static PromotionEvaluationResult Empty =>
         new(0m, 0m, 0m, 0m, 0, [], []);

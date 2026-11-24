@@ -5,6 +5,7 @@ using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Memberships;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Promotions;
 using HAMBOX.Modules.Commerce.Application.Promotions.Models;
 using HAMBOX.Modules.Commerce.Application.Services;
@@ -25,14 +26,18 @@ internal sealed class CartResponseBuilder
     private readonly ICurrentUserService _currentUserService;
     private readonly IPaymentGatewayConfigurationProvider _paymentGatewaySettings;
 
+    private readonly StarsCheckoutService? _starsCheckout;
+
     public CartResponseBuilder(
         ICommerceDbContext commerceDbContext,
         ICatalogDbContext catalogDbContext,
         IPromotionEngine promotionEngine,
         IMembershipEngine membershipEngine,
         ICurrentUserService currentUserService,
-        IPaymentGatewayConfigurationProvider paymentGatewaySettings)
+        IPaymentGatewayConfigurationProvider paymentGatewaySettings,
+        StarsCheckoutService? starsCheckout = null)
     {
+        _starsCheckout = starsCheckout;
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _promotionEngine = promotionEngine;
@@ -89,7 +94,22 @@ internal sealed class CartResponseBuilder
             taxRateOverridePercent);
 
         var evaluation = await _promotionEngine.EvaluateAsync(context, cancellationToken);
-        return (evaluation.Subtotal, evaluation.TotalDiscount, evaluation.Tax, evaluation.Total, evaluation);
+
+        // Stars are applied last, on the final payable total, so promotions/membership/coupons are priced exactly as before.
+        var stars = _starsCheckout is null
+            ? StarsRedemptionQuote.None
+            : await _starsCheckout.QuoteAsync(cart.StarsToRedeem, evaluation.Total, cancellationToken);
+        if (stars.Stars > 0)
+        {
+            evaluation = evaluation with { StarsRedeemed = stars.Stars, StarsDiscount = stars.DiscountUsd };
+        }
+
+        return (
+            evaluation.Subtotal,
+            evaluation.TotalDiscount + evaluation.StarsDiscount,
+            evaluation.Tax,
+            evaluation.Total - evaluation.StarsDiscount,
+            evaluation);
     }
 
     private async Task<IReadOnlyDictionary<Guid, Product>> LoadProductsAsync(

@@ -1,6 +1,7 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Contracts.Account;
+using HAMBOX.Modules.Commerce.Application.Features.Cart.SetCartStars;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.AddCartItem;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.ApplyCartCoupon;
 using HAMBOX.Modules.Commerce.Application.Features.Cart.RemoveCartCoupon;
@@ -177,6 +178,26 @@ internal static class CartEndpoints
             });
         })
         .WithName("MergeCart")
+        .RequireAuthorization()
+        .RequireCustomerContext();
+
+        group.MapPut("cart/stars", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (
+            [FromBody] SetCartStarsRequest request,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new SetCartStarsCommand(request.Stars));
+
+            return result.IsSuccess
+                ? TypedResults.NoContent()
+                : TypedResults.BadRequest(new ProblemDetails
+                {
+                    Title = "Bad Request",
+                    Detail = result.Error.Description,
+                    Type = result.Error.Code,
+                    Status = StatusCodes.Status400BadRequest
+                });
+        })
+        .WithName("SetCartStars")
         .RequireAuthorization()
         .RequireCustomerContext();
 
@@ -436,3 +457,5 @@ internal sealed record ApplyCartCouponRequest(string CouponCode, string? Country
 internal sealed record CheckoutRequest(string Email, string Country, string PaymentMethod);
 
 internal sealed record MembershipHostedCheckoutRequest(Guid PlanId, string Action, string Gateway, string Email, string Country, string? Wallet = null);
+
+internal sealed record SetCartStarsRequest(int Stars);

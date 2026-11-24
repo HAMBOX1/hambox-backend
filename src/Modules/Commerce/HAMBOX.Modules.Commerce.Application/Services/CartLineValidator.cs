@@ -42,7 +42,8 @@ internal sealed record CartLineValidationResult(IReadOnlyList<ResolvedLinePricin
 internal sealed class CartLineValidator(
     IInventoryEngine inventoryEngine,
     IFulfillmentRouter fulfillmentRouter,
-    ISupplierPricingEngine supplierPricingEngine)
+    ISupplierPricingEngine supplierPricingEngine,
+    HAMBOX.Modules.Commerce.Application.Memberships.PriceSlotService? priceSlots = null)
 {
     public async Task<Result<CartLineValidationResult>> ValidateAsync(
         ShoppingCart cart,
@@ -54,6 +55,11 @@ internal sealed class CartLineValidator(
         CancellationToken cancellationToken)
     {
         var resolvedLines = new List<ResolvedLinePricing>();
+
+        // ELITE price slots: null = unlimited (no slot benefit); otherwise the member price is used only while slots remain.
+        int? slotsLeft = access.SubscriptionId.HasValue && priceSlots is not null && cart.UserId is { } slotUser
+            ? await priceSlots.GetRemainingAsync(slotUser, cancellationToken)
+            : null;
 
         foreach (var item in cart.Items)
         {
@@ -127,7 +133,7 @@ internal sealed class CartLineValidator(
                     resolvedLines.Add(new ResolvedLinePricing(
                         item.ProductId,
                         variantId,
-                        EffectivePriceResolver.Resolve(variant, product, winner?.SellingPrice),
+                        MemberPriced(EffectivePriceResolver.Resolve(variant, product, winner?.SellingPrice), variant, access, item.Quantity, ref slotsLeft),
                         winner?.SupplierId,
                         winner?.SupplierProductMappingId,
                         winner?.CostInBaseCurrency,
@@ -136,7 +142,7 @@ internal sealed class CartLineValidator(
                 else
                 {
                     resolvedLines.Add(new ResolvedLinePricing(
-                        item.ProductId, variantId, EffectivePriceResolver.Resolve(variant, product), null, null, null, null));
+                        item.ProductId, variantId, MemberPriced(EffectivePriceResolver.Resolve(variant, product), variant, access, item.Quantity, ref slotsLeft), null, null, null, null));
                 }
             }
             else if (await inventoryEngine.ProductHasVariantsAsync(item.ProductId, cancellationToken))
@@ -170,5 +176,29 @@ internal sealed class CartLineValidator(
             var existing = cart.Items.First(i => i.ProductId == resolved.ProductId && i.ProductVariantId == resolved.ProductVariantId);
             cart.AddOrUpdateItem(resolved.ProductId, existing.Quantity, resolved.UnitPrice, resolved.ProductVariantId);
         }
+    }
+
+    /// <summary>
+    /// ELITE member price (EL-05): an active ELITE subscriber pays the variant's member price when it is lower than the price
+    /// they would otherwise pay. Anyone else, or a variant with no member price, is unaffected.
+    /// </summary>
+    private static decimal MemberPriced(decimal price, ProductVariant variant, MembershipAccessInfo access, int quantity, ref int? slotsLeft)
+    {
+        if (!access.SubscriptionId.HasValue || variant.MemberPrice is not { } member || member <= 0m || member >= price)
+        {
+            return price;
+        }
+
+        if (slotsLeft is { } left)
+        {
+            if (left < quantity)
+            {
+                return price;
+            }
+
+            slotsLeft = left - quantity;
+        }
+
+        return member;
     }
 }

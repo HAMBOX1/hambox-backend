@@ -63,6 +63,17 @@ internal sealed class UpdateCategoryCommandHandler : IRequestHandler<UpdateCateg
             category.Deactivate();
         }
 
+        // Null means "leave as is", so older clients that never send these fields keep working.
+        if (request.IsDraft is { } isDraft)
+        {
+            category.SetDraft(isDraft);
+        }
+
+        if (request.DescriptionAr is not null)
+        {
+            category.SetDescriptionAr(request.DescriptionAr);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

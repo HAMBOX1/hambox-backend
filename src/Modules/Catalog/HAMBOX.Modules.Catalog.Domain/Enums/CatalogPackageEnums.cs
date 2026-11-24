@@ -41,6 +41,7 @@ public enum CatalogImportEntityType
     Inventory = 3,
     Codes = 4,
     Collections = 5,
+    Pricing = 6,
 }
 
 public enum CatalogDuplicateStrategy

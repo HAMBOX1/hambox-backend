@@ -1,7 +1,10 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.PlatformSettings;
+using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
+using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Account;
+using HAMBOX.Modules.Commerce.Domain.Memberships;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +22,10 @@ namespace HAMBOX.Modules.Commerce.Application.Points;
 public sealed class PurchasePointsService(
     ICommerceDbContext db,
     IPlatformSettingsProvider platformSettings,
-    ILogger<PurchasePointsService> logger)
+    ILogger<PurchasePointsService> logger,
+    ICatalogDbContext? catalog = null,
+    IMembershipEngine? membershipEngine = null,
+    IUserDirectory? users = null)
 {
     /// <summary>
     /// Credits points for a paid, completed order at the rate configured right now. A no-op when the program is
@@ -37,8 +43,25 @@ public sealed class PurchasePointsService(
                 return;
             }
 
+            // B2B-04: a wholesale order does not earn Stars unless its business account was made eligible.
+            if (order.PaymentMethod == "b2b"
+                && !await db.BusinessAccounts.AsNoTracking().AnyAsync(a => a.UserId == order.UserId && a.StarsEligible, cancellationToken))
+            {
+                return;
+            }
+
             var eligibleAmount = EligibleAmountUsd(order, settings.AmountBasis);
-            var points = (int)Math.Min(Math.Floor(eligibleAmount * settings.PointsPerUsd), int.MaxValue);
+            var now = DateTimeOffset.UtcNow;
+            var rules = await db.StarsEarnRules.AsNoTracking().Where(r => r.IsActive).ToListAsync(cancellationToken);
+            var elite = await ResolveEliteBonusAsync(order.UserId, cancellationToken);
+            var (audience, rankOrders) = await ResolveAudienceAsync(order.UserId, elite.IsElite, rules.Count > 0, cancellationToken);
+            var lines = await BuildLinesAsync(order, rules.Count > 0, cancellationToken);
+            var context = rules.Any(r => r.Condition != StarsRuleCondition.None) ? await BuildContextAsync(order, eligibleAmount, now, cancellationToken) : null;
+            var limits = await BuildLimitsAsync(order.UserId, rules, cancellationToken);
+            var result = StarsEarnCalculator.CalculateDetailed(
+                lines, eligibleAmount, settings.PointsPerUsd, rules, now, audience, rankOrders, context, limits,
+                settings.StackingMode, settings.MaxMultiplier);
+            var points = elite.Apply(result.Total);
             if (points <= 0)
             {
                 return;
@@ -50,8 +73,18 @@ public sealed class PurchasePointsService(
                 return;
             }
 
+            // ST-04: delivery is complete (this runs on completion); a configured hold keeps the credit Pending until it passes.
+            var held = settings.HoldDays > 0;
             db.PointsTransactions.Add(PointsTransaction.Earn(
-                order.UserId, order.Id, order.OrderNumber, points, eligibleAmount, settings.PointsPerUsd));
+                order.UserId, order.Id, order.OrderNumber, points, eligibleAmount, settings.PointsPerUsd,
+                held ? StarsStatus.Pending : StarsStatus.Available,
+                held ? now.AddDays(settings.HoldDays) : null,
+                settings.ExpiryDays > 0 ? now.AddDays(settings.HoldDays + settings.ExpiryDays) : null));
+            foreach (var (ruleId, stars) in result.PerRule.Where(p => p.Value > 0))
+            {
+                db.StarsRuleAwards.Add(StarsRuleAward.Create(ruleId, order.UserId, order.Id, stars));
+            }
+
             await db.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
@@ -76,13 +109,21 @@ public sealed class PurchasePointsService(
     {
         try
         {
-            var earned = await db.PointsTransactions
-                .Where(t => t.OrderId == order.Id && t.Type == PointsTransactionType.Earned)
-                .Select(t => t.Points)
-                .FirstOrDefaultAsync(cancellationToken);
+            var earnRow = await db.PointsTransactions
+                .FirstOrDefaultAsync(t => t.OrderId == order.Id && t.Type == PointsTransactionType.Earned, cancellationToken);
+            var earned = earnRow?.Points ?? 0;
 
             if (earned <= 0)
             {
+                return;
+            }
+
+            // Never spendable yet, so there is nothing to claw back: void the credit instead of adding a negative row.
+            // ponytail: a partial refund voids the whole pending credit; split it if clients object.
+            if (earnRow!.Status == StarsStatus.Pending)
+            {
+                earnRow.Cancel();
+                await db.SaveChangesAsync(cancellationToken);
                 return;
             }
 
@@ -106,6 +147,13 @@ public sealed class PurchasePointsService(
 
             db.PointsTransactions.Add(PointsTransaction.Reverse(
                 order.UserId, order.Id, order.OrderNumber, delta, target, reason));
+
+            // A fully reversed order gives its campaign budget back.
+            if (target >= earned)
+            {
+                db.StarsRuleAwards.RemoveRange(await db.StarsRuleAwards.Where(a => a.OrderId == order.Id).ToListAsync(cancellationToken));
+            }
+
             await db.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
@@ -116,6 +164,116 @@ public sealed class PurchasePointsService(
         {
             logger.LogError(ex, "Could not reverse purchase points for order {OrderNumber}.", order.OrderNumber);
         }
+    }
+
+    private async Task<StarsOrderContext> BuildContextAsync(Order order, decimal eligibleAmount, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var prior = db.Orders.AsNoTracking().Where(o =>
+            o.UserId == order.UserId && o.Id != order.Id && o.Kind == OrderKind.Product && o.Status == OrderStatus.Completed && o.PaymentStatus == PaymentStatus.Paid);
+        var count = await prior.CountAsync(cancellationToken);
+        var last = count == 0 ? null : await prior.MaxAsync(o => (DateTimeOffset?)o.CreatedOnUtc, cancellationToken);
+
+        var anniversary = false;
+        if (users is not null && await users.GetRegisteredOnAsync(order.UserId, cancellationToken) is { } registered)
+        {
+            var thisYear = new DateTimeOffset(now.Year, Math.Min(registered.Month, 12), Math.Min(registered.Day, DateTime.DaysInMonth(now.Year, registered.Month)), 0, 0, 0, TimeSpan.Zero);
+            anniversary = now.Year > registered.Year && Math.Abs((now - thisYear).TotalDays) <= 3;
+        }
+
+        return new StarsOrderContext(
+            eligibleAmount,
+            order.Items.Sum(i => i.Quantity),
+            count,
+            last is { } l ? (int)(now - l).TotalDays : null,
+            anniversary,
+            order.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).ToHashSet());
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, StarsRuleLimit>> BuildLimitsAsync(
+        string userId, IReadOnlyList<StarsEarnRule> rules, CancellationToken cancellationToken)
+    {
+        var limited = rules.Where(r => r.BudgetStars is not null || r.MaxStarsPerCustomer is not null).ToList();
+        if (limited.Count == 0)
+        {
+            return new Dictionary<Guid, StarsRuleLimit>();
+        }
+
+        var ids = limited.Select(r => r.Id).ToList();
+        var campaign = await db.StarsRuleAwards.AsNoTracking().Where(a => ids.Contains(a.RuleId))
+            .GroupBy(a => a.RuleId).Select(g => new { g.Key, Sum = g.Sum(a => a.Stars) }).ToDictionaryAsync(x => x.Key, x => x.Sum, cancellationToken);
+        var customer = await db.StarsRuleAwards.AsNoTracking().Where(a => ids.Contains(a.RuleId) && a.UserId == userId)
+            .GroupBy(a => a.RuleId).Select(g => new { g.Key, Sum = g.Sum(a => a.Stars) }).ToDictionaryAsync(x => x.Key, x => x.Sum, cancellationToken);
+
+        return limited.ToDictionary(
+            r => r.Id,
+            r => new StarsRuleLimit(
+                r.BudgetStars is { } b ? Math.Max(b - campaign.GetValueOrDefault(r.Id), 0) : null,
+                r.MaxStarsPerCustomer is { } c ? Math.Max(c - customer.GetValueOrDefault(r.Id), 0) : null));
+    }
+
+    private readonly record struct EliteBonus(bool IsElite, decimal Percent)
+    {
+        public int Apply(int points) =>
+            Percent > 0m && points > 0 ? (int)Math.Min(Math.Floor(points * (1m + Percent / 100m)), int.MaxValue) : points;
+    }
+
+    /// <summary>ELITE membership state: whether the customer holds an active subscription, and the plan's "Bonus Stars" percentage.</summary>
+    private async Task<EliteBonus> ResolveEliteBonusAsync(string userId, CancellationToken cancellationToken)
+    {
+        if (membershipEngine is null)
+        {
+            return default;
+        }
+
+        var features = await platformSettings.GetAsync<FeatureCenterSettingsPayload>(PlatformSettingsCategoryKeys.Features, cancellationToken);
+        if (!features.EliteSubscription)
+        {
+            return default;
+        }
+
+        var snapshot = await membershipEngine.ResolveAsync(userId, cancellationToken);
+        if (snapshot.SubscriptionId == Guid.Empty)
+        {
+            return default;
+        }
+
+        var bonus = snapshot.Benefits.FirstOrDefault(b => b.Type.Equals(nameof(MembershipBenefitType.BonusStars), StringComparison.OrdinalIgnoreCase))?.Value;
+        return new EliteBonus(
+            true,
+            decimal.TryParse(bonus, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var percent) ? percent : 0m);
+    }
+
+    private async Task<(StarsAudience Audience, IReadOnlyDictionary<string, int>? RankOrders)> ResolveAudienceAsync(
+        string userId, bool isElite, bool anyRules, CancellationToken cancellationToken)
+    {
+        if (!anyRules)
+        {
+            return (new StarsAudience(0, isElite), null);
+        }
+
+        var orders = await db.LoyaltyRanks.AsNoTracking().ToDictionaryAsync(r => r.Key, r => r.SortOrder, cancellationToken);
+        var key = await db.CustomerLoyaltyRanks.AsNoTracking().Where(r => r.UserId == userId).Select(r => r.RankKey).FirstOrDefaultAsync(cancellationToken);
+        return (new StarsAudience(key is not null && orders.TryGetValue(key, out var order) ? order : 0, isElite), orders);
+    }
+
+    private async Task<List<StarsEarnLine>> BuildLinesAsync(Order order, bool needCategories, CancellationToken cancellationToken)
+    {
+        var categories = new Dictionary<Guid, Guid>();
+        if (needCategories && catalog is not null)
+        {
+            var ids = order.Items.Where(i => i.ProductId.HasValue).Select(i => i.ProductId!.Value).Distinct().ToList();
+            categories = await catalog.Products.AsNoTracking()
+                .Where(p => ids.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.CategoryId, cancellationToken);
+        }
+
+        return order.Items
+            .Select(i => new StarsEarnLine(
+                i.ProductId,
+                i.ProductId is { } id && categories.TryGetValue(id, out var cat) ? cat : null,
+                i.Quantity,
+                i.LineTotal))
+            .ToList();
     }
 
     // Paid and still live. Completed implies paid, but the payment check keeps this safe if a caller ever passes

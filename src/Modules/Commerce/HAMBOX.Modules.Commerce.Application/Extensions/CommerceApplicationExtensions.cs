@@ -29,6 +29,17 @@ public static class CommerceApplicationExtensions
         services.AddScoped<MembershipOperationsService>();
         services.AddScoped<ReferralRewardService>();
         services.AddScoped<PurchasePointsService>();
+        services.AddScoped<StarsLedgerService>();
+        services.AddScoped<Features.Cosmetics.CosmeticService>();
+        services.AddScoped<Memberships.PriceSlotService>();
+        services.AddScoped<Features.Loyalty.LoyaltyReportService>();
+        services.AddScoped<Features.Missions.MissionService>();
+        services.AddScoped<Archive.LegacyArchiveService>();
+        services.AddScoped<HAMBOX.Application.Loyalty.ILoyaltyRankProvider, Loyalty.LoyaltyRankProvider>();
+        services.AddScoped<StarsCampaignService>();
+        services.AddScoped<StarsCheckoutService>();
+        services.AddScoped<Rewards.RewardRedemptionService>();
+        services.AddScoped<Loyalty.LoyaltyRankService>();
         services.AddScoped<ReferralLifecycleService>();
         services.AddScoped<IReferralRedemptionService>(sp => sp.GetRequiredService<ReferralLifecycleService>());
         services.AddScoped<OrderFulfillmentService>();

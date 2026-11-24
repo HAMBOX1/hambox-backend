@@ -48,6 +48,29 @@ public sealed class FilterSheetImportTests
             .Handle(new ImportProductFiltersCommand(sheet, "sheet.xlsx", hash, mode, allowNew, apply), CancellationToken.None);
 
     [Fact]
+    public async Task SeveralSkusOfOneProduct_AddUpTheirValues_AndCommasSeparateThem()
+    {
+        var (db, products) = await SeedAsync(1);
+        var variant = ProductVariant.Create(products[0].Id, "SKU-1B");
+        variant.Activate();
+        db.ProductVariants.Add(variant);
+        await db.SaveChangesAsync();
+        // The client's layout: the parent row carries the genres, a variant row carries its region.
+        var sheet = Sheet(
+            ["SKU", "ProductName", "Game Mode", "Region"],
+            ["SKU-1", "Product 1", "Single Player, Multiplayer", ""],
+            ["SKU-1B", "Product 1 US", "", "US"]);
+
+        var result = (await RunAsync(db, sheet, apply: true)).Value;
+
+        Assert.Empty(result.Errors);
+        Assert.Empty(result.Warnings);
+        Assert.True(result.Applied);
+        Assert.Equal(1, result.ProductsToChange);
+        Assert.Equal(3, await db.ProductFilterValues.CountAsync());
+    }
+
+    [Fact]
     public async Task APreviewChangesNothing_AndShowsOldAndNewValues()
     {
         var (db, products) = await SeedAsync();

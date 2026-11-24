@@ -10,6 +10,7 @@ using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Options;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -40,7 +41,8 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
     DotFawryPaymentVerificationService verificationService,
     ILogger<InitiateDotFawryCheckoutCommandHandler> logger,
     OrderStockHoldService? stockHold = null,
-    PurchaseControlService? purchaseControl = null)
+    PurchaseControlService? purchaseControl = null,
+    StarsCheckoutService? starsCheckout = null)
     : IRequestHandler<InitiateDotFawryCheckoutCommand, Result<DotFawryCheckoutInitiationDto>>
 {
     public async Task<Result<DotFawryCheckoutInitiationDto>> Handle(
@@ -190,6 +192,11 @@ internal sealed class InitiateDotFawryCheckoutCommandHandler(
             taxAmount,
             totalAmount,
             orderItems);
+
+        if (starsCheckout is not null)
+        {
+            await starsCheckout.ReserveAsync(order, evaluation, cancellationToken);
+        }
 
         if (purchaseControl is not null)
         {

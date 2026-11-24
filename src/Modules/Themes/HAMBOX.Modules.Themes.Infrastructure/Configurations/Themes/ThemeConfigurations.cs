@@ -90,6 +90,17 @@ internal sealed class ThemeAssignmentConfiguration : IEntityTypeConfiguration<Th
     }
 }
 
+internal sealed class UserThemePreferenceConfiguration : IEntityTypeConfiguration<UserThemePreference>
+{
+    public void Configure(EntityTypeBuilder<UserThemePreference> builder)
+    {
+        builder.ToTable("UserThemePreferences");
+        builder.HasKey(p => p.Id);
+        builder.Property(p => p.UserId).IsRequired().HasMaxLength(450);
+        builder.HasIndex(p => p.UserId).IsUnique().HasDatabaseName("UX_UserThemePreferences_UserId");
+    }
+}
+
 internal sealed class ThemeAssetConfiguration : IEntityTypeConfiguration<ThemeAsset>
 {
     public void Configure(EntityTypeBuilder<ThemeAsset> builder)

@@ -32,6 +32,7 @@ public static class CommerceInfrastructureExtensions
         IConfiguration configuration)
     {
         services.AddScoped<HAMBOX.Application.Abstractions.ICustomerActivityReader, CustomerActivityReader>();
+        services.AddSingleton<HAMBOX.Modules.Commerce.Application.Archive.ILegacyArchiveParser, LegacyArchiveParser>();
         var connectionString = configuration.GetConnectionString("Database");
         services.AddDbContext<CommerceDbContext>((sp, options) =>
             options.UseSqlServer(connectionString,
@@ -143,6 +144,8 @@ public static class CommerceInfrastructureExtensions
         services.AddScoped<IBackgroundJobHandler, GenerateOperationalAlertsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, SupplierHealthCheckJobHandler>();
         services.AddScoped<IBackgroundJobHandler, BackInStockAlertJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, MembershipLifecycleJobHandler>();
+        services.AddScoped<IBackgroundJobHandler, StarsLifecycleJobHandler>();
         services.AddScoped<IBackgroundJobHandler, PriceDropAlertJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotPaymentsJobHandler>();
         services.AddScoped<IBackgroundJobHandler, ReconcileDotFawryPaymentsJobHandler>();

@@ -195,6 +195,17 @@ public sealed class Product : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public bool IsParentProduct { get; private set; }
 
+    /// <summary>Extra text shown under the description (plan details, restrictions); empty when there is none.</summary>
+    public string? AdditionalDescriptionEn { get; private set; }
+
+    public string? AdditionalDescriptionAr { get; private set; }
+
+    public void SetAdditionalDescription(string? en, string? ar)
+    {
+        AdditionalDescriptionEn = string.IsNullOrWhiteSpace(en) ? null : en.Trim();
+        AdditionalDescriptionAr = string.IsNullOrWhiteSpace(ar) ? null : ar.Trim();
+    }
+
     public void SetParentProduct(bool isParent) => IsParentProduct = isParent;
 
     /// <summary>

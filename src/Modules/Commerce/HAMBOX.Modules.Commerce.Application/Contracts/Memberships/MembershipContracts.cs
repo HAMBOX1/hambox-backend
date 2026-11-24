@@ -31,7 +31,8 @@ public sealed record MembershipPlanDetailDto(
     IReadOnlyList<MembershipBenefitDto> Benefits,
     IReadOnlyList<Guid> ExclusiveProductIds,
     IReadOnlyList<Guid> UnlockedThemeIds,
-    DateTimeOffset CreatedOnUtc);
+    DateTimeOffset CreatedOnUtc,
+    int DurationMonths = 0);
 
 public sealed record CreateMembershipPlanRequest(
     string Name,
@@ -45,7 +46,8 @@ public sealed record CreateMembershipPlanRequest(
     bool IsDefault,
     IReadOnlyList<MembershipBenefitDto>? Benefits,
     IReadOnlyList<Guid>? ExclusiveProductIds,
-    IReadOnlyList<Guid>? UnlockedThemeIds);
+    IReadOnlyList<Guid>? UnlockedThemeIds,
+    int DurationMonths = 0);
 
 public sealed record UpdateMembershipPlanRequest(
     string Name,
@@ -58,7 +60,8 @@ public sealed record UpdateMembershipPlanRequest(
     string? ThemeKey,
     IReadOnlyList<MembershipBenefitDto>? Benefits,
     IReadOnlyList<Guid>? ExclusiveProductIds,
-    IReadOnlyList<Guid>? UnlockedThemeIds);
+    IReadOnlyList<Guid>? UnlockedThemeIds,
+    int DurationMonths = 0);
 
 public sealed record AssignMembershipRequest(string UserId, Guid PlanId, bool AutoRenew);
 

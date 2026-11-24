@@ -37,11 +37,17 @@ public sealed class MembershipSubscription : AggregateRoot
     public DateTime? CancelledOnUtc { get; private set; }
     public bool AutoRenew { get; private set; }
 
+    /// <summary>When the "ends soon" reminder went out for the current period; cleared on renewal so the next period gets its own.</summary>
+    public DateTime? ExpiryReminderSentOnUtc { get; private set; }
+
+    public void MarkReminderSent() => ExpiryReminderSentOnUtc = DateTime.UtcNow;
+
     public static MembershipSubscription Create(
         string userId,
         Guid planId,
         int durationDays,
-        bool autoRenew = false)
+        bool autoRenew = false,
+        int durationMonths = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         var now = DateTime.UtcNow;
@@ -50,7 +56,7 @@ public sealed class MembershipSubscription : AggregateRoot
             userId,
             planId,
             now,
-            now.AddDays(durationDays),
+            Advance(now, durationDays, durationMonths),
             autoRenew,
             MembershipSubscriptionStatus.Active);
     }
@@ -72,7 +78,7 @@ public sealed class MembershipSubscription : AggregateRoot
             MembershipSubscriptionStatus.PendingPayment);
     }
 
-    public void Activate(int durationDays)
+    public void Activate(int durationDays, int durationMonths = 0)
     {
         if (Status is MembershipSubscriptionStatus.Cancelled)
         {
@@ -81,7 +87,8 @@ public sealed class MembershipSubscription : AggregateRoot
 
         var now = DateTime.UtcNow;
         StartsOnUtc = now;
-        ExpiresOnUtc = now.AddDays(durationDays);
+        ExpiresOnUtc = Advance(now, durationDays, durationMonths);
+        ExpiryReminderSentOnUtc = null;
         Status = MembershipSubscriptionStatus.Active;
         CancelledOnUtc = null;
     }
@@ -98,7 +105,7 @@ public sealed class MembershipSubscription : AggregateRoot
         AutoRenew = false;
     }
 
-    public void Renew(int durationDays)
+    public void Renew(int durationDays, int durationMonths = 0)
     {
         if (Status == MembershipSubscriptionStatus.Cancelled)
         {
@@ -106,15 +113,16 @@ public sealed class MembershipSubscription : AggregateRoot
         }
 
         var baseDate = ExpiresOnUtc < DateTime.UtcNow ? DateTime.UtcNow : ExpiresOnUtc;
-        ExpiresOnUtc = baseDate.AddDays(durationDays);
+        ExpiresOnUtc = Advance(baseDate, durationDays, durationMonths);
+        ExpiryReminderSentOnUtc = null;
         Status = MembershipSubscriptionStatus.Active;
         CancelledOnUtc = null;
     }
 
-    public void ChangePlan(Guid newPlanId, int durationDays)
+    public void ChangePlan(Guid newPlanId, int durationDays, int durationMonths = 0)
     {
         PlanId = newPlanId;
-        Renew(durationDays);
+        Renew(durationDays, durationMonths);
     }
 
     public void Cancel()
@@ -131,6 +139,8 @@ public sealed class MembershipSubscription : AggregateRoot
             Status = MembershipSubscriptionStatus.Expired;
         }
     }
+
+    private static DateTime Advance(DateTime from, int days, int months) => months > 0 ? from.AddMonths(months) : from.AddDays(days);
 
     public bool IsActiveAt(DateTime utcNow) =>
         Status == MembershipSubscriptionStatus.Active && utcNow < ExpiresOnUtc;

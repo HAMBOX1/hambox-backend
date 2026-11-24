@@ -44,8 +44,14 @@ internal static class PlatformSettingsPayloadRules
             [PlatformSettingsCategoryKeys.Referral] =
             [
                 ("pointsPerReferral", 0, 10_000_000), ("pointValueUsd", 0, 10_000), ("rewardExpiryDays", 0, 3650),
+                ("inviteeStars", 0, 10_000_000), ("minOrderUsd", 0, 1_000_000), ("holdDays", 0, 365),
+                ("maxRewardedPerReferrer", 0, 1_000_000), ("milestoneReferrals", 0, 10_000), ("milestoneBonusStars", 0, 10_000_000),
             ],
-            [PlatformSettingsCategoryKeys.PurchasePoints] = [("pointsPerUsd", 0, 10_000)],
+            [PlatformSettingsCategoryKeys.PurchasePoints] =
+            [
+                ("pointsPerUsd", 0, 10_000), ("holdDays", 0, 365), ("expiryDays", 0, 3650),
+                ("redeemStarsPerUsd", 1, 1_000_000), ("redeemMaxPercent", 0, 100), ("minRedeemStars", 0, 1_000_000), ("minMarginPercent", 0, 100), ("maxMultiplier", 0, 1000),
+            ],
             [PlatformSettingsCategoryKeys.Inventory] = [("lowStockThreshold", 0, 1_000_000), ("reservationTimeoutMinutes", 1, 1440)],
             [PlatformSettingsCategoryKeys.Queue] =
             [

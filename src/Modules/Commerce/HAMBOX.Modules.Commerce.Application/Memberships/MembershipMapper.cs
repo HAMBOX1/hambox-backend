@@ -27,7 +27,8 @@ internal static class MembershipMapper
             plan.Benefits.Select(ToBenefitDto).ToList(),
             plan.ExclusiveProductAccess.Select(a => a.ProductId).ToList(),
             unlockedThemeIds ?? [],
-            plan.CreatedOnUtc);
+            plan.CreatedOnUtc,
+            plan.DurationMonths);
 
     public static MembershipSubscriptionDto ToSubscriptionDto(MembershipSubscription subscription, MembershipPlan plan) =>
         new(

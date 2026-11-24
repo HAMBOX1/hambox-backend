@@ -192,6 +192,8 @@ public static class CommerceErrors
         "Coupons.NotFound",
         "The coupon code was not found.");
 
+    public static readonly Error VaultMembersOnly = new("Memberships.VaultMembersOnly", "The ELITE Vault is for active ELITE members.");
+
     public static readonly Error MembershipPlanNotFound = new("Memberships.PlanNotFound", "Membership plan was not found.");
     public static readonly Error MembershipUserNotFound = new("Memberships.UserNotFound", "One or more of the selected users do not exist.");
     public static readonly Error MembershipTooManyUsers = new("Memberships.TooManyUsers", "Assign to at most 500 users at a time.");

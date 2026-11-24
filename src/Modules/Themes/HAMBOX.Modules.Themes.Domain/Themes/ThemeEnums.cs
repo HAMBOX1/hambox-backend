@@ -37,6 +37,9 @@ public enum ThemeAssignmentType
     /// <summary>Reserved — HAMBOX is single-tenant; no use case exists. See Campaign's remarks.</summary>
     [Obsolete("Non-functional — never resolved by ThemeEngine. HAMBOX is single-tenant.")]
     Tenant = 4,
+
+    /// <summary>A loyalty rank's storefront design; the target key is the rank key (bronze, silver, gold, platinum, diamond).</summary>
+    Rank = 5,
 }
 
 public enum ThemeAssetType

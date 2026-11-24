@@ -104,6 +104,68 @@ public static class CommunicationDataSeeder
                 bodyAr: "<p>انخفض سعر <strong>{{ProductName}}</strong> ({{VariantLabel}}) من {{OldPrice}} إلى <strong>{{NewPrice}}</strong>.</p>");
         }
 
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "EliteExpiringSoon"))
+        {
+            SeedTemplate(db, "EliteExpiringSoon", CommunicationChannels.InApp, CommunicationCategory.Membership,
+                "Your {{PlanName}} membership ends soon",
+                "Your {{PlanName}} membership ends on {{EndDate}}. It will not renew automatically and you will not be charged — renew early to keep your remaining time.",
+                subjectAr: "اشتراك {{PlanName}} ينتهي قريبًا",
+                bodyAr: "ينتهي اشتراك {{PlanName}} في {{EndDate}}. لن يتجدد تلقائيًا ولن يُخصم منك أي مبلغ — جدده مبكرًا للاحتفاظ بالمدة المتبقية.");
+            SeedTemplate(db, "EliteExpiringSoon", CommunicationChannels.Email, CommunicationCategory.Membership,
+                "Your {{PlanName}} membership ends soon",
+                "<p>Your <strong>{{PlanName}}</strong> membership ends on <strong>{{EndDate}}</strong>. It will not renew automatically and you will not be charged. Renew early to keep your remaining time.</p>",
+                subjectAr: "اشتراك {{PlanName}} ينتهي قريبًا",
+                bodyAr: "<p>ينتهي اشتراك <strong>{{PlanName}}</strong> في <strong>{{EndDate}}</strong>. لن يتجدد تلقائيًا ولن يُخصم منك أي مبلغ. جدده مبكرًا للاحتفاظ بالمدة المتبقية.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "EliteExpired"))
+        {
+            SeedTemplate(db, "EliteExpired", CommunicationChannels.InApp, CommunicationCategory.Membership,
+                "Your {{PlanName}} membership has ended",
+                "Your {{PlanName}} membership ended on {{EndDate}}. Your rank design and Stars are untouched.",
+                subjectAr: "انتهى اشتراك {{PlanName}}",
+                bodyAr: "انتهى اشتراك {{PlanName}} في {{EndDate}}. تصميم رتبتك ونجومك كما هي.");
+            SeedTemplate(db, "EliteExpired", CommunicationChannels.Email, CommunicationCategory.Membership,
+                "Your {{PlanName}} membership has ended",
+                "<p>Your <strong>{{PlanName}}</strong> membership ended on {{EndDate}}. Your rank design and your Stars are untouched. You can subscribe again at any time.</p>",
+                subjectAr: "انتهى اشتراك {{PlanName}}",
+                bodyAr: "<p>انتهى اشتراك <strong>{{PlanName}}</strong> في {{EndDate}}. تصميم رتبتك ونجومك كما هي. يمكنك الاشتراك مجددًا في أي وقت.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "StarsExpiringSoon"))
+        {
+            SeedTemplate(db, "StarsExpiringSoon", CommunicationChannels.InApp, CommunicationCategory.System,
+                "{{Stars}} Stars expire soon", "{{Stars}} of your Stars expire on {{Date}}. Spend them in the Stars Shop before they lapse.",
+                subjectAr: "{{Stars}} نجمة ستنتهي قريبًا", bodyAr: "ستنتهي صلاحية {{Stars}} من نجومك في {{Date}}. اصرفها في متجر النجوم قبل أن تنتهي.");
+            SeedTemplate(db, "StarsExpiringSoon", CommunicationChannels.Email, CommunicationCategory.System,
+                "{{Stars}} Stars expire soon", "<p><strong>{{Stars}}</strong> of your Stars expire on <strong>{{Date}}</strong>. Spend them in the Stars Shop before they lapse.</p>",
+                subjectAr: "{{Stars}} نجمة ستنتهي قريبًا", bodyAr: "<p>ستنتهي صلاحية <strong>{{Stars}}</strong> من نجومك في <strong>{{Date}}</strong>. اصرفها في متجر النجوم قبل أن تنتهي.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "StarsCampaignStarted"))
+        {
+            SeedTemplate(db, "StarsCampaignStarted", CommunicationChannels.InApp, CommunicationCategory.Marketing,
+                "{{Offer}} Stars on a product you follow", "{{Campaign}} has started: earn {{Offer}} Stars on a product in your wishlist.",
+                subjectAr: "{{Offer}} نجوم على منتج تتابعه", bodyAr: "بدأت حملة {{Campaign}}: اكسب {{Offer}} نجوم على منتج في قائمة مفضلتك.");
+            SeedTemplate(db, "StarsCampaignStarted", CommunicationChannels.Email, CommunicationCategory.Marketing,
+                "{{Offer}} Stars on a product you follow", "<p><strong>{{Campaign}}</strong> has started: earn <strong>{{Offer}}</strong> Stars on a product in your wishlist.</p>",
+                subjectAr: "{{Offer}} نجوم على منتج تتابعه", bodyAr: "<p>بدأت حملة <strong>{{Campaign}}</strong>: اكسب <strong>{{Offer}}</strong> نجوم على منتج في قائمة مفضلتك.</p>");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "RankUp"))
+        {
+            SeedTemplate(db, "RankUp", CommunicationChannels.InApp, CommunicationCategory.Promotion,
+                "You reached {{Rank}}", "Congratulations — you are now {{Rank}}. Your new rank design is ready.",
+                subjectAr: "وصلت إلى رتبة {{RankAr}}", bodyAr: "تهانينا — أصبحت الآن {{RankAr}}. تصميم رتبتك الجديد جاهز.");
+        }
+
+        if (!await db.CommunicationTemplates.AnyAsync(t => t.Key == "MissionCompleted"))
+        {
+            SeedTemplate(db, "MissionCompleted", CommunicationChannels.InApp, CommunicationCategory.Promotion,
+                "Mission completed: {{Mission}}", "You completed \"{{Mission}}\" and earned {{Stars}} Stars.",
+                subjectAr: "أنجزت المهمة: {{MissionAr}}", bodyAr: "أنجزت «{{MissionAr}}» وكسبت {{Stars}} نجمة.");
+        }
+
         await db.SaveChangesAsync();
 
         // Older databases hold English-only copies of the default templates: add the Arabic where it is still missing.

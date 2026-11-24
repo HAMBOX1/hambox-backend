@@ -27,6 +27,9 @@ public static class ThemeSemanticTokens
     public const string Navbar = "navbar";
     public const string Sidebar = "sidebar";
     public const string Footer = "footer";
+    public const string HeroHeight = "heroHeight";
+    public const string SectionGap = "sectionGap";
+    public const string GridGap = "gridGap";
 
     public static readonly IReadOnlyList<string> Required =
     [
@@ -58,5 +61,8 @@ public static class ThemeSemanticTokens
             [Navbar] = "--theme-nav-bg",
             [Sidebar] = "--theme-sidebar",
             [Footer] = "--theme-footer-card",
+            [HeroHeight] = "--sf-hero-height",
+            [SectionGap] = "--sf-section-gap",
+            [GridGap] = "--sf-grid-gap",
         };
 }

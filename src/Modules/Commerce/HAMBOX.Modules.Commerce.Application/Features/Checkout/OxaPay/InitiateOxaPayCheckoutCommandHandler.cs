@@ -7,6 +7,7 @@ using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -33,7 +34,8 @@ internal sealed class InitiateOxaPayCheckoutCommandHandler(
     IPlatformSettingsProvider platformSettings,
     ILogger<InitiateOxaPayCheckoutCommandHandler> logger,
     OrderStockHoldService? stockHold = null,
-    PurchaseControlService? purchaseControl = null)
+    PurchaseControlService? purchaseControl = null,
+    StarsCheckoutService? starsCheckout = null)
     : IRequestHandler<InitiateOxaPayCheckoutCommand, Result<OxaPayCheckoutInitiationDto>>
 {
     public async Task<Result<OxaPayCheckoutInitiationDto>> Handle(
@@ -168,6 +170,11 @@ internal sealed class InitiateOxaPayCheckoutCommandHandler(
             taxAmount,
             totalAmount,
             orderItems);
+
+        if (starsCheckout is not null)
+        {
+            await starsCheckout.ReserveAsync(order, evaluation, cancellationToken);
+        }
 
         if (purchaseControl is not null)
         {

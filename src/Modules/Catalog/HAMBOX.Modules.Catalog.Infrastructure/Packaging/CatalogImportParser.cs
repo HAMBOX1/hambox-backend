@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using ClosedXML.Excel;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
@@ -59,8 +59,11 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             return ToPackage(entityType, ReadCategoryRows(workbook), [], [], [], []);
         }
 
-        var sheet = FindSheet(workbook, entityType.ToString()) ?? workbook.Worksheets.FirstOrDefault();
-        return ToPackage(entityType, ReadSheetRows(sheet), [], [], [], []);
+        var sheet = FindSheet(workbook, entityType.ToString())
+            ?? (entityType == CatalogImportEntityType.Codes ? FindSheet(workbook, "Stock") : null)
+            ?? workbook.Worksheets.FirstOrDefault();
+        // The Pricing sheet has a banner row above its headers, so its header row is found by the SKU column.
+        return ToPackage(entityType, ReadSheetRows(sheet, entityType == CatalogImportEntityType.Pricing ? "SKU" : null), [], [], [], []);
     }
 
     private static ParsedCatalogPackage ToPackage(
@@ -71,8 +74,16 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
         List<Dictionary<string, string>> variantRows,
         List<Dictionary<string, string>> codeRows) => entityType switch
     {
-        CatalogImportEntityType.Categories => ParsedCatalogPackage.Empty with { Categories = primaryRows.Select((r, i) => ToCategoryRow(r, i)).ToList() },
+        CatalogImportEntityType.Categories => ParsedCatalogPackage.Empty with
+        {
+            Categories = ClientSheets.IsCategorySheet(primaryRows)
+                ? ClientSheets.Categories(primaryRows).Categories
+                : primaryRows.Select((r, i) => ToCategoryRow(r, i)).ToList(),
+            Collections = ClientSheets.IsCategorySheet(primaryRows) ? ClientSheets.Categories(primaryRows).Collections : [],
+        },
+        CatalogImportEntityType.Pricing => ParsedCatalogPackage.Empty with { Prices = ClientSheets.Pricing(primaryRows) },
         CatalogImportEntityType.Collections => ParsedCatalogPackage.Empty with { Collections = primaryRows.Select((r, i) => ToCollectionRow(r, i)).ToList() },
+        CatalogImportEntityType.Products when ClientSheets.IsProductSheet(primaryRows) => ClientProducts(primaryRows),
         CatalogImportEntityType.Products => ParsedCatalogPackage.Empty with
         {
             Products = primaryRows.Select((r, i) => ToProductRow(r, i)).ToList(),
@@ -82,9 +93,20 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
             Codes = codeRows.Select((r, i) => ToCodeRow(r, i)).ToList(),
         },
         CatalogImportEntityType.Inventory => ParsedCatalogPackage.Empty with { Variants = primaryRows.Select((r, i) => ToVariantRow(r, i)).ToList() },
-        CatalogImportEntityType.Codes => ParsedCatalogPackage.Empty with { Codes = primaryRows.Select((r, i) => ToCodeRow(r, i)).ToList() },
+        CatalogImportEntityType.Codes => ParsedCatalogPackage.Empty with
+        {
+            Codes = ClientSheets.IsStockSheet(primaryRows)
+                ? ClientSheets.Stock(primaryRows)
+                : primaryRows.Select((r, i) => ToCodeRow(r, i)).ToList(),
+        },
         _ => throw new InvalidDataException($"'{entityType}' uploads must specify a single entity type."),
     };
+
+    private static ParsedCatalogPackage ClientProducts(List<Dictionary<string, string>> rows)
+    {
+        var (products, groups, options, variants) = ClientSheets.Products(rows);
+        return ParsedCatalogPackage.Empty with { Products = products, OptionGroups = groups, Options = options, Variants = variants };
+    }
 
     // ---------- tabular readers ----------
 
@@ -158,14 +180,21 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
     private static IXLWorksheet? FindSheet(XLWorkbook workbook, string name) =>
         workbook.Worksheets.TryGetWorksheet(name, out var worksheet) ? worksheet : null;
 
-    private static List<Dictionary<string, string>> ReadSheetRows(IXLWorksheet? worksheet)
+    /// <summary>
+    /// The rows of a sheet keyed by header. The header is the first used row, or — when <paramref name="headerKey"/> is given —
+    /// the first of the top ten rows that has a cell with that text (a sheet may carry a banner above its headers).
+    /// </summary>
+    private static List<Dictionary<string, string>> ReadSheetRows(IXLWorksheet? worksheet, string? headerKey = null)
     {
         if (worksheet is null)
         {
             return [];
         }
 
-        var headerRow = worksheet.FirstRowUsed();
+        var headerRow = headerKey is null
+            ? worksheet.FirstRowUsed()
+            : worksheet.RowsUsed().Take(10).FirstOrDefault(r => r.CellsUsed().Any(c => string.Equals(c.GetString().Trim(), headerKey, StringComparison.OrdinalIgnoreCase)))
+                ?? worksheet.FirstRowUsed();
         if (headerRow is null)
         {
             return [];
@@ -174,12 +203,12 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
         var headers = headerRow.CellsUsed().Select(c => c.GetString().Trim()).ToList();
 
         var rows = new List<Dictionary<string, string>>();
-        foreach (var row in worksheet.RowsUsed().Skip(1))
+        foreach (var row in worksheet.RowsUsed().Where(r => r.RowNumber() > headerRow.RowNumber()))
         {
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < headers.Count; i++)
             {
-                dict[headers[i]] = row.Cell(i + 1).GetString().Trim();
+                dict[headers[i]] = CellText(row.Cell(i + 1));
             }
 
             if (dict.Values.Any(v => v.Length > 0))
@@ -190,6 +219,12 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
 
         return rows;
     }
+
+    /// <summary>A date cell is read as an ISO date-time, so it parses the same whatever the sheet's display format is.</summary>
+    private static string CellText(IXLCell cell) =>
+        cell.DataType == XLDataType.DateTime
+            ? cell.GetDateTime().ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture)
+            : cell.GetString().Trim();
 
     private static List<Dictionary<string, string>> ReadCsvRows(Stream stream)
     {
@@ -352,25 +387,25 @@ internal sealed class CatalogImportParser(IHamboxPackageReader hamboxReader) : I
         ParseNullableDate(Get(row, "ExpirationDate")),
         NullIfEmpty(Get(row, "BatchName")));
 
-    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    internal static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
-    private static bool ParseBool(string value, bool defaultValue) =>
+    internal static bool ParseBool(string value, bool defaultValue) =>
         bool.TryParse(value, out var result) ? result : defaultValue;
 
-    private static int ParseInt(string value, int defaultValue) =>
+    internal static int ParseInt(string value, int defaultValue) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : defaultValue;
 
-    private static decimal ParseDecimal(string value) =>
+    internal static decimal ParseDecimal(string value) =>
         decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) ? result : -1m;
 
-    private static decimal? ParseNullableDecimal(string value) =>
+    internal static decimal? ParseNullableDecimal(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : ParseDecimal(value);
 
-    private static DateTimeOffset? ParseNullableDate(string value) =>
+    internal static DateTimeOffset? ParseNullableDate(string value) =>
         string.IsNullOrWhiteSpace(value) ? null
             : DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var result) ? result : null;
 
-    private static List<string> SplitList(string value) =>
+    internal static List<string> SplitList(string value) =>
         string.IsNullOrWhiteSpace(value)
             ? []
             : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

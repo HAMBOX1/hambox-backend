@@ -32,7 +32,8 @@ public sealed record FloatingAdAdminDto(
     string PositionMobile = "Bottom",
     IReadOnlyList<string>? Pages = null,
     string? PriceText = null,
-    string? OldPriceText = null);
+    string? OldPriceText = null,
+    string? MinRankKey = null);
 
 /// <summary>The fields an admin sends when creating or updating an ad.</summary>
 public sealed record FloatingAdInput(
@@ -56,7 +57,8 @@ public sealed record FloatingAdInput(
     string? PositionMobile = null,
     IReadOnlyList<string>? Pages = null,
     string? PriceText = null,
-    string? OldPriceText = null);
+    string? OldPriceText = null,
+    string? MinRankKey = null);
 
 /// <summary>An ad as the storefront shows it.</summary>
 public sealed record FloatingAdPublicDto(
@@ -106,7 +108,7 @@ internal static class FloatingAdMapping
     public static FloatingAdAdminDto ToAdminDto(FloatingAd ad) => new(
         ad.Id, ad.TitleEn, ad.TitleAr, ad.MessageEn, ad.MessageAr, ad.ButtonLabelEn, ad.ButtonLabelAr, ad.LinkUrl,
         ad.Audience.ToString(), ad.IsActive, ad.StartsOnUtc, ad.EndsOnUtc, ad.SortOrder, ad.DismissHours, ad.ImageUrl, ad.ShowCountdown,
-        ad.Style, ad.PositionDesktop, ad.PositionMobile, ad.GetPages(), ad.PriceText, ad.OldPriceText);
+        ad.Style, ad.PositionDesktop, ad.PositionMobile, ad.GetPages(), ad.PriceText, ad.OldPriceText, ad.MinRankKey);
 
     /// <summary>Returns the first problem with the input, or null when it can be saved.</summary>
     public static Error? Validate(FloatingAdInput input)
@@ -181,6 +183,7 @@ internal sealed class CreateFloatingAdCommandHandler(ICommerceDbContext db)
             input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
             input.ImageUrl, input.ShowCountdown);
         ad.SetPresentation(input.Style, input.PositionDesktop, input.PositionMobile, input.Pages, input.PriceText, input.OldPriceText);
+        ad.SetMinRank(input.MinRankKey);
 
         db.FloatingAds.Add(ad);
         await db.SaveChangesAsync(cancellationToken);
@@ -212,6 +215,7 @@ internal sealed class UpdateFloatingAdCommandHandler(ICommerceDbContext db)
             input.LinkUrl, input.Audience, input.IsActive, input.StartsOnUtc, input.EndsOnUtc, input.SortOrder, input.DismissHours,
             input.ImageUrl, input.ShowCountdown);
         ad.SetPresentation(input.Style, input.PositionDesktop, input.PositionMobile, input.Pages, input.PriceText, input.OldPriceText);
+        ad.SetMinRank(input.MinRankKey);
 
         await db.SaveChangesAsync(cancellationToken);
         return Result.Success(FloatingAdMapping.ToAdminDto(ad));

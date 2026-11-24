@@ -58,6 +58,9 @@ public static class PermissionDefinitionRegistry
         public static readonly Guid Campaigns = new("15000000-0000-0000-0000-000000000033");
         public static readonly Guid Faq = new("15000000-0000-0000-0000-000000000034");
         public static readonly Guid WhatsAppBot = new("15000000-0000-0000-0000-000000000035");
+        public static readonly Guid B2B = new("15000000-0000-0000-0000-000000000039");
+        public static readonly Guid Loyalty = new("15000000-0000-0000-0000-000000000037");
+        public static readonly Guid Stars = new("15000000-0000-0000-0000-000000000036");
         public static readonly Guid PaymentGateways = new("923cabe7-aade-4b79-94d8-a784f8617884");
     }
 
@@ -80,6 +83,9 @@ public static class PermissionDefinitionRegistry
         new(GroupIds.Reviews, "Reviews", "Reviews", "Commerce", 150),
         new(GroupIds.Notifications, "Notifications", "Notifications", "Commerce", 160),
         new(GroupIds.Referral, "Referral", "Referral", "Commerce", 170),
+        new(GroupIds.Stars, "Stars", "Stars", "Commerce", 172),
+        new(GroupIds.Loyalty, "Loyalty", "Loyalty Ranks", "Commerce", 173),
+        new(GroupIds.B2B, "B2B", "ELITE Business", "Commerce", 175),
         new(GroupIds.Reports, "Reports", "Reports", "Analytics", 180),
         new(GroupIds.Localization, "Localization", "Localization", "Platform", 190),
         new(GroupIds.Settings, "Settings", "Settings", "Platform", 200),
@@ -319,6 +325,26 @@ public static class PermissionDefinitionRegistry
         // WhatsApp Bot (281-282) appended to preserve RolePermission seed indices
         new(new Guid("20000000-0000-0000-0000-000000000281"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.View, 1),
         new(new Guid("20000000-0000-0000-0000-000000000282"), GroupIds.WhatsAppBot, PermissionConstants.WhatsAppBot.Edit, 2),
+
+        // Stars & Loyalty (283-285) appended to preserve RolePermission seed indices
+        new(new Guid("20000000-0000-0000-0000-000000000283"), GroupIds.Stars, PermissionConstants.Stars.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000284"), GroupIds.Stars, PermissionConstants.Stars.ManageRules, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000285"), GroupIds.Stars, PermissionConstants.Stars.Adjust, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000289"), GroupIds.Stars, PermissionConstants.Stars.ApproveOverride, 4),
+
+        // Customer data (290-291)
+        new(new Guid("20000000-0000-0000-0000-000000000290"), GroupIds.Customers, PermissionConstants.Customers.Export, 3),
+        new(new Guid("20000000-0000-0000-0000-000000000291"), GroupIds.Customers, PermissionConstants.Customers.Import, 4),
+
+        // ELITE Business (292-294)
+        new(new Guid("20000000-0000-0000-0000-000000000292"), GroupIds.B2B, PermissionConstants.B2B.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000293"), GroupIds.B2B, PermissionConstants.B2B.Manage, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000294"), GroupIds.B2B, PermissionConstants.B2B.Approve, 3),
+
+        // Loyalty Ranks (286-288)
+        new(new Guid("20000000-0000-0000-0000-000000000286"), GroupIds.Loyalty, PermissionConstants.Loyalty.View, 1),
+        new(new Guid("20000000-0000-0000-0000-000000000287"), GroupIds.Loyalty, PermissionConstants.Loyalty.Manage, 2),
+        new(new Guid("20000000-0000-0000-0000-000000000288"), GroupIds.Loyalty, PermissionConstants.Loyalty.AdjustRank, 3),
 
         // Payment Gateways appended to preserve RolePermission seed indices. Random (not
         // sequential-looking) GUIDs here deliberately — the sequential "next number" convention used

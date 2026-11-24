@@ -70,6 +70,7 @@ internal sealed class MembershipPlanCommandHandlers :
 
         var plan = MembershipPlan.Create(request.Name, request.Slug, request.Description, request.Price,
             request.DurationDays, request.SortOrder, request.BadgeLabel, request.ThemeKey, request.IsDefault);
+        plan.SetDurationMonths(request.DurationMonths);
         plan.ReplaceBenefits(MembershipMapper.ParseBenefits(request.Benefits));
         plan.SetExclusiveProducts(request.ExclusiveProductIds ?? []);
         await SyncThemeAssignmentsAsync(plan.Slug, request.UnlockedThemeIds, cancellationToken);
@@ -97,6 +98,7 @@ internal sealed class MembershipPlanCommandHandlers :
         var request = command.Request;
         plan.Update(request.Name, request.Slug, request.Description, request.Price, request.DurationDays,
             request.SortOrder, request.BadgeLabel, request.ThemeKey);
+        plan.SetDurationMonths(request.DurationMonths);
         plan.ReplaceBenefits(MembershipMapper.ParseBenefits(request.Benefits));
         plan.SetExclusiveProducts(request.ExclusiveProductIds ?? []);
         await SyncThemeAssignmentsAsync(plan.Slug, request.UnlockedThemeIds, cancellationToken);

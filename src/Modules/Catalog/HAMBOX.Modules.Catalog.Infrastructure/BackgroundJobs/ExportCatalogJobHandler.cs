@@ -129,9 +129,41 @@ internal sealed class ExportCatalogJobHandler(
         var categoriesInScope = CollectWithAncestors(allCategories, referencedCategoryIds);
         var categorySlugById = allCategories.ToDictionary(c => c.Id, c => c.Slug);
 
-        var categoryRows = categoriesInScope.Select((c, i) => new ParsedCategoryRow(
-            i + 1, c.Slug, c.NameEn, c.NameAr, c.ParentId.HasValue ? categorySlugById.GetValueOrDefault(c.ParentId.Value) : null,
-            c.IsActive, c.SortOrder)).ToList();
+        var facetsByCategory = options.IncludeCategories
+            ? (await catalogDb.CategoryFacetSettings.AsNoTracking().Where(s => s.IsVisible).OrderBy(s => s.SortOrder).ToListAsync(ct))
+                .GroupBy(s => s.CategoryId).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(s => s.GroupKey).ToList())
+            : new Dictionary<Guid, IReadOnlyList<string>>();
+        var parentIdByCategory = allCategories.ToDictionary(c => c.Id, c => c.ParentId);
+
+        // What a category inherits: its parent's own list, else the nearest ancestor's, else the store default.
+        IReadOnlyList<string> Inherited(Guid? parentId)
+        {
+            var seen = new HashSet<Guid>();
+            while (parentId is { } id && seen.Add(id))
+            {
+                if (facetsByCategory.TryGetValue(id, out var own))
+                {
+                    return own;
+                }
+
+                parentId = parentIdByCategory.GetValueOrDefault(id);
+            }
+
+            return facetsByCategory.GetValueOrDefault(CategoryFacetSetting.DefaultCategoryId) ?? [];
+        }
+
+        var categoryRows = categoriesInScope.Select((c, i) =>
+        {
+            var own = facetsByCategory.GetValueOrDefault(c.Id);
+            var inherited = Inherited(c.ParentId);
+            return new ParsedCategoryRow(
+                i + 1, c.Slug, c.NameEn, c.NameAr, c.ParentId.HasValue ? categorySlugById.GetValueOrDefault(c.ParentId.Value) : null,
+                c.IsActive, c.SortOrder,
+                c.IsDraft ? "Draft" : c.IsActive ? "Active" : "Inactive",
+                c.DescriptionHtml, c.DescriptionAr,
+                own?.Except(inherited, StringComparer.OrdinalIgnoreCase).ToList(),
+                own is null ? null : inherited.Except(own, StringComparer.OrdinalIgnoreCase).ToList());
+        }).ToList();
 
         var referencedCollectionIds = products.SelectMany(p => p.Collections.Select(pc => pc.CollectionId)).ToHashSet();
 
@@ -188,13 +220,16 @@ internal sealed class ExportCatalogJobHandler(
                 product.AdditionalCategories.Select(ac => categorySlugById.GetValueOrDefault(ac.CategoryId, string.Empty))
                     .Where(s => s.Length > 0).ToList(),
                 product.Collections.Select(pc => collectionNameById.GetValueOrDefault(pc.CollectionId, string.Empty))
-                    .Where(s => s.Length > 0).ToList()));
+                    .Where(s => s.Length > 0).ToList(),
+                product.AdditionalDescriptionEn,
+                options.IncludeLocalization ? product.AdditionalDescriptionAr : null));
         }
 
         var optionGroupRows = new List<ParsedOptionGroupRow>();
         var optionRows = new List<ParsedOptionRow>();
         var variantRows = new List<ParsedVariantRow>();
         var codeRows = new List<ParsedCodeRow>();
+        var priceRows = new List<ParsedPriceRow>();
 
         if (options.IncludeVariants)
         {
@@ -238,7 +273,12 @@ internal sealed class ExportCatalogJobHandler(
                 variantRows.Add(new ParsedVariantRow(
                     vIndex, variant.Sku, productIdToKey.GetValueOrDefault(variant.ProductId, string.Empty),
                     variant.PriceOverride, variant.ComparePrice, variant.Status.ToString(), variant.LowStockThreshold,
-                    variant.MembershipPlanId, selectedValues));
+                    variant.MembershipPlanId, selectedValues, variant.DescriptionHtml));
+                priceRows.Add(new ParsedPriceRow(
+                    vIndex, variant.Sku, "USD",
+                    // What a variant costs is staff-only data: it travels only with the supplier/cost option, which needs ViewCosts.
+                    options.IncludeSuppliers ? variant.CostPrice : null,
+                    variant.PriceOverride, variant.SalePrice, variant.MemberPrice, variant.SaleStartsOn, variant.SaleEndsOn));
             }
 
             if (options.IncludeDigitalCodes)
@@ -265,7 +305,8 @@ internal sealed class ExportCatalogJobHandler(
                         code.PurchaseCost,
                         code.Currency,
                         code.ExpirationDate,
-                        batches.GetValueOrDefault(code.BatchId)?.Name));
+                        batches.GetValueOrDefault(code.BatchId)?.Name,
+                        code.Notes));
                 }
             }
         }
@@ -297,7 +338,7 @@ internal sealed class ExportCatalogJobHandler(
 
         return new ParsedCatalogPackage(
             categoryRows, productRows, optionGroupRows, optionRows, variantRows, codeRows, supplierMappingRows, images, payload.EncryptCodes,
-            collectionRows);
+            collectionRows, priceRows);
     }
 
     private static List<Category> CollectWithAncestors(List<Category> allCategories, HashSet<Guid> seedIds)
@@ -365,116 +406,8 @@ internal sealed class ExportCatalogJobHandler(
         sheet.Columns().AdjustToContents();
     }
 
-    /// <summary>
-    /// The workbook the import reads back: a "Products" tab, one tab per category (named after the category, holding that
-    /// category's products), and the "Variant Groups" / "Variant Options" tabs of the products' option groups, plus an
-    /// "Instructions" tab. A product is on exactly one product tab (its category's tab, or "Products" when the category has
-    /// no usable tab name), so importing the file again never creates a product twice.
-    /// </summary>
-    internal static byte[] BuildCatalogXlsx(ParsedCatalogPackage package)
-    {
-        using var workbook = new XLWorkbook();
-
-        var categoryNameBySlug = package.Categories
-            .GroupBy(c => c.Slug, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().NameEn, StringComparer.OrdinalIgnoreCase);
-
-        var generalProducts = new List<ParsedProductRow>();
-        var productsByTab = new SortedDictionary<string, List<ParsedProductRow>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var product in package.Products)
-        {
-            var tab = categoryNameBySlug.TryGetValue(product.CategorySlug, out var categoryName)
-                ? CatalogSheetNames.TryCategoryTabName(categoryName)
-                : null;
-
-            if (tab is null || (!productsByTab.ContainsKey(tab) && productsByTab.Count >= 60))
-            {
-                generalProducts.Add(product);
-                continue;
-            }
-
-            if (!productsByTab.TryGetValue(tab, out var list))
-            {
-                list = [];
-                productsByTab[tab] = list;
-            }
-
-            list.Add(product);
-        }
-
-        WriteProductsSheet(workbook.Worksheets.Add("Products"), generalProducts);
-        foreach (var (tab, rows) in productsByTab)
-        {
-            WriteProductsSheet(workbook.Worksheets.Add(tab), rows);
-        }
-
-        var groupSheet = workbook.Worksheets.Add("Variant Groups");
-        string[] groupHeaders = ["ProductImportKey", "GroupKey", "DisplayName", "ParentGroupKey", "SortOrder", "IsRequired"];
-        for (var i = 0; i < groupHeaders.Length; i++)
-        {
-            groupSheet.Cell(1, i + 1).Value = groupHeaders[i];
-            groupSheet.Cell(1, i + 1).Style.Font.Bold = true;
-        }
-
-        for (var r = 0; r < package.OptionGroups.Count; r++)
-        {
-            var g = package.OptionGroups[r];
-            groupSheet.Cell(r + 2, 1).Value = g.ProductImportKey;
-            groupSheet.Cell(r + 2, 2).Value = g.Key;
-            groupSheet.Cell(r + 2, 3).Value = g.DisplayName;
-            groupSheet.Cell(r + 2, 4).Value = g.ParentKey ?? string.Empty;
-            groupSheet.Cell(r + 2, 5).Value = g.SortOrder;
-            groupSheet.Cell(r + 2, 6).Value = g.IsRequired ? "TRUE" : "FALSE";
-        }
-
-        groupSheet.SheetView.FreezeRows(1);
-        groupSheet.Columns().AdjustToContents();
-
-        var optionSheet = workbook.Worksheets.Add("Variant Options");
-        string[] optionHeaders = ["ProductImportKey", "GroupKey", "Value", "Label", "SortOrder"];
-        for (var i = 0; i < optionHeaders.Length; i++)
-        {
-            optionSheet.Cell(1, i + 1).Value = optionHeaders[i];
-            optionSheet.Cell(1, i + 1).Style.Font.Bold = true;
-        }
-
-        for (var r = 0; r < package.Options.Count; r++)
-        {
-            var o = package.Options[r];
-            optionSheet.Cell(r + 2, 1).Value = o.ProductImportKey;
-            optionSheet.Cell(r + 2, 2).Value = o.GroupKey;
-            optionSheet.Cell(r + 2, 3).Value = o.Value;
-            optionSheet.Cell(r + 2, 4).Value = o.Label;
-            optionSheet.Cell(r + 2, 5).Value = o.SortOrder;
-        }
-
-        optionSheet.SheetView.FreezeRows(1);
-        optionSheet.Columns().AdjustToContents();
-
-        var notes = workbook.Worksheets.Add("Instructions");
-        notes.Cell(1, 1).Value = "Sheet";
-        notes.Cell(1, 2).Value = "What it holds";
-        notes.Range(1, 1, 1, 2).Style.Font.Bold = true;
-        string[][] lines =
-        [
-            ["Products", "Products whose category has no tab of its own (and any new product you add without a category)."],
-            ["<Category tabs>", "One tab per category, named after the category, holding that category's products. A product on a category tab is filed under that category."],
-            ["Variant Groups", "The option groups of each product (Platform, Region, Duration...). ProductImportKey is the ImportKey of the product on its tab."],
-            ["Variant Options", "The values of each option group. GroupKey must match a GroupKey on the Variant Groups tab."],
-            ["Note", "Do not rename a category tab: its name is the category. Keep ImportKey as it is to update a product; leave it blank for a new one."],
-        ];
-        for (var i = 0; i < lines.Length; i++)
-        {
-            notes.Cell(i + 2, 1).Value = lines[i][0];
-            notes.Cell(i + 2, 2).Value = lines[i][1];
-        }
-
-        notes.Columns().AdjustToContents();
-
-        using var stream = new MemoryStream();
-        workbook.SaveAs(stream);
-        return stream.ToArray();
-    }
+    /// <summary>The workbook the import reads back: the client's Categories, Products, Pricing and (when codes are included) Stock sheets.</summary>
+    internal static byte[] BuildCatalogXlsx(ParsedCatalogPackage package) => ClientSheetsWriter.Workbook(package);
 
     private static byte[] BuildProductsCsv(IReadOnlyList<ParsedProductRow> products)
     {

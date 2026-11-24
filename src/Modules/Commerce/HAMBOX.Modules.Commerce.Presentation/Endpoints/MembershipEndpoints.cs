@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Contracts.Memberships;
+using HAMBOX.Modules.Commerce.Application.Features.Memberships.Codes;
 using HAMBOX.Modules.Commerce.Application.Features.Memberships.Plans;
 using HAMBOX.Modules.Commerce.Application.Features.Memberships.Plans.GetMembershipPlans;
 using HAMBOX.Modules.Commerce.Application.Features.Memberships.Subscriptions;
@@ -85,6 +86,20 @@ internal static class MembershipEndpoints
         .WithName("ActivateMembershipPlan")
         .RequirePermission(PermissionConstants.Memberships.Edit);
 
+        group.MapGet("codes", async Task<IResult> (ISender sender) => MapResult(await sender.Send(new GetMembershipCodesQuery())))
+            .WithName("GetMembershipCodes")
+            .RequirePermission(PermissionConstants.Memberships.View);
+
+        group.MapPost("codes", async Task<IResult> ([FromBody] CreateMembershipCodeInput input, ISender sender) =>
+                MapResult(await sender.Send(new CreateMembershipCodeCommand(input))))
+            .WithName("CreateMembershipCode")
+            .RequirePermission(PermissionConstants.Memberships.Assign);
+
+        group.MapPost("codes/{id:guid}/active", async Task<IResult> (Guid id, [FromBody] SetCodeActiveRequest body, ISender sender) =>
+                MapResult(await sender.Send(new SetMembershipCodeActiveCommand(id, body.IsActive))))
+            .WithName("SetMembershipCodeActive")
+            .RequirePermission(PermissionConstants.Memberships.Assign);
+
         group.MapGet("statistics", async Task<IResult> (ISender sender) =>
             MapResult(await sender.Send(new GetMembershipStatisticsQuery())))
         .WithName("GetMembershipStatistics")
@@ -163,6 +178,9 @@ internal static class MembershipEndpoints
                 Type = result.Error.Code,
                 Status = StatusCodes.Status400BadRequest,
             });
+
 }
 
 internal sealed record DuplicateMembershipPlanRequest(string? NewName, string? NewSlug);
+
+internal sealed record SetCodeActiveRequest(bool IsActive);

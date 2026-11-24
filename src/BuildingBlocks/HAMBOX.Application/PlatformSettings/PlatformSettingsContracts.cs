@@ -29,13 +29,15 @@ public static class PlatformSettingsCategoryKeys
     public const string Integrations = "integrations";
     public const string Maintenance = "maintenance";
     public const string Legal = "legal";
+    public const string Features = "features";
+    public const string Loyalty = "loyalty";
 
     public static readonly IReadOnlyList<string> All =
     [
         General, Branding, Storefront, Localization, Currency, Theme, Email,
         Authentication, Security, Otp, Totp, Commerce, Checkout, Promotions,
         Memberships, Referral, PurchasePoints, Inventory, Queue, RetryPolicies, Notifications,
-        Media, Seo, Analytics, Integrations, Maintenance, Legal,
+        Media, Seo, Analytics, Integrations, Maintenance, Legal, Features, Loyalty,
     ];
 }
 
@@ -290,7 +292,13 @@ public sealed record ReferralSettingsPayload(
     bool Enabled,
     int PointsPerReferral,
     decimal PointValueUsd,
-    int RewardExpiryDays);
+    int RewardExpiryDays,
+    int InviteeStars = 0,
+    decimal MinOrderUsd = 0m,
+    int HoldDays = 0,
+    int MaxRewardedPerReferrer = 0,
+    int MilestoneReferrals = 0,
+    int MilestoneBonusStars = 0);
 
 /// <summary>
 /// Earn-only purchase points. <paramref name="PointsPerUsd"/> is applied to the eligible amount in USD (the
@@ -300,7 +308,25 @@ public sealed record ReferralSettingsPayload(
 public sealed record PurchasePointsSettingsPayload(
     bool Enabled,
     decimal PointsPerUsd,
-    string AmountBasis);
+    string AmountBasis,
+    int HoldDays = 0,
+    int ExpiryDays = 0,
+    decimal RedeemStarsPerUsd = 100m,
+    int RedeemMaxPercent = 50,
+    int MinRedeemStars = 0,
+    decimal MinMarginPercent = 0m,
+    string StackingMode = StarsStackingMode.HighestOffer,
+    decimal MaxMultiplier = 0m);
+
+/// <summary>How several Stars rules that match the same item are combined (CM-03).</summary>
+public static class StarsStackingMode
+{
+    /// <summary>Only the winning rule (highest priority) applies. The default: nothing stacks by accident.</summary>
+    public const string HighestOffer = "HighestOffer";
+
+    /// <summary>Multiplier bonuses add together (×2 and ×3 give ×4), fixed amounts add, an Exclude still wins; optionally capped by MaxMultiplier.</summary>
+    public const string Combine = "Combine";
+}
 
 public static class PurchasePointsAmountBasis
 {
@@ -386,6 +412,32 @@ public sealed record LegalSettingsPayload(
     string RefundPolicyHtml,
     string SupportPolicyHtml);
 
+/// <summary>The Feature Center: every loyalty/membership feature ships dark and is switched on here (CORE-04).</summary>
+public sealed record FeatureCenterSettingsPayload(
+    bool StarsShop = false,
+    bool LoyaltyRanks = false,
+    bool RankThemes = false,
+    bool EliteSubscription = false,
+    bool EliteVault = false,
+    bool GiftPass = false,
+    bool ReferralGiveAndGet = false,
+    bool StarsCampaigns = false,
+    bool Missions = false,
+    bool Watchlist = false,
+    bool EliteBusiness = false,
+    bool ProfileStyle = false);
+
+/// <summary>How a customer's loyalty rank is earned (LV-02). Independent of the spendable Stars balance.</summary>
+public sealed record LoyaltySettingsPayload(
+    string Criterion = LoyaltyCriterion.SpendUsd,
+    bool AllowDowngrade = false);
+
+public static class LoyaltyCriterion
+{
+    public const string SpendUsd = "SpendUsd";
+    public const string CompletedOrders = "CompletedOrders";
+}
+
 public sealed record PublicPlatformSettingsDto(
     GeneralSettingsPayload General,
     BrandingSettingsPayload Branding,
@@ -393,4 +445,5 @@ public sealed record PublicPlatformSettingsDto(
     SeoSettingsPayload Seo,
     AnalyticsSettingsPayload Analytics,
     MaintenanceSettingsPayload Maintenance,
-    LegalSettingsPayload Legal);
+    LegalSettingsPayload Legal,
+    FeatureCenterSettingsPayload? Features = null);

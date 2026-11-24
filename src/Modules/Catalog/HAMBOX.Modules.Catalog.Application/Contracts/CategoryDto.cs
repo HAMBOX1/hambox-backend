@@ -18,4 +18,6 @@ public sealed record CategoryDto(
     Guid? ParentId,
     string? ImageUrl = null,
     string? DescriptionHtml = null,
-    string? IconUrl = null);
+    string? IconUrl = null,
+    bool IsDraft = false,
+    string? DescriptionAr = null);

@@ -8,6 +8,7 @@ using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Options;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -35,7 +36,8 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
     IPlatformSettingsProvider platformSettings,
     ILogger<InitiateCryptomusCheckoutCommandHandler> logger,
     OrderStockHoldService? stockHold = null,
-    PurchaseControlService? purchaseControl = null)
+    PurchaseControlService? purchaseControl = null,
+    StarsCheckoutService? starsCheckout = null)
     : IRequestHandler<InitiateCryptomusCheckoutCommand, Result<CryptomusCheckoutInitiationDto>>
 {
     public async Task<Result<CryptomusCheckoutInitiationDto>> Handle(
@@ -168,6 +170,11 @@ internal sealed class InitiateCryptomusCheckoutCommandHandler(
             taxAmount,
             totalAmount,
             orderItems);
+
+        if (starsCheckout is not null)
+        {
+            await starsCheckout.ReserveAsync(order, evaluation, cancellationToken);
+        }
 
         if (purchaseControl is not null)
         {

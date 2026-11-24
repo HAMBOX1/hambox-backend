@@ -44,6 +44,12 @@ internal sealed class CatalogImportTemplateGenerator : IImportTemplateGenerator
 
     public byte[] Generate(CatalogImportEntityType entityType, CatalogImportLookups lookups)
     {
+        // The client's layouts (Categories, Products, Pricing, Stock); the rest keep this class's own sheets.
+        if (ClientSheetsWriter.Handles(entityType))
+        {
+            return ClientSheetsWriter.Template(entityType, lookups);
+        }
+
         using var workbook = new XLWorkbook();
         var listsSheet = BuildListsSheet(workbook, lookups);
 

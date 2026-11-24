@@ -1,6 +1,7 @@
 using HAMBOX.SharedKernel.Errors;
 using HAMBOX.Modules.Themes.Application.Errors;
 using HAMBOX.Application.Abstractions;
+using HAMBOX.Application.Loyalty;
 using HAMBOX.Application.Membership;
 using HAMBOX.Modules.Themes.Application.Abstractions;
 using HAMBOX.Modules.Themes.Application.Contracts.Themes;
@@ -178,7 +179,9 @@ public sealed record GetActiveThemeQuery(string? MembershipPlanSlug)
 internal sealed class GetActiveThemeQueryHandler(
     IThemeEngine themeEngine,
     ICurrentUserService currentUser,
-    IMembershipAccessProvider membershipAccess)
+    IMembershipAccessProvider membershipAccess,
+    ILoyaltyRankProvider loyaltyRanks,
+    IThemesDbContext dbContext)
     : IRequestHandler<GetActiveThemeQuery, Result<ActiveThemeDto>>
 {
     public async Task<Result<ActiveThemeDto>> Handle(GetActiveThemeQuery request, CancellationToken cancellationToken)
@@ -195,14 +198,75 @@ internal sealed class GetActiveThemeQueryHandler(
             membershipPlanSlug = access.HasActiveMembership ? access.PlanSlug : null;
         }
 
+        string? rankKey = null;
+        var useOriginal = false;
+        if (!string.IsNullOrWhiteSpace(currentUser.UserId))
+        {
+            rankKey = await loyaltyRanks.GetThemeRankKeyAsync(currentUser.UserId, cancellationToken);
+            useOriginal = await dbContext.UserThemePreferences.AsNoTracking()
+                .AnyAsync(p => p.UserId == currentUser.UserId && p.UseOriginalDesign, cancellationToken);
+        }
+
         var active = await themeEngine.ResolveActiveThemeAsync(
             currentUser.UserId,
             membershipPlanSlug,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            rankKey: rankKey,
+            useOriginalDesign: useOriginal);
 
         return active is null
             ? Result.Failure<ActiveThemeDto>(ThemeErrors.ThemeNoActive)
             : Result.Success(active);
+    }
+}
+
+public sealed record ThemePreferenceDto(bool UseOriginalDesign, bool HasRankDesign);
+
+public sealed record GetThemePreferenceQuery : IRequest<Result<ThemePreferenceDto>>;
+
+internal sealed class GetThemePreferenceQueryHandler(
+    ICurrentUserService currentUser, IThemesDbContext dbContext, ILoyaltyRankProvider loyaltyRanks, IMembershipAccessProvider membershipAccess)
+    : IRequestHandler<GetThemePreferenceQuery, Result<ThemePreferenceDto>>
+{
+    public async Task<Result<ThemePreferenceDto>> Handle(GetThemePreferenceQuery request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(currentUser.UserId))
+        {
+            return Result.Success(new ThemePreferenceDto(false, false));
+        }
+
+        var original = await dbContext.UserThemePreferences.AsNoTracking()
+            .AnyAsync(p => p.UserId == currentUser.UserId && p.UseOriginalDesign, cancellationToken);
+        var hasRank = await loyaltyRanks.GetThemeRankKeyAsync(currentUser.UserId, cancellationToken) is not null
+            || (await membershipAccess.GetAccessInfoAsync(currentUser.UserId, cancellationToken)).SubscriptionId.HasValue;
+        return Result.Success(new ThemePreferenceDto(original, hasRank));
+    }
+}
+
+public sealed record SetThemePreferenceCommand(bool UseOriginalDesign) : IRequest<Result<ThemePreferenceDto>>;
+
+internal sealed class SetThemePreferenceCommandHandler(ICurrentUserService currentUser, IThemesDbContext dbContext, ISender sender)
+    : IRequestHandler<SetThemePreferenceCommand, Result<ThemePreferenceDto>>
+{
+    public async Task<Result<ThemePreferenceDto>> Handle(SetThemePreferenceCommand request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(currentUser.UserId))
+        {
+            return Result.Failure<ThemePreferenceDto>(ThemeErrors.ThemeNoActive);
+        }
+
+        var row = await dbContext.UserThemePreferences.FirstOrDefaultAsync(p => p.UserId == currentUser.UserId, cancellationToken);
+        if (row is null)
+        {
+            dbContext.UserThemePreferences.Add(UserThemePreference.Create(currentUser.UserId, request.UseOriginalDesign));
+        }
+        else
+        {
+            row.Set(request.UseOriginalDesign);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return await sender.Send(new GetThemePreferenceQuery(), cancellationToken);
     }
 }
 
@@ -641,6 +705,12 @@ internal sealed class AssignThemeCommandHandler(IThemesDbContext dbContext, ICur
 #pragma warning disable CS0618 // intentionally comparing against the obsolete reserved values to reject them
         if (type is ThemeAssignmentType.Campaign or ThemeAssignmentType.Region or ThemeAssignmentType.Tenant)
 #pragma warning restore CS0618
+        {
+            return Result.Failure<Guid>(ThemeErrors.ThemeInvalidAssignmentType);
+        }
+
+        if (type == ThemeAssignmentType.Rank
+            && !new[] { "bronze", "silver", "gold", "platinum", "diamond" }.Contains(request.Request.TargetKey?.Trim().ToLowerInvariant()))
         {
             return Result.Failure<Guid>(ThemeErrors.ThemeInvalidAssignmentType);
         }

@@ -33,6 +33,8 @@ internal static class PlatformSettingsCategoryMetadata
         new("integrations", "Integrations", "Platform"),
         new("maintenance", "Maintenance Mode", "Platform"),
         new("legal", "Legal", "Platform"),
+        new("features", "Feature Center", "Platform"),
+        new("loyalty", "Loyalty Ranks", "Commerce"),
     ];
 
     internal static Meta GetRequired(string key) =>

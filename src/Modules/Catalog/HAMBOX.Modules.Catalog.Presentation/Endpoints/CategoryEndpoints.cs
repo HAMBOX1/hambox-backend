@@ -152,7 +152,7 @@ internal static class CategoryEndpoints
         // PUT /api/v1/categories/{id}
         group.MapPut("{id:guid}", async Task<Results<NoContent, BadRequest<ProblemDetails>>> (Guid id, [FromBody] UpdateCategoryRequest request, ISender sender) =>
         {
-            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive, request.ParentId, request.DescriptionHtml, request.IconUrl);
+            var command = new UpdateCategoryCommand(id, request.NameAr, request.NameEn, request.Slug, request.IsActive, request.ParentId, request.DescriptionHtml, request.IconUrl, request.IsDraft, request.DescriptionAr);
             var result = await sender.Send(command);
             
             if (result.IsSuccess)
@@ -240,6 +240,6 @@ internal static class CategoryEndpoints
 }
 
 internal sealed record CreateCategoryRequest(string NameAr, string NameEn, string Slug, Guid? ParentId, string? DescriptionHtml = null, string? IconUrl = null);
-internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId, string? DescriptionHtml = null, string? IconUrl = null);
+internal sealed record UpdateCategoryRequest(string NameAr, string NameEn, string Slug, bool IsActive, Guid? ParentId, string? DescriptionHtml = null, string? IconUrl = null, bool? IsDraft = null, string? DescriptionAr = null);
 internal sealed record ReorderCategoriesRequest(IReadOnlyList<CategoryReorderEntryRequest> Entries);
 internal sealed record CategoryReorderEntryRequest(Guid Id, Guid? ParentId, int SortOrder);

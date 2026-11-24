@@ -12,7 +12,9 @@ public interface IThemeEngine
         string? userId,
         string? membershipPlanSlug,
         DateTime? asOfUtc = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? rankKey = null,
+        bool useOriginalDesign = false);
 
     Task<ActiveThemeDto?> ResolvePreviewAsync(string previewToken, CancellationToken cancellationToken = default);
 }
@@ -41,7 +43,9 @@ public sealed class ThemeEngine : IThemeEngine
         string? userId,
         string? membershipPlanSlug,
         DateTime? asOfUtc = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? rankKey = null,
+        bool useOriginalDesign = false)
     {
         var now = asOfUtc ?? DateTime.UtcNow;
 
@@ -68,6 +72,13 @@ public sealed class ThemeEngine : IThemeEngine
             }
         }
 
+        // A customer who chose the original HAMBOX design skips their earned designs (ELITE first, then rank).
+        if (useOriginalDesign)
+        {
+            membershipPlanSlug = null;
+            rankKey = null;
+        }
+
         if (!string.IsNullOrWhiteSpace(membershipPlanSlug))
         {
             var membershipThemeId = await ResolveAssignmentThemeIdAsync(
@@ -81,6 +92,20 @@ public sealed class ThemeEngine : IThemeEngine
                 if (membershipTheme is not null)
                 {
                     return membershipTheme;
+                }
+            }
+        }
+
+        // Below ELITE, above the store design: the customer's loyalty rank design.
+        if (!string.IsNullOrWhiteSpace(rankKey))
+        {
+            var rankThemeId = await ResolveAssignmentThemeIdAsync(ThemeAssignmentType.Rank, rankKey.ToLowerInvariant(), cancellationToken);
+            if (rankThemeId.HasValue)
+            {
+                var rankTheme = await BuildPublishedThemeAsync(rankThemeId.Value, "rank", cancellationToken);
+                if (rankTheme is not null)
+                {
+                    return rankTheme;
                 }
             }
         }

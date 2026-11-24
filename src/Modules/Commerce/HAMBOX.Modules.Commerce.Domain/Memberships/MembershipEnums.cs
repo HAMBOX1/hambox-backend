@@ -27,6 +27,18 @@ public enum MembershipBenefitType
     Badge = 6,
     ThemeUnlock = 7,
     FeatureFlag = 8,
+    BonusStars = 9,
+    MonthlyGift = 10,
+    PriceSlots = 11,
+    VaultAccess = 12,
+}
+
+public enum MembershipCodeKind
+{
+    Gift = 0,
+    Trial = 1,
+    Offer = 2,
+    AdminGrant = 3,
 }
 
 public enum MembershipHistoryAction

@@ -9,6 +9,7 @@ using HAMBOX.Modules.Commerce.Application.Contracts;
 using HAMBOX.Modules.Commerce.Application.Errors;
 using HAMBOX.Modules.Commerce.Application.Features.Checkout;
 using HAMBOX.Modules.Commerce.Application.Options;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Enums;
 using HAMBOX.Modules.Commerce.Domain.Orders;
@@ -37,7 +38,8 @@ internal sealed class InitiateDotCheckoutCommandHandler(
     IPlatformSettingsProvider platformSettings,
     ILogger<InitiateDotCheckoutCommandHandler> logger,
     OrderStockHoldService? stockHold = null,
-    PurchaseControlService? purchaseControl = null)
+    PurchaseControlService? purchaseControl = null,
+    StarsCheckoutService? starsCheckout = null)
     : IRequestHandler<InitiateDotCheckoutCommand, Result<DotCheckoutInitiationDto>>
 {
     public async Task<Result<DotCheckoutInitiationDto>> Handle(
@@ -180,6 +182,11 @@ internal sealed class InitiateDotCheckoutCommandHandler(
             taxAmount,
             totalAmount,
             orderItems);
+
+        if (starsCheckout is not null)
+        {
+            await starsCheckout.ReserveAsync(order, evaluation, cancellationToken);
+        }
 
         if (purchaseControl is not null)
         {

@@ -29,7 +29,8 @@ public sealed record CatalogImportPlan(
     IReadOnlyList<CatalogImportPlanRow<ParsedOptionGroupRow>> OptionGroups,
     IReadOnlyList<CatalogImportPlanRow<ParsedOptionRow>> Options,
     IReadOnlyList<CatalogImportPlanRow<ParsedSupplierMappingRow>> SupplierMappings,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<CatalogImportPlanRow<ParsedPriceRow>>? Prices = null);
 
 /// <summary>
 /// Duplicate-detection keys: Category by <c>Slug</c>, Product by case-insensitive
@@ -40,6 +41,11 @@ public sealed record CatalogImportPlan(
 /// </summary>
 public static class CatalogImportMatcher
 {
+    private static readonly HashSet<string> CategoryStatuses = new(["Draft", "Active", "Inactive"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The currencies a price sheet may be written in (the platform's supported display currencies).</summary>
+    public static readonly string[] PriceCurrencies = ["USD", "EUR", "EGP", "SAR"];
+
     /// <summary>Matches the Product.NameEn/NameAr column length.</summary>
     private const int ProductNameMaxLength = 200;
 
@@ -53,7 +59,7 @@ public static class CatalogImportMatcher
 
         // ---------- Categories ----------
         var existingCategories = await db.Categories.AsNoTracking()
-            .Select(c => new { c.Id, c.Slug, c.NameEn, c.NameAr, c.IsActive, c.SortOrder })
+            .Select(c => new { c.Id, c.Slug, c.NameEn, c.NameAr, c.IsActive, c.SortOrder, c.IsDraft, c.DescriptionHtml, c.DescriptionAr })
             .ToListAsync(cancellationToken);
         var existingCategoryBySlug = existingCategories
             .ToDictionary(c => c.Slug, StringComparer.OrdinalIgnoreCase);
@@ -120,6 +126,11 @@ public static class CatalogImportMatcher
                 errors.Add("NameEn is required.");
             }
 
+            if (!string.IsNullOrWhiteSpace(row.Status) && !CategoryStatuses.Contains(row.Status))
+            {
+                errors.Add("Status must be Draft, Active or Inactive.");
+            }
+
             if (!string.IsNullOrWhiteSpace(row.ParentSlug) && !CategoryExists(row.ParentSlug))
             {
                 errors.Add($"Parent category '{row.ParentSlug}' was not found.");
@@ -137,7 +148,12 @@ public static class CatalogImportMatcher
                 var changed = !string.Equals(existing.NameEn, row.NameEn, StringComparison.Ordinal)
                     || !string.Equals(existing.NameAr, row.NameAr ?? row.NameEn, StringComparison.Ordinal)
                     || existing.IsActive != row.IsActive
-                    || existing.SortOrder != row.SortOrder;
+                    || existing.SortOrder != row.SortOrder
+                    || existing.IsDraft != string.Equals(row.Status, "Draft", StringComparison.OrdinalIgnoreCase)
+                    || (row.DescriptionEn is not null && !string.Equals(existing.DescriptionHtml, row.DescriptionEn, StringComparison.Ordinal))
+                    || (row.DescriptionAr is not null && !string.Equals(existing.DescriptionAr, row.DescriptionAr, StringComparison.Ordinal))
+                    || row.FilterGroups is { Count: > 0 }
+                    || row.ExcludedFilterGroups is { Count: > 0 };
                 categoryRows.Add(new(row, changed ? CatalogImportRowStatus.Updated : CatalogImportRowStatus.Duplicate, existing.Id, [], []));
             }
             else
@@ -465,6 +481,11 @@ public static class CatalogImportMatcher
                 warnings.Add($"Variant '{row.Sku}': membership plan link was not migrated — reassign it manually.");
             }
 
+            if (row.SelectedOptionValues.Count == 0 && package.OptionGroups.Any(g => string.Equals(g.ProductImportKey, row.ProductImportKey, StringComparison.OrdinalIgnoreCase)))
+            {
+                warnings.Add($"Variant '{row.Sku}': its options could not be read from its name, so it was added without any — choose them on the product.");
+            }
+
             // AutoGenerate discards whatever Sku the file supplies, so a provided value can never
             // collide with an existing variant — it's always New from the matcher's point of view.
             if (skuStrategy != CatalogSkuStrategy.AutoGenerate
@@ -495,6 +516,7 @@ public static class CatalogImportMatcher
         var existingCodeHashSet = existingCodeHashes.ToHashSet(StringComparer.Ordinal);
 
         var codeRows = new List<CatalogImportPlanRow<ParsedCodeRow>>();
+        var codeHashesInFile = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in package.Codes)
         {
             var errors = new List<string>();
@@ -527,9 +549,84 @@ public static class CatalogImportMatcher
             }
 
             var hash = DigitalInventoryCode.ComputeHash(row.Code);
-            codeRows.Add(existingCodeHashSet.Contains(hash)
+            codeRows.Add(existingCodeHashSet.Contains(hash) || !codeHashesInFile.Add(hash)
                 ? new(row, CatalogImportRowStatus.Duplicate, null, [], [])
                 : new(row, CatalogImportRowStatus.New, null, [], []));
+        }
+
+        // ---------- Prices (the Pricing sheet: one line per variant SKU) ----------
+        var existingPricing = await db.ProductVariants.AsNoTracking()
+            .Select(v => new { v.Sku, v.PriceOverride, v.CostPrice, v.MemberPrice, v.SalePrice })
+            .ToListAsync(cancellationToken);
+        var pricingBySku = existingPricing.ToDictionary(v => v.Sku, StringComparer.OrdinalIgnoreCase);
+        var skusInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var priceRows = new List<CatalogImportPlanRow<ParsedPriceRow>>();
+        foreach (var row in package.Prices ?? [])
+        {
+            var errors = new List<string>();
+            var fieldIssues = new List<CatalogImportFieldIssue>();
+            if (row.ParseError is not null)
+            {
+                errors.Add(row.ParseError);
+            }
+
+            if (!pricingBySku.TryGetValue(row.Sku, out var current))
+            {
+                errors.Add($"Variant '{row.Sku}' was not found.");
+                fieldIssues.Add(new("SKU", row.Sku, "UnknownVariant"));
+            }
+
+            if (!skusInFile.Add(row.Sku))
+            {
+                errors.Add($"SKU '{row.Sku}' appears more than once in the file.");
+            }
+
+            if (!PriceCurrencies.Contains(row.Currency, StringComparer.OrdinalIgnoreCase))
+            {
+                errors.Add($"Currency must be one of {string.Join(", ", PriceCurrencies)}.");
+            }
+
+            foreach (var (label, amount) in new[] { ("Cost Price", row.CostPrice), ("Normal Price", row.NormalPrice), ("Sale Price", row.SalePrice), ("Elite Price", row.ElitePrice) })
+            {
+                if (amount is < 0 or > ProductPublishGuard.MaxPrice)
+                {
+                    errors.Add($"{label} must be between 0 and {ProductPublishGuard.MaxPrice:N0}.");
+                }
+            }
+
+            if (row.NormalPrice is <= 0)
+            {
+                errors.Add("Normal Price must be greater than zero.");
+            }
+
+            if (row.SalePrice is not null && row.NormalPrice is { } normal && row.SalePrice >= normal)
+            {
+                errors.Add("Sale Price must be lower than the Normal Price.");
+            }
+
+            if (row.SaleStart is { } start && row.SaleEnd is { } end && end < start)
+            {
+                errors.Add("Sale End must not be before Sale Start.");
+            }
+
+            if (row.SalePrice is null && (row.SaleStart is not null || row.SaleEnd is not null))
+            {
+                warnings.Add($"SKU '{row.Sku}': sale dates were ignored because there is no Sale Price.");
+            }
+
+            if (errors.Count > 0 || current is null)
+            {
+                priceRows.Add(new(row, CatalogImportRowStatus.Invalid, null, errors, fieldIssues));
+                continue;
+            }
+
+            // Only a USD row can be compared exactly; a row in another currency is converted at run time, so it is always "updated".
+            var unchanged = string.Equals(row.Currency, "USD", StringComparison.OrdinalIgnoreCase)
+                && (row.CostPrice is null || row.CostPrice == current.CostPrice)
+                && (row.NormalPrice is null || row.NormalPrice == current.PriceOverride)
+                && (row.ElitePrice is null || row.ElitePrice == current.MemberPrice)
+                && row.SalePrice is null;
+            priceRows.Add(new(row, unchanged ? CatalogImportRowStatus.Duplicate : CatalogImportRowStatus.Updated, null, [], []));
         }
 
         // ---------- Supplier mappings: lighter-touch pass-through ----------
@@ -543,7 +640,7 @@ public static class CatalogImportMatcher
             .ToList();
 
         return new CatalogImportPlan(
-            categoryRows, collectionRows, productRows, variantRows, codeRows, optionGroupRows, optionRows, supplierMappingRows, warnings);
+            categoryRows, collectionRows, productRows, variantRows, codeRows, optionGroupRows, optionRows, supplierMappingRows, warnings, priceRows);
     }
 
     public static CatalogImportValidationReport ToReport(
@@ -558,6 +655,7 @@ public static class CatalogImportMatcher
         rows.AddRange(plan.Variants.Select((r, i) => ToRowResult(i + 1, "Variant", r.Row.Sku ?? "(auto)", r)));
         rows.AddRange(plan.Codes.Select((r, i) => ToRowResult(i + 1, "Code", MaskCode(r.Row.Code), r)));
         rows.AddRange(plan.SupplierMappings.Select((r, i) => ToRowResult(i + 1, "SupplierMapping", r.Row.ExternalProductId, r)));
+        rows.AddRange((plan.Prices ?? []).Select((r, i) => ToRowResult(r.Row.RowNumber, "Price", r.Row.Sku, r)));
 
         return new CatalogImportValidationReport(
             uploadId,
@@ -577,11 +675,7 @@ public static class CatalogImportMatcher
     private static string MaskCode(string code) =>
         code.Length <= 4 ? "****" : $"{code[..2]}****{code[^2..]}";
 
-    private static string Slugify(string value)
-    {
-        var slug = System.Text.RegularExpressions.Regex.Replace(value.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
-        return slug.Length > 0 ? slug : Guid.NewGuid().ToString("N")[..8];
-    }
+    private static string Slugify(string value) => CatalogSlug.From(value);
 
     private sealed class ProductKeyComparer : IEqualityComparer<(string Slug, string NameEn)>
     {

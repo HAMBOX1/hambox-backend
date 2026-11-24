@@ -29,7 +29,7 @@ public sealed class MembershipOperationsService
             sub.Cancel();
         }
 
-        var subscription = MembershipSubscription.Create(userId, plan.Id, plan.DurationDays, autoRenew);
+        var subscription = MembershipSubscription.Create(userId, plan.Id, plan.DurationDays, autoRenew, plan.DurationMonths);
         _dbContext.MembershipSubscriptions.Add(subscription);
         _dbContext.MembershipHistories.Add(MembershipHistory.Create(
             subscription.Id, userId, plan.Id, MembershipHistoryAction.Assigned, performedByUserId: performedByUserId));
@@ -71,7 +71,7 @@ public sealed class MembershipOperationsService
                         sub.Cancel();
                     }
 
-                    subscription.Activate(plan.DurationDays);
+                    subscription.Activate(plan.DurationDays, plan.DurationMonths);
                 }
 
                 historyAction = MembershipHistoryAction.Assigned;
@@ -79,14 +79,14 @@ public sealed class MembershipOperationsService
                 break;
 
             case MembershipCheckoutAction.Renew:
-                subscription.Renew(plan.DurationDays);
+                subscription.Renew(plan.DurationDays, plan.DurationMonths);
                 historyAction = MembershipHistoryAction.Renewed;
                 auditAction = MembershipAuditAction.MembershipRenewed;
                 break;
 
             case MembershipCheckoutAction.Upgrade:
                 var previousPlanId = subscription.PlanId;
-                subscription.ChangePlan(plan.Id, plan.DurationDays);
+                subscription.ChangePlan(plan.Id, plan.DurationDays, plan.DurationMonths);
                 historyAction = MembershipHistoryAction.Upgraded;
                 auditAction = MembershipAuditAction.MembershipUpgraded;
                 _dbContext.MembershipHistories.Add(MembershipHistory.Create(
@@ -102,7 +102,7 @@ public sealed class MembershipOperationsService
 
             case MembershipCheckoutAction.Downgrade:
                 var priorPlanId = subscription.PlanId;
-                subscription.ChangePlan(plan.Id, plan.DurationDays);
+                subscription.ChangePlan(plan.Id, plan.DurationDays, plan.DurationMonths);
                 historyAction = MembershipHistoryAction.Downgraded;
                 auditAction = MembershipAuditAction.MembershipDowngraded;
                 _dbContext.MembershipHistories.Add(MembershipHistory.Create(
@@ -156,7 +156,7 @@ public sealed class MembershipOperationsService
     {
         var subscription = await GetSubscriptionAsync(subscriptionId, cancellationToken);
         var plan = await GetActivePlanAsync(subscription.PlanId, cancellationToken);
-        subscription.Renew(plan.DurationDays);
+        subscription.Renew(plan.DurationDays, plan.DurationMonths);
 
         _dbContext.MembershipHistories.Add(MembershipHistory.Create(
             subscription.Id, subscription.UserId, plan.Id, MembershipHistoryAction.Renewed, performedByUserId: performedByUserId));
@@ -176,7 +176,7 @@ public sealed class MembershipOperationsService
         var subscription = await GetSubscriptionAsync(subscriptionId, cancellationToken);
         var previousPlanId = subscription.PlanId;
         var plan = await GetActivePlanAsync(targetPlanId, cancellationToken);
-        subscription.ChangePlan(plan.Id, plan.DurationDays);
+        subscription.ChangePlan(plan.Id, plan.DurationDays, plan.DurationMonths);
 
         _dbContext.MembershipHistories.Add(MembershipHistory.Create(
             subscription.Id,

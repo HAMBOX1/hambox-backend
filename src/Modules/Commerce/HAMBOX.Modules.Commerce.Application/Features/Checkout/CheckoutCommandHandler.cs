@@ -7,6 +7,7 @@ using HAMBOX.Modules.Catalog.Application.Errors;
 using HAMBOX.Modules.Catalog.Domain.Enums;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.Modules.Commerce.Domain.Account;
@@ -42,6 +43,7 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
     private readonly IPlatformSettingsProvider _platformSettings;
     private readonly ILogger<CheckoutCommandHandler> _logger;
     private readonly PurchaseControlService? _purchaseControl;
+    private readonly StarsCheckoutService? _starsCheckout;
 
     public CheckoutCommandHandler(
         ICommerceDbContext commerceDbContext,
@@ -60,9 +62,11 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
         IOperationalJobQueue jobQueue,
         IPlatformSettingsProvider platformSettings,
         ILogger<CheckoutCommandHandler> logger,
-        PurchaseControlService? purchaseControl = null)
+        PurchaseControlService? purchaseControl = null,
+        StarsCheckoutService? starsCheckout = null)
     {
         _purchaseControl = purchaseControl;
+        _starsCheckout = starsCheckout;
         _commerceDbContext = commerceDbContext;
         _catalogDbContext = catalogDbContext;
         _legalDbContext = legalDbContext;
@@ -285,6 +289,11 @@ internal sealed class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, 
                     orderItems);
 
                 order.RecordPayment(paymentResult!.Provider, paymentResult.TransactionId!);
+
+                if (_starsCheckout is not null)
+                {
+                    await _starsCheckout.ReserveAsync(order, evaluation, ct);
+                }
 
                 // Sensitive product / suspicious activity: take the money, but park the order for an admin —
                 // the manual stock reserved above goes straight back to the pool.

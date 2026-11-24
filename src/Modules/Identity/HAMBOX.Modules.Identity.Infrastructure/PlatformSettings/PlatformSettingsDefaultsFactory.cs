@@ -51,6 +51,8 @@ internal static class PlatformSettingsDefaultsFactory
             PlatformSettingsCategoryKeys.Integrations => CreateIntegrations(),
             PlatformSettingsCategoryKeys.Maintenance => CreateMaintenance(),
             PlatformSettingsCategoryKeys.Legal => CreateLegal(),
+            PlatformSettingsCategoryKeys.Features => new FeatureCenterSettingsPayload(),
+            PlatformSettingsCategoryKeys.Loyalty => new LoyaltySettingsPayload(),
             _ => throw new ArgumentException($"Unknown settings category: {categoryKey}", nameof(categoryKey)),
         };
 

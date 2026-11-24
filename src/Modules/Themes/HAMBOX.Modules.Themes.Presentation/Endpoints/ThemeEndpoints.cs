@@ -117,6 +117,16 @@ internal static class ThemeEndpoints
         publicGroup.MapGet("active", async Task<IResult> ([FromQuery] string? membershipPlanSlug, ISender sender) =>
             MapResult(await sender.Send(new GetActiveThemeQuery(membershipPlanSlug))));
 
+        publicGroup.MapGet("preference", async Task<IResult> (ISender sender) =>
+            MapResult(await sender.Send(new GetThemePreferenceQuery())))
+            .RequireAuthorization()
+            .RequireCustomerContext();
+
+        publicGroup.MapPut("preference", async Task<IResult> ([FromBody] ThemePreferenceRequest body, ISender sender) =>
+            MapResult(await sender.Send(new SetThemePreferenceCommand(body.UseOriginalDesign))))
+            .RequireAuthorization()
+            .RequireCustomerContext();
+
         publicGroup.MapGet("preview/{token}", async Task<IResult> (string token, ISender sender) =>
             MapResult(await sender.Send(new GetPreviewThemeQuery(token))));
     }
@@ -127,3 +137,5 @@ internal static class ThemeEndpoints
     private static IResult MapResult<T>(Result<T> result, int successStatusCode = StatusCodes.Status200OK) =>
         result.IsSuccess ? Results.Json(result.Value, statusCode: successStatusCode) : Results.Problem(result.Error.Description, statusCode: StatusCodes.Status400BadRequest);
 }
+
+internal sealed record ThemePreferenceRequest(bool UseOriginalDesign);

@@ -108,7 +108,9 @@ public sealed record PointsSummaryDto(
     int Balance,
     int TotalEarned,
     bool Enabled,
-    decimal PointsPerUsd);
+    decimal PointsPerUsd,
+    int PendingBalance = 0,
+    int ReservedBalance = 0);
 
 /// <summary>
 /// One purchase-points ledger row as shown in the customer's history.
@@ -117,10 +119,13 @@ public sealed record PointsTransactionDto(
     Guid Id,
     string Type,
     int Points,
-    Guid OrderId,
-    string OrderNumber,
+    Guid? OrderId,
+    string? OrderNumber,
     string Description,
-    DateTimeOffset OccurredOnUtc);
+    DateTimeOffset OccurredOnUtc,
+    string Status = "Available",
+    DateTimeOffset? AvailableOnUtc = null,
+    DateTimeOffset? ExpiresOnUtc = null);
 
 /// <summary>
 /// Represents the referral dashboard.

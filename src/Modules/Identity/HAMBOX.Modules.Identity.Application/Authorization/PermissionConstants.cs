@@ -69,6 +69,8 @@ public static class PermissionConstants
     {
         public const string View = "Customers.View";
         public const string Edit = "Customers.Edit";
+        public const string Export = "Customers.Export";
+        public const string Import = "Customers.Import";
     }
 
     public static class Users
@@ -190,6 +192,28 @@ public static class PermissionConstants
     {
         public const string View = "Referral.View";
         public const string Manage = "Referral.Manage";
+    }
+
+    public static class B2B
+    {
+        public const string View = "B2B.View";
+        public const string Manage = "B2B.Manage";
+        public const string Approve = "B2B.Approve";
+    }
+
+    public static class Loyalty
+    {
+        public const string View = "Loyalty.View";
+        public const string Manage = "Loyalty.Manage";
+        public const string AdjustRank = "Loyalty.AdjustRank";
+    }
+
+    public static class Stars
+    {
+        public const string View = "Stars.View";
+        public const string ManageRules = "Stars.ManageRules";
+        public const string Adjust = "Stars.Adjust";
+        public const string ApproveOverride = "Stars.ApproveOverride";
     }
 
     public static class Reports

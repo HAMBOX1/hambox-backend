@@ -63,6 +63,11 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
     /// </summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>A category still being prepared: hidden from the storefront like an inactive one, but listed as Draft so it is not mistaken for a retired one.</summary>
+    public bool IsDraft { get; private set; }
+
+    public string? DescriptionAr { get; private set; }
+
     /// <summary>
     /// Gets the display order among sibling categories (same <see cref="ParentId"/>).
     /// </summary>
@@ -189,6 +194,22 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
         DescriptionHtml = descriptionHtml;
     }
 
+    public void SetDescriptionAr(string? descriptionAr)
+    {
+        DescriptionAr = string.IsNullOrWhiteSpace(descriptionAr) ? null : descriptionAr.Trim();
+    }
+
+    /// <summary>Draft is a kind of inactive: marking a category draft deactivates it, and activating it later clears the draft flag.</summary>
+    public void SetDraft(bool isDraft)
+    {
+        if (isDraft && IsActive)
+        {
+            Deactivate();
+        }
+
+        IsDraft = isDraft;
+    }
+
     /// <summary>Sets (or clears, with null) the small card icon.</summary>
     public void SetIcon(string? iconUrl)
     {
@@ -262,6 +283,7 @@ public sealed class Category : AggregateRoot, IAuditable, ISoftDeletable
         }
 
         IsActive = true;
+        IsDraft = false;
 
         RaiseDomainEvent(new CategoryActivatedDomainEvent(Id));
     }

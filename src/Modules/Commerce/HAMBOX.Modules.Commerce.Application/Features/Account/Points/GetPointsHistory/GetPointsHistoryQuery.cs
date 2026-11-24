@@ -48,7 +48,8 @@ internal sealed class GetPointsHistoryQueryHandler(ICommerceDbContext db, ICurre
 
         var items = rows
             .Select(t => new PointsTransactionDto(
-                t.Id, t.Type.ToString(), t.Points, t.OrderId, t.OrderNumber, t.Description, t.OccurredOnUtc))
+                t.Id, t.Type.ToString(), t.Points, t.OrderId, t.OrderNumber, t.Description, t.OccurredOnUtc,
+                t.Status.ToString(), t.AvailableOnUtc, t.ExpiresOnUtc))
             .ToList();
 
         return Result.Success(new PagedResult<PointsTransactionDto>(items, pageNumber, pageSize, totalCount));

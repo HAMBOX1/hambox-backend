@@ -14,8 +14,9 @@ namespace HAMBOX.Modules.Catalog.Application.Services;
 /// </summary>
 public static class EffectivePriceResolver
 {
+    /// <summary>A live sale price (see <see cref="ProductVariant.ActiveSalePrice"/>) wins over the normal price, but not over a supplier-derived one.</summary>
     public static decimal Resolve(ProductVariant variant, Product product, decimal? supplierEffectivePrice = null) =>
-        supplierEffectivePrice ?? variant.PriceOverride ?? product.Price;
+        supplierEffectivePrice ?? variant.ActiveSalePrice(DateTimeOffset.UtcNow) ?? variant.PriceOverride ?? product.Price;
 
     public static decimal Resolve(decimal? variantPriceOverride, decimal productPrice, decimal? supplierEffectivePrice = null) =>
         supplierEffectivePrice ?? variantPriceOverride ?? productPrice;

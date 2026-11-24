@@ -33,7 +33,7 @@ public sealed class PointsQueriesTests
     }
 
     private Task<Result<PointsSummaryDto>> SummaryFor(string? userId) =>
-        new GetPointsSummaryQueryHandler(_db, new FakeCurrentUserService(userId), _settings)
+        new GetPointsSummaryQueryHandler(new FakeCurrentUserService(userId), _settings, new HAMBOX.Modules.Commerce.Application.Points.StarsLedgerService(_db))
             .Handle(new GetPointsSummaryQuery(), CancellationToken.None);
 
     private Task<Result<PagedResult<PointsTransactionDto>>> HistoryFor(

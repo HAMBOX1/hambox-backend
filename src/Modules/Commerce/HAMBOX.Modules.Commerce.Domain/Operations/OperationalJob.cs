@@ -44,6 +44,8 @@ public static class OperationalJobTypes
     public const string ReconcileCryptomusPayments = "ReconcileCryptomusPayments";
     public const string ReconcileOxaPayPayments = "ReconcileOxaPayPayments";
     public const string RecomputeSupplierDerivedPricing = "RecomputeSupplierDerivedPricing";
+    public const string ProcessMembershipLifecycle = "ProcessMembershipLifecycle";
+    public const string ProcessStarsLifecycle = "ProcessStarsLifecycle";
 
     /// <summary>
     /// Job types that are per-order work: enqueueing one while another for the same entity is still queued or

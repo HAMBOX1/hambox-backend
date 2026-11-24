@@ -22,6 +22,10 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
     public PurchasePointsSettingsPayload PurchasePoints { get; set; } = new(
         Enabled: false, PointsPerUsd: 1m, AmountBasis: PurchasePointsAmountBasis.NetOfTax);
 
+    public FeatureCenterSettingsPayload Features { get; set; } = new();
+
+    public LoyaltySettingsPayload Loyalty { get; set; } = new();
+
     public PromotionsSettingsPayload Promotions { get; set; } = new(50m, StackCouponsAllowed: true, 1000, 1);
 
     public RetryPoliciesSettingsPayload RetryPolicies { get; set; } = new(3, 30, 120, 5, UseExponentialBackoff: false);
@@ -43,6 +47,16 @@ internal sealed class FakeCommerceSettingsProvider : IPlatformSettingsProvider
         if (categoryKey == PlatformSettingsCategoryKeys.PurchasePoints && PurchasePoints is T purchasePoints)
         {
             return Task.FromResult(purchasePoints);
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.Features && Features is T features)
+        {
+            return Task.FromResult(features);
+        }
+
+        if (categoryKey == PlatformSettingsCategoryKeys.Loyalty && Loyalty is T loyalty)
+        {
+            return Task.FromResult(loyalty);
         }
 
         if (categoryKey == PlatformSettingsCategoryKeys.Promotions && Promotions is T promotions)

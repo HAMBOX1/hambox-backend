@@ -3,14 +3,20 @@ using HAMBOX.Domain.Entities;
 using HAMBOX.Infrastructure.Persistence.Conversions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Domain.Account;
+using HAMBOX.Modules.Commerce.Domain.Archive;
+using HAMBOX.Modules.Commerce.Domain.Business;
 using HAMBOX.Modules.Commerce.Domain.Carts;
+using HAMBOX.Modules.Commerce.Domain.Cosmetics;
 using HAMBOX.Modules.Commerce.Domain.Idempotency;
+using HAMBOX.Modules.Commerce.Domain.Loyalty;
 using HAMBOX.Modules.Commerce.Domain.Memberships;
+using HAMBOX.Modules.Commerce.Domain.Missions;
 using HAMBOX.Modules.Commerce.Domain.Operations;
 using HAMBOX.Modules.Commerce.Domain.Orders;
 using HAMBOX.Modules.Commerce.Domain.PaymentGateways;
 using HAMBOX.Modules.Commerce.Domain.Promotions;
 using HAMBOX.Modules.Commerce.Domain.Reports;
+using HAMBOX.Modules.Commerce.Domain.Rewards;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -55,6 +61,25 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     /// <inheritdoc />
     public DbSet<ReferralAuditLog> ReferralAuditLogs => Set<ReferralAuditLog>();
     public DbSet<PointsTransaction> PointsTransactions => Set<PointsTransaction>();
+    public DbSet<StarsEarnRule> StarsEarnRules => Set<StarsEarnRule>();
+    public DbSet<ProfileCosmetic> ProfileCosmetics => Set<ProfileCosmetic>();
+    public DbSet<CustomerCosmetic> CustomerCosmetics => Set<CustomerCosmetic>();
+    public DbSet<CustomerProfileStyle> CustomerProfileStyles => Set<CustomerProfileStyle>();
+    public DbSet<StarsRuleAward> StarsRuleAwards => Set<StarsRuleAward>();
+    public DbSet<Mission> Missions => Set<Mission>();
+    public DbSet<MissionCompletion> MissionCompletions => Set<MissionCompletion>();
+    public DbSet<BusinessAccount> BusinessAccounts => Set<BusinessAccount>();
+    public DbSet<BusinessPrice> BusinessPrices => Set<BusinessPrice>();
+    public DbSet<BusinessQuote> BusinessQuotes => Set<BusinessQuote>();
+    public DbSet<LegacyCustomerRecord> LegacyCustomerRecords => Set<LegacyCustomerRecord>();
+    public DbSet<LegacyOrderRecord> LegacyOrderRecords => Set<LegacyOrderRecord>();
+    public DbSet<ReferralLegacyCode> ReferralLegacyCodes => Set<ReferralLegacyCode>();
+    public DbSet<RewardItem> RewardItems => Set<RewardItem>();
+    public DbSet<RewardRedemption> RewardRedemptions => Set<RewardRedemption>();
+    public DbSet<StarsGoal> StarsGoals => Set<StarsGoal>();
+    public DbSet<LoyaltyRank> LoyaltyRanks => Set<LoyaltyRank>();
+    public DbSet<CustomerLoyaltyRank> CustomerLoyaltyRanks => Set<CustomerLoyaltyRank>();
+    public DbSet<LoyaltyRankHistory> LoyaltyRankHistory => Set<LoyaltyRankHistory>();
 
     /// <inheritdoc />
     public DbSet<OrderLicenseKey> OrderLicenseKeys => Set<OrderLicenseKey>();
@@ -99,6 +124,9 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     public DbSet<MembershipPlanProductAccess> MembershipPlanProductAccess => Set<MembershipPlanProductAccess>();
     public DbSet<MembershipSubscription> MembershipSubscriptions => Set<MembershipSubscription>();
     public DbSet<MembershipHistory> MembershipHistories => Set<MembershipHistory>();
+    public DbSet<MembershipCode> MembershipCodes => Set<MembershipCode>();
+    public DbSet<MemberPriceUsage> MemberPriceUsages => Set<MemberPriceUsage>();
+    public DbSet<MembershipCodeRedemption> MembershipCodeRedemptions => Set<MembershipCodeRedemption>();
     public DbSet<MembershipTransaction> MembershipTransactions => Set<MembershipTransaction>();
     public DbSet<MembershipAuditLog> MembershipAuditLogs => Set<MembershipAuditLog>();
 

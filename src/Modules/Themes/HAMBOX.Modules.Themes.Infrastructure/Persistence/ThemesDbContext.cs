@@ -12,6 +12,7 @@ public sealed class ThemesDbContext(DbContextOptions<ThemesDbContext> options)
     public DbSet<ThemeVersion> ThemeVersions => Set<ThemeVersion>();
     public DbSet<ThemeSchedule> ThemeSchedules => Set<ThemeSchedule>();
     public DbSet<ThemeAssignment> ThemeAssignments => Set<ThemeAssignment>();
+    public DbSet<UserThemePreference> UserThemePreferences => Set<UserThemePreference>();
     public DbSet<ThemeAsset> ThemeAssets => Set<ThemeAsset>();
     public DbSet<ThemeAuditLog> ThemeAuditLogs => Set<ThemeAuditLog>();
     public DbSet<ThemePreviewSession> ThemePreviewSessions => Set<ThemePreviewSession>();

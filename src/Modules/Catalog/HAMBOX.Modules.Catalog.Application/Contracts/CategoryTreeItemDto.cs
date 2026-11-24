@@ -15,4 +15,5 @@ public sealed record CategoryTreeItemDto(
     int ChildrenCount,
     int ProductCount,
     string? ImageUrl = null,
-    string? IconUrl = null);
+    string? IconUrl = null,
+    bool IsDraft = false);

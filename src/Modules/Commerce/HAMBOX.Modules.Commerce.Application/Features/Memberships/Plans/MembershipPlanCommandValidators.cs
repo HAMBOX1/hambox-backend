@@ -14,6 +14,7 @@ public sealed class CreateMembershipPlanCommandValidator : AbstractValidator<Cre
         RuleFor(x => x.Request.Description).MaximumLength(2000);
         RuleFor(x => x.Request.Price).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Request.DurationDays).GreaterThan(0);
+        RuleFor(x => x.Request.DurationMonths).InclusiveBetween(0, 120);
         RuleFor(x => x.Request.SortOrder).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Request.BadgeLabel).MaximumLength(100);
         RuleFor(x => x.Request.ThemeKey).MaximumLength(100);
@@ -32,6 +33,7 @@ public sealed class UpdateMembershipPlanCommandValidator : AbstractValidator<Upd
         RuleFor(x => x.Request.Description).MaximumLength(2000);
         RuleFor(x => x.Request.Price).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Request.DurationDays).GreaterThan(0);
+        RuleFor(x => x.Request.DurationMonths).InclusiveBetween(0, 120);
         RuleFor(x => x.Request.SortOrder).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Request.BadgeLabel).MaximumLength(100);
         RuleFor(x => x.Request.ThemeKey).MaximumLength(100);

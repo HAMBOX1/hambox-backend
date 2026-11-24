@@ -1,6 +1,7 @@
 using Asp.Versioning.Builder;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.ApproveAdminReferral;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.GetAdminReferrals;
+using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.ImportLegacyCodes;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.GetAdminReferralById;
 using HAMBOX.Modules.Commerce.Application.Features.Referrals.Admin.ReverseAdminReferral;
 using HAMBOX.Modules.Identity.Application.Authorization;
@@ -51,6 +52,12 @@ internal static class AdminReferralEndpoints
         .WithName("ReverseAdminReferral")
         .RequirePermission(PermissionConstants.Referral.Manage);
 
+        // Carries retired PRIME codes over to their owners (LV-03).
+        group.MapPost("legacy-codes/import", async Task<IResult> (ImportLegacyCodesRequest body, ISender sender) =>
+            MapResult(await sender.Send(new ImportLegacyReferralCodesCommand(body.Rows ?? []))))
+        .WithName("ImportLegacyReferralCodes")
+        .RequirePermission(PermissionConstants.Referral.Manage);
+
         // Clears a referral held for review as possible farming (audit R49).
         group.MapPost("{id:guid}/approve", async Task<IResult> (Guid id, ISender sender) =>
             MapResult(await sender.Send(new ApproveAdminReferralCommand(id))))
@@ -69,3 +76,5 @@ internal static class AdminReferralEndpoints
                 Status = StatusCodes.Status400BadRequest,
             });
 }
+
+internal sealed record ImportLegacyCodesRequest(IReadOnlyList<LegacyReferralCodeRow>? Rows);

@@ -55,7 +55,8 @@ internal static class StorefrontProductConfigurationBuilder
                 v.Id,
                 v.Sku,
                 EffectivePriceResolver.Resolve(v, product, supplierEffectivePrice),
-                v.ComparePrice,
+                // While a sale runs the normal price is shown struck through next to the sale price.
+                v.ActiveSalePrice(DateTimeOffset.UtcNow) is null ? v.ComparePrice : v.ComparePrice ?? v.PriceOverride ?? product.Price,
                 manualAvailable,
                 s?.IsLowStock ?? false,
                 !isPurchasable,

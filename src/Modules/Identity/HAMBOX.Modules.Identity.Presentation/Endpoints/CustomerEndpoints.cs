@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 
 namespace HAMBOX.Modules.Identity.Presentation.Endpoints;
 
@@ -33,15 +34,24 @@ internal static class CustomerEndpoints
             [FromQuery] bool? member,
             [FromQuery] DateTimeOffset? registeredFrom,
             [FromQuery] DateTimeOffset? registeredTo,
+            [FromQuery] string? rank,
             ISender sender,
             CancellationToken ct) =>
         {
             pageNumber = pageNumber <= 0 ? 1 : pageNumber;
             pageSize = pageSize <= 0 ? 25 : Math.Min(pageSize, 200);
-            var result = await sender.Send(new GetCustomersQuery(pageNumber, pageSize, searchTerm, status, member, registeredFrom, registeredTo), ct);
+            var result = await sender.Send(new GetCustomersQuery(pageNumber, pageSize, searchTerm, status, member, registeredFrom, registeredTo, rank), ct);
             return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error.Description);
         })
         .WithName("GetAdminCustomers")
+        .RequirePermission(PermissionConstants.Security.ManageUsers);
+
+        group.MapGet("{id:guid}", async Task<IResult> (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GetCustomer360Query(id), ct);
+            return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error.Description);
+        })
+        .WithName("GetAdminCustomer360")
         .RequirePermission(PermissionConstants.Security.ManageUsers);
 
         group.MapGet("export", async Task<IResult> (
@@ -50,53 +60,42 @@ internal static class CustomerEndpoints
             [FromQuery] bool? member,
             [FromQuery] DateTimeOffset? registeredFrom,
             [FromQuery] DateTimeOffset? registeredTo,
+            [FromQuery] string? rank,
+            [FromQuery] string? format,
+            [FromQuery] string? columns,
+            System.Security.Claims.ClaimsPrincipal user,
+            ILoggerFactory loggers,
             ISender sender,
             CancellationToken ct) =>
         {
-            var result = await sender.Send(new GetCustomersQuery(1, MaxExportRows, searchTerm, status, member, registeredFrom, registeredTo), ct);
+            var result = await sender.Send(new GetCustomersQuery(1, MaxExportRows, searchTerm, status, member, registeredFrom, registeredTo, rank), ct);
             if (result.IsFailure)
             {
                 return Results.BadRequest(result.Error.Description);
             }
 
-            var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(ToCsv(result.Value.Items))).ToArray();
-            return Results.File(bytes, "text/csv; charset=utf-8", $"customers-{DateTime.UtcNow:yyyyMMdd-HHmm}.csv");
+            var selected = CustomerExportColumns.Resolve(columns);
+            var xlsx = string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase);
+
+            // Who pulled which customer data, when, with what filters — the audit trail the brief asks for.
+            loggers.CreateLogger("CustomerExport").LogInformation(
+                "Customer export by {User}: {Rows} rows, format {Format}, columns [{Columns}], filters search={Search} status={Status} member={Member} rank={Rank}.",
+                user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, result.Value.Items.Count, xlsx ? "xlsx" : "csv",
+                string.Join(',', selected.Select(c => c.Key)), searchTerm, status, member, rank);
+
+            var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+            if (xlsx)
+            {
+                return Results.File(
+                    CustomerExportColumns.ToXlsx(result.Value.Items, selected),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    $"customers-{stamp}.xlsx");
+            }
+
+            var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(CustomerExportColumns.ToCsv(result.Value.Items, selected))).ToArray();
+            return Results.File(bytes, "text/csv; charset=utf-8", $"customers-{stamp}.csv");
         })
         .WithName("ExportAdminCustomers")
-        .RequirePermission(PermissionConstants.Security.ManageUsers);
-    }
-
-    /// <summary>Only account and activity columns: never a password hash, token or card detail.</summary>
-    internal static string ToCsv(IEnumerable<CustomerListItemDto> customers)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine("CustomerId,Email,FirstName,LastName,Phone,Status,EmailConfirmed,Language,Currency,RegisteredOnUtc,Orders,PaidOrders,PaidSpendUsd,LastOrderOnUtc,MembershipPlan,MembershipStatus,MembershipExpiresOnUtc,Points,ReferralCode");
-        foreach (var c in customers)
-        {
-            builder.AppendLine(string.Join(',',
-                Cell(c.Id.ToString()), Cell(c.Email), Cell(c.FirstName), Cell(c.LastName),
-                // A leading apostrophe keeps spreadsheet apps from turning a phone number into a number (dropping the + or a leading zero).
-                Cell(string.IsNullOrWhiteSpace(c.PhoneNumber) ? string.Empty : "'" + c.PhoneNumber, protectFormula: false),
-                Cell(c.Status), Cell(c.EmailConfirmed ? "TRUE" : "FALSE"), Cell(c.PreferredLanguage), Cell(c.PreferredCurrency),
-                Cell(c.RegisteredOnUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
-                c.OrderCount, c.PaidOrderCount, c.PaidSpendUsd.ToString("0.00", CultureInfo.InvariantCulture),
-                Cell(c.LastOrderOnUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? string.Empty),
-                Cell(c.MembershipPlan ?? string.Empty), Cell(c.MembershipStatus ?? string.Empty),
-                Cell(c.MembershipExpiresOnUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? string.Empty),
-                c.PointsBalance, Cell(c.ReferralCode ?? string.Empty)));
-        }
-
-        return builder.ToString();
-    }
-
-    private static string Cell(string value, bool protectFormula = true)
-    {
-        // A cell that starts with = + - @ would run as a formula when opened in Excel: neutralise it.
-        if (protectFormula && value.Length > 0 && "=+-@".Contains(value[0]))
-        {
-            value = "'" + value;
-        }
-
-        return value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+        .RequirePermission(PermissionConstants.Customers.Export);
     }
 }

@@ -265,8 +265,10 @@ internal sealed class PlatformSettingsService(
         var maintenance = await GetMaintenanceAsync(cancellationToken);
         var legal = await GetAsync<LegalSettingsPayload>(PlatformSettingsCategoryKeys.Legal, cancellationToken);
 
+        var features = await GetAsync<FeatureCenterSettingsPayload>(PlatformSettingsCategoryKeys.Features, cancellationToken);
+
         return new PublicPlatformSettingsDto(
-            general, branding, localization, seo, analytics, maintenance, legal);
+            general, branding, localization, seo, analytics, maintenance, legal, features);
     }
 
     public void InvalidateCache(string? categoryKey = null)
@@ -460,6 +462,8 @@ internal sealed class PlatformSettingsService(
             var t when t == typeof(AnalyticsSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<AnalyticsSettingsPayload>(mergedJson),
             var t when t == typeof(IntegrationsSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<IntegrationsSettingsPayload>(mergedJson),
             var t when t == typeof(MaintenanceSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<MaintenanceSettingsPayload>(mergedJson),
+            var t when t == typeof(LoyaltySettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<LoyaltySettingsPayload>(mergedJson),
+            var t when t == typeof(FeatureCenterSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<FeatureCenterSettingsPayload>(mergedJson),
             var t when t == typeof(LegalSettingsPayload) => PlatformSettingsDefaultsFactory.Deserialize<LegalSettingsPayload>(mergedJson),
             _ => JsonSerializer.Deserialize<JsonElement>(mergedJson, JsonOptions)!,
         };

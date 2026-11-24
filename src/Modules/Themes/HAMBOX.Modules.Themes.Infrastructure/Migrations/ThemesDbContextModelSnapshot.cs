@@ -413,6 +413,35 @@ namespace HAMBOX.Modules.Themes.Infrastructure.Migrations
                     b.ToTable("ThemeVersions", "platform");
                 });
 
+            modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Themes.UserThemePreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("UseOriginalDesign")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_UserThemePreferences_UserId");
+
+                    b.ToTable("UserThemePreferences", "platform");
+                });
+
             modelBuilder.Entity("HAMBOX.Modules.Themes.Domain.Campaigns.ThemeCampaign", b =>
                 {
                     b.HasOne("HAMBOX.Modules.Themes.Domain.Themes.StoreTheme", null)

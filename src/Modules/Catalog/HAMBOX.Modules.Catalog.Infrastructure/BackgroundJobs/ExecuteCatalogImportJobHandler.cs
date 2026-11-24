@@ -1,9 +1,11 @@
+using System.Net;
 using System.Text.Json;
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Application.BackgroundJobs;
 using HAMBOX.Modules.Catalog.Application.Abstractions;
 using HAMBOX.Modules.Catalog.Application.Features.ImportExport;
 using HAMBOX.Modules.Catalog.Application.Features.Inventory;
+using HAMBOX.Modules.Catalog.Application.Services;
 using HAMBOX.Modules.Catalog.Domain.Categories;
 using HAMBOX.Modules.Catalog.Domain.Collections;
 using HAMBOX.Modules.Catalog.Domain.Enums;
@@ -11,6 +13,7 @@ using HAMBOX.Modules.Catalog.Domain.Inventory;
 using HAMBOX.Modules.Catalog.Domain.Packaging;
 using HAMBOX.Modules.Catalog.Domain.Products;
 using HAMBOX.Modules.Catalog.Infrastructure.Persistence;
+using HAMBOX.Infrastructure.Currency;
 using HAMBOX.Modules.Suppliers.Application.Abstractions;
 using HAMBOX.Modules.Suppliers.Domain.Suppliers;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +34,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
     ICatalogSuppliersTransactionService suppliersTransaction,
     IFileStorage fileStorage,
     ICatalogImportParser parser,
-    ICatalogPackageSecretProtector secretProtector)
+    ICatalogPackageSecretProtector secretProtector,
+    CurrencyExchangeRateService exchangeRates)
     : BackgroundJobHandlerBase<ExecuteCatalogImportJobPayload>(serializer)
 {
     public override string JobType => CatalogJobTypes.ImportPackage;
@@ -67,12 +71,16 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 .Where(o => o.EntityType == "Variant")
                 .ToDictionary(o => o.RowNumber, o => o.Strategy);
 
-            var hasSupplierWrites = payload.Options.IncludeSuppliers && plan.SupplierMappings.Count > 0;
+            // A Stock sheet is nothing but codes (filed under variants that already exist), so it needs both switches on whatever the wizard sent.
+            var options = job.EntityType == CatalogImportEntityType.Codes
+                ? payload.Options with { IncludeDigitalCodes = true, IncludeVariants = true }
+                : payload.Options;
+            var hasSupplierWrites = options.IncludeSuppliers && plan.SupplierMappings.Count > 0;
 
             if (hasSupplierWrites)
             {
                 await suppliersTransaction.ExecuteAsync(
-                    ct => ApplyPlanAsync(job, plan, payload.Strategy, payload.SkuStrategy, rowOverridesByRowNumber, payload.Options, summary, context, ct),
+                    ct => ApplyPlanAsync(job, plan, payload.Strategy, payload.SkuStrategy, rowOverridesByRowNumber, options, summary, context, ct),
                     cancellationToken);
             }
             else
@@ -80,7 +88,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 await using var transaction = await catalogDb.Database.BeginTransactionAsync(cancellationToken);
                 try
                 {
-                    await ApplyPlanAsync(job, plan, payload.Strategy, payload.SkuStrategy, rowOverridesByRowNumber, payload.Options, summary, context, cancellationToken);
+                    await ApplyPlanAsync(job, plan, payload.Strategy, payload.SkuStrategy, rowOverridesByRowNumber, options, summary, context, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                 }
                 catch
@@ -126,6 +134,8 @@ internal sealed class ExecuteCatalogImportJobHandler(
         var productKeyToId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var skuToVariantId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var takenSlugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var effectiveFilterGroups = new Dictionary<Guid, IReadOnlyList<string>>();
+        var knownFilterKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var takenSkus = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ---------- Categories (parents before children — iterative pass) ----------
@@ -135,6 +145,20 @@ internal sealed class ExecuteCatalogImportJobHandler(
                 .ForEach(c => { slugToId[c.Slug] = c.Id; takenSlugs.Add(c.Slug); });
 
             var remaining = new List<CatalogImportPlanRow<ParsedCategoryRow>>(plan.Categories.Where(r => r.Status != CatalogImportRowStatus.Invalid));
+            var configuresFilters = remaining.Any(r => r.Row.FilterGroups is { Count: > 0 } || r.Row.ExcludedFilterGroups is { Count: > 0 });
+            if (configuresFilters)
+            {
+                foreach (var key in await catalogDb.ProductOptionGroups.AsNoTracking().Select(g => g.Key).Distinct().ToListAsync(cancellationToken))
+                {
+                    knownFilterKeys[key] = key;
+                }
+
+                foreach (var key in await catalogDb.FilterDefinitions.AsNoTracking().Select(d => d.Key).ToListAsync(cancellationToken))
+                {
+                    knownFilterKeys[key] = key;
+                }
+            }
+
             var progressed = true;
             while (remaining.Count > 0 && progressed)
             {
@@ -159,6 +183,12 @@ internal sealed class ExecuteCatalogImportJobHandler(
                         {
                             var existing = await catalogDb.Categories.FirstAsync(c => c.Id == existingId, cancellationToken);
                             existing.Update(row.NameAr ?? row.NameEn, row.NameEn, row.Slug, parentId);
+                            ApplyCategoryState(existing, row);
+                            if (configuresFilters)
+                            {
+                                await ApplyFilterGroupsAsync(row, parentId, existingId, effectiveFilterGroups, knownFilterKeys, cancellationToken);
+                            }
+
                             summary.Updated++;
                         }
 
@@ -171,7 +201,13 @@ internal sealed class ExecuteCatalogImportJobHandler(
                             : row.Slug;
 
                         var category = Category.Create(row.NameAr ?? row.NameEn, row.NameEn, slug, parentId);
+                        ApplyCategoryState(category, row);
                         catalogDb.Categories.Add(category);
+                        if (configuresFilters)
+                        {
+                            await ApplyFilterGroupsAsync(row, parentId, category.Id, effectiveFilterGroups, knownFilterKeys, cancellationToken);
+                        }
+
                         slugToId[row.Slug] = category.Id;
                         slugToId[slug] = category.Id;
                         takenSlugs.Add(slug);
@@ -301,6 +337,11 @@ internal sealed class ExecuteCatalogImportJobHandler(
                             : row.DescriptionEn ?? existing.DescriptionEn;
                         existing.Update(row.NameAr ?? existing.NameAr, row.NameEn, row.DescriptionAr ?? existing.DescriptionAr, descriptionEn);
                         existing.ChangePrice(row.Price ?? existing.Price);
+                        if (row.AdditionalDescriptionEn is not null || row.AdditionalDescriptionAr is not null)
+                        {
+                            existing.SetAdditionalDescription(row.AdditionalDescriptionEn, row.AdditionalDescriptionAr);
+                        }
+
                         ApplyRequestedStatus(existing, row.Status);
                         if (additionalCategoryIds.Count > 0)
                         {
@@ -321,6 +362,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
                         row.NameAr ?? row.NameEn, row.NameEn, row.DescriptionAr ?? string.Empty, row.DescriptionEn ?? string.Empty,
                         row.Price ?? 0m, categoryId);
                     product.SetInitialStock(row.StockQuantity);
+                    product.SetAdditionalDescription(row.AdditionalDescriptionEn, row.AdditionalDescriptionAr);
                     ApplyRequestedStatus(product, row.Status);
                     if (additionalCategoryIds.Count > 0)
                     {
@@ -491,6 +533,11 @@ internal sealed class ExecuteCatalogImportJobHandler(
                             existing.SetOptions(optionIds);
                         }
 
+                        if (row.Description is not null)
+                        {
+                            existing.SetDescription(ToHtml(row.Description), false);
+                        }
+
                         summary.Updated++;
                     }
                 }
@@ -510,6 +557,13 @@ internal sealed class ExecuteCatalogImportJobHandler(
                     {
                         variant.SetOptions(optionIds);
                     }
+
+                    if (row.Description is not null)
+                    {
+                        variant.SetDescription(ToHtml(row.Description), false);
+                    }
+
+                    ApplyRequestedVariantStatus(variant, row.Status);
 
                     catalogDb.ProductVariants.Add(variant);
                     if (!string.IsNullOrWhiteSpace(row.Sku))
@@ -592,7 +646,7 @@ internal sealed class ExecuteCatalogImportJobHandler(
 
                 var code = DigitalInventoryCode.Create(
                     variantId, batch.Id, row.Code, null, row.SerialNumber, row.Pin, row.PurchaseCost, null, row.Currency,
-                    null, row.ExpirationDate);
+                    row.Notes, row.ExpirationDate);
                 catalogDb.DigitalInventoryCodes.Add(code);
                 batch.RecordImport(1);
                 summary.Created++;
@@ -603,6 +657,9 @@ internal sealed class ExecuteCatalogImportJobHandler(
 
         job.ReportProgress(90);
         await context.ReportProgressAsync(90, cancellationToken);
+
+        // ---------- Prices (the Pricing sheet) ----------
+        await ApplyPricesAsync(plan.Prices ?? [], summary, cancellationToken);
 
         // ---------- Supplier mappings (best-effort: missing supplier = non-fatal warning) ----------
         if (options.IncludeSuppliers)
@@ -631,6 +688,148 @@ internal sealed class ExecuteCatalogImportJobHandler(
 
             await suppliersDb.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    /// <summary>Applies a client-layout category row's status and descriptions. A row from an older layout (no status) leaves the state alone.</summary>
+    private static void ApplyCategoryState(Category category, ParsedCategoryRow row)
+    {
+        if (row.DescriptionEn is not null)
+        {
+            category.SetDescription(ToHtml(row.DescriptionEn));
+        }
+
+        if (row.DescriptionAr is not null)
+        {
+            category.SetDescriptionAr(row.DescriptionAr);
+        }
+
+        if (row.Status is null)
+        {
+            return;
+        }
+
+        if (row.Status.Equals("Draft", StringComparison.OrdinalIgnoreCase))
+        {
+            category.SetDraft(true);
+        }
+        else if (row.Status.Equals("Inactive", StringComparison.OrdinalIgnoreCase))
+        {
+            category.SetDraft(false);
+            if (category.IsActive)
+            {
+                category.Deactivate();
+            }
+        }
+        else
+        {
+            category.SetDraft(false);
+            if (!category.IsActive)
+            {
+                category.Activate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// A category's filter list is what it inherits (its parent's, else the store default) plus its <c>FilterGroups</c> minus
+    /// its <c>ExcludedFilterGroups</c>. A category that names neither keeps inheriting; one that names either gets its own list.
+    /// </summary>
+    private async Task ApplyFilterGroupsAsync(
+        ParsedCategoryRow row,
+        Guid? parentId,
+        Guid categoryId,
+        Dictionary<Guid, IReadOnlyList<string>> effectiveById,
+        IReadOnlyDictionary<string, string> knownKeys,
+        CancellationToken cancellationToken)
+    {
+        var inherited = await InheritedFilterGroupsAsync(parentId, effectiveById, cancellationToken);
+        var include = (row.FilterGroups ?? []).Select(k => knownKeys.GetValueOrDefault(k, k)).ToList();
+        var exclude = new HashSet<string>((row.ExcludedFilterGroups ?? []).Select(k => knownKeys.GetValueOrDefault(k, k)), StringComparer.OrdinalIgnoreCase);
+        if (include.Count == 0 && exclude.Count == 0)
+        {
+            effectiveById[categoryId] = inherited;
+            return;
+        }
+
+        var effective = inherited.Concat(include).Where(k => !exclude.Contains(k)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        catalogDb.CategoryFacetSettings.RemoveRange(await catalogDb.CategoryFacetSettings.Where(s => s.CategoryId == categoryId).ToListAsync(cancellationToken));
+        for (var order = 0; order < effective.Count; order++)
+        {
+            catalogDb.CategoryFacetSettings.Add(CategoryFacetSetting.Create(categoryId, effective[order], null, null, order, true));
+        }
+
+        effectiveById[categoryId] = effective;
+    }
+
+    private async Task<IReadOnlyList<string>> InheritedFilterGroupsAsync(
+        Guid? categoryId, Dictionary<Guid, IReadOnlyList<string>> effectiveById, CancellationToken cancellationToken)
+    {
+        var visited = new HashSet<Guid>();
+        var current = categoryId;
+        while (current is { } id && visited.Add(id))
+        {
+            if (effectiveById.TryGetValue(id, out var known))
+            {
+                return known;
+            }
+
+            var own = await VisibleGroupsAsync(id, cancellationToken);
+            if (own.Count > 0)
+            {
+                return own;
+            }
+
+            current = await catalogDb.Categories.AsNoTracking().Where(c => c.Id == id).Select(c => c.ParentId).FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return await VisibleGroupsAsync(CategoryFacetSetting.DefaultCategoryId, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<string>> VisibleGroupsAsync(Guid categoryId, CancellationToken cancellationToken) =>
+        await catalogDb.CategoryFacetSettings.AsNoTracking()
+            .Where(s => s.CategoryId == categoryId && s.IsVisible)
+            .OrderBy(s => s.SortOrder)
+            .Select(s => s.GroupKey)
+            .ToListAsync(cancellationToken);
+
+    /// <summary>A sheet cell is plain text, or HTML written by our own export: either way what is stored is sanitized HTML.</summary>
+    private static string ToHtml(string text) =>
+        text.TrimStart().StartsWith('<')
+            ? ProductOptionDescriptionSanitizer.Sanitize(text) ?? string.Empty
+            : $"<p>{WebUtility.HtmlEncode(text)}</p>";
+
+    private static void ApplyRequestedVariantStatus(ProductVariant variant, string? statusText)
+    {
+        if (!Enum.TryParse<ProductVariantStatus>(statusText, ignoreCase: true, out var status))
+        {
+            return;
+        }
+
+        switch (status)
+        {
+            case ProductVariantStatus.Active:
+                variant.Activate();
+                break;
+            case ProductVariantStatus.Inactive:
+                variant.Deactivate();
+                break;
+            case ProductVariantStatus.Archived:
+                variant.Archive();
+                break;
+        }
+    }
+
+    private async Task ApplyPricesAsync(
+        IReadOnlyList<CatalogImportPlanRow<ParsedPriceRow>> prices, ImportRunSummary summary, CancellationToken cancellationToken)
+    {
+        var rates = CatalogPriceApplier.NeedsRates(prices)
+            ? (await exchangeRates.GetRatesAsync(cancellationToken)).Rates
+            : new Dictionary<string, decimal>();
+        var result = await CatalogPriceApplier.ApplyAsync(catalogDb, prices, rates, cancellationToken);
+        summary.Updated += result.Updated;
+        summary.Skipped += result.Skipped;
+        summary.Failed += result.Errors.Count;
+        summary.Errors.AddRange(result.Errors);
     }
 
     private async Task GenerateCombinatorialVariantsAsync(

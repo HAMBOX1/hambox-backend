@@ -30,6 +30,62 @@ internal sealed class UserDirectory(IIdentityDbContext dbContext) : IUserDirecto
         return found.Select(id => id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
+    public async Task<IReadOnlyDictionary<string, string>> FindUserIdsByEmailAsync(
+        IReadOnlyCollection<string> emails,
+        CancellationToken cancellationToken = default)
+    {
+        var wanted = emails
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e.Trim().ToUpperInvariant())
+            .Distinct()
+            .ToList();
+
+        if (wanted.Count == 0)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        var users = await dbContext.Users.AsNoTracking()
+            .Where(user => user.NormalizedEmail != null && wanted.Contains(user.NormalizedEmail))
+            .Select(user => new { user.Id, user.Email })
+            .ToListAsync(cancellationToken);
+
+        return users.ToDictionary(u => u.Email.ToLowerInvariant(), u => u.Id.ToString(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task<DateTimeOffset?> GetRegisteredOnAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(userId, out var id))
+        {
+            return null;
+        }
+
+        return await dbContext.Users.AsNoTracking().Where(user => user.Id == id).Select(user => (DateTimeOffset?)user.CreatedOnUtc).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<string?> GetEmailAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(userId, out var id))
+        {
+            return null;
+        }
+
+        return await dbContext.Users.AsNoTracking().Where(user => user.Id == id).Select(user => user.Email).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<string?> GetVerifiedEmailAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(userId, out var id))
+        {
+            return null;
+        }
+
+        return await dbContext.Users.AsNoTracking()
+            .Where(user => user.Id == id && user.EmailConfirmed)
+            .Select(user => user.Email)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetDisplayNamesAsync(
         IReadOnlyCollection<string> userIds,
         CancellationToken cancellationToken = default)

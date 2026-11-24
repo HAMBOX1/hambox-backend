@@ -39,6 +39,11 @@ public sealed class ShoppingCart : AggregateRoot
     /// </summary>
     public string? AppliedCouponCode { get; private set; }
 
+    /// <summary>How many Stars the customer chose to spend on this cart's checkout; 0 = none. The usable amount is re-quoted at checkout.</summary>
+    public int StarsToRedeem { get; private set; }
+
+    public void SetStarsToRedeem(int stars) => StarsToRedeem = Math.Max(stars, 0);
+
     /// <summary>
     /// Gets the cart items.
     /// </summary>
@@ -106,6 +111,7 @@ public sealed class ShoppingCart : AggregateRoot
     {
         _items.Clear();
         AppliedCouponCode = null;
+        StarsToRedeem = 0;
     }
 
     /// <summary>

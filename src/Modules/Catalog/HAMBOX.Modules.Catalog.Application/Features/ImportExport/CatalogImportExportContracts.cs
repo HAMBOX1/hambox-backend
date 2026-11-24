@@ -39,8 +39,14 @@ public sealed record CatalogExportScope(
 /// variants/option-groups/codes rows reference "which product". It is never persisted and never
 /// used to detect duplicates against the destination database (see <see cref="CatalogDedupeKeys"/>).
 /// </summary>
+/// <summary>
+/// <see cref="Status"/> is Draft/Active/Inactive (blank = follow <see cref="IsActive"/>). <see cref="FilterGroups"/> are the filter
+/// groups this category adds to the ones it inherits from its parent; <see cref="ExcludedFilterGroups"/> are inherited ones it drops.
+/// </summary>
 public sealed record ParsedCategoryRow(
-    int RowNumber, string Slug, string NameEn, string? NameAr, string? ParentSlug, bool IsActive, int SortOrder);
+    int RowNumber, string Slug, string NameEn, string? NameAr, string? ParentSlug, bool IsActive, int SortOrder,
+    string? Status = null, string? DescriptionEn = null, string? DescriptionAr = null,
+    IReadOnlyList<string>? FilterGroups = null, IReadOnlyList<string>? ExcludedFilterGroups = null);
 
 /// <summary>
 /// A collection has no slug (internal-only, no URL) — dedupe/matching uses <c>Name</c> +
@@ -59,7 +65,8 @@ public sealed record ParsedProductRow(
     int RowNumber, string ImportKey, string NameEn, string? NameAr, string? DescriptionEn, string? DescriptionAr,
     decimal? Price, string CategorySlug, string? Status, int StockQuantity,
     IReadOnlyList<string> ImagePaths, IReadOnlyList<string> AdditionalCategorySlugs,
-    IReadOnlyList<string>? CollectionNames = null);
+    IReadOnlyList<string>? CollectionNames = null,
+    string? AdditionalDescriptionEn = null, string? AdditionalDescriptionAr = null, string? MainImageRef = null);
 
 public sealed record ParsedOptionGroupRow(
     string ProductImportKey, string Key, string DisplayName, string? ParentKey, int SortOrder, bool IsRequired,
@@ -79,11 +86,21 @@ public sealed record ParsedOptionRow(
 /// </summary>
 public sealed record ParsedVariantRow(
     int RowNumber, string? Sku, string ProductImportKey, decimal? PriceOverride, decimal? ComparePrice,
-    string? Status, int LowStockThreshold, Guid? MembershipPlanId, IReadOnlyList<string> SelectedOptionValues);
+    string? Status, int LowStockThreshold, Guid? MembershipPlanId, IReadOnlyList<string> SelectedOptionValues,
+    string? Description = null);
 
 public sealed record ParsedCodeRow(
     int RowNumber, string VariantSku, string Code, string? SerialNumber, string? Pin,
-    decimal? PurchaseCost, string Currency, DateTimeOffset? ExpirationDate, string? BatchName);
+    decimal? PurchaseCost, string Currency, DateTimeOffset? ExpirationDate, string? BatchName, string? Notes = null);
+
+/// <summary>
+/// One line of the Pricing sheet. Amounts are in <see cref="Currency"/>; Execute converts them to the stored USD. A blank amount
+/// leaves that price as it is (the sale is changed only by a row that has a sale price; end one by setting its Sale End in the past).
+/// </summary>
+public sealed record ParsedPriceRow(
+    int RowNumber, string Sku, string Currency, decimal? CostPrice, decimal? NormalPrice, decimal? SalePrice,
+    decimal? ElitePrice, DateTimeOffset? SaleStart, DateTimeOffset? SaleEnd, string? ParseError = null,
+    string? ProductName = null);
 
 public sealed record ParsedSupplierMappingRow(
     string ProductImportKey, string SupplierCode, string ExternalProductId, string? ExternalSku,
@@ -99,11 +116,12 @@ public sealed record ParsedCatalogPackage(
     IReadOnlyList<ParsedSupplierMappingRow> SupplierMappings,
     IReadOnlyDictionary<string, byte[]> Images,
     bool CodesEncrypted,
-    IReadOnlyList<ParsedCollectionRow> Collections)
+    IReadOnlyList<ParsedCollectionRow> Collections,
+    IReadOnlyList<ParsedPriceRow>? Prices = null)
 {
     public static ParsedCatalogPackage Empty { get; } = new(
         [], [], [], [], [], [], [],
-        new Dictionary<string, byte[]>(), false, []);
+        new Dictionary<string, byte[]>(), false, [], []);
 }
 
 // ---------- Validation report (Step 2 of the wizard) ----------

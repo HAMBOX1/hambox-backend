@@ -43,7 +43,7 @@ internal static class SheetText
     public static string Norm(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
     public static List<string> SplitValues(string cell) =>
-        cell.Split(['|', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        cell.Split(['|', ';', ',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(v => v.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -181,7 +181,7 @@ internal sealed class ImportProductFiltersCommandHandler(ICatalogDbContext db, I
     : IRequestHandler<ImportProductFiltersCommand, Result<FilterImportPreviewDto>>
 {
     private const int MaxChangesShown = 300;
-    private static readonly HashSet<string> IgnoredColumns = ["productid", "sku", "name", "category", "platform", "image"];
+    private static readonly HashSet<string> IgnoredColumns = ["productid", "sku", "name", "productname", "category", "platform", "image"];
 
     private sealed record PlannedChange(Guid ProductId, string ProductName, FilterDefinition Filter, List<FilterValue> Old, List<string> NewKeys);
 
@@ -287,7 +287,11 @@ internal sealed class ImportProductFiltersCommandHandler(ICatalogDbContext db, I
 
         var newValueLabels = new List<string>();
         var planned = new List<PlannedChange>();
-        var seenProducts = new HashSet<Guid>();
+        // Several rows may belong to one product (a parent and its variants, each with their own SKU): their values are
+        // added together per filter. Only the same SKU / ProductId twice is a mistake.
+        var seenRows = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var wanted = new Dictionary<(Guid ProductId, Guid FilterId), List<string>>();
+        var wantedFirstRow = new Dictionary<(Guid ProductId, Guid FilterId), int>();
         foreach (var (rowNumber, idText, sku) in rowRefs)
         {
             Guid? productId = null;
@@ -306,7 +310,7 @@ internal sealed class ImportProductFiltersCommandHandler(ICatalogDbContext db, I
                 continue;
             }
 
-            if (!seenProducts.Add(productId.Value))
+            if (!seenRows.Add(string.IsNullOrWhiteSpace(sku) ? idText ?? string.Empty : sku.Trim()))
             {
                 errors.Add(new FilterImportIssue(rowNumber, $"“{productsById[productId.Value]}” appears more than once in the sheet."));
                 continue;
@@ -358,20 +362,40 @@ internal sealed class ImportProductFiltersCommandHandler(ICatalogDbContext db, I
                     }
                 }
 
-                var old = currentTags.Where(t => t.ProductId == productId && t.FilterId == definition.Id)
-                    .Select(t => definition.Values.FirstOrDefault(v => v.Id == t.FilterValueId)).Where(v => v is not null).Select(v => v!).ToList();
-                var oldKeys = old.Select(v => v.Value).ToHashSet();
-                var newKeys = request.Mode switch
+                var slot = (productId.Value, definition.Id);
+                if (!wanted.TryGetValue(slot, out var keys))
                 {
-                    FilterAssignMode.Replace => wantedKeys.Distinct().ToList(),
-                    FilterAssignMode.Remove => oldKeys.Where(k => !wantedKeys.Contains(k)).ToList(),
-                    _ => oldKeys.Concat(wantedKeys).Distinct().ToList(),
-                };
-
-                if (!newKeys.OrderBy(k => k).SequenceEqual(oldKeys.OrderBy(k => k)))
-                {
-                    planned.Add(new PlannedChange(productId.Value, productsById[productId.Value], definition, old, newKeys));
+                    wanted[slot] = keys = [];
+                    wantedFirstRow[slot] = rowNumber;
                 }
+
+                keys.AddRange(wantedKeys);
+            }
+        }
+
+        foreach (var ((productId, filterId), keys) in wanted)
+        {
+            var definition = filterColumns.First(f => f.Definition.Id == filterId).Definition;
+            var wantedKeys = keys.Distinct().ToList();
+            if (!definition.IsMultiSelect && wantedKeys.Count > 1)
+            {
+                errors.Add(new FilterImportIssue(wantedFirstRow[(productId, filterId)], $"“{definition.NameEn}” allows one value, but the rows of “{productsById[productId]}” give {wantedKeys.Count}."));
+                continue;
+            }
+
+            var old = currentTags.Where(t => t.ProductId == productId && t.FilterId == definition.Id)
+                .Select(t => definition.Values.FirstOrDefault(v => v.Id == t.FilterValueId)).Where(v => v is not null).Select(v => v!).ToList();
+            var oldKeys = old.Select(v => v.Value).ToHashSet();
+            var newKeys = request.Mode switch
+            {
+                FilterAssignMode.Replace => wantedKeys,
+                FilterAssignMode.Remove => oldKeys.Where(k => !wantedKeys.Contains(k)).ToList(),
+                _ => oldKeys.Concat(wantedKeys).Distinct().ToList(),
+            };
+
+            if (!newKeys.OrderBy(k => k).SequenceEqual(oldKeys.OrderBy(k => k)))
+            {
+                planned.Add(new PlannedChange(productId, productsById[productId], definition, old, newKeys));
             }
         }
 

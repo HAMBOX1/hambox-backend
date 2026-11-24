@@ -56,7 +56,10 @@ public sealed record ProductVariantDto(
     bool ShowDescriptionInline = false,
     bool IsComplete = true,
     IReadOnlyList<string>? MissingGroups = null,
-    string? DuplicateOfSku = null);
+    string? DuplicateOfSku = null,
+    decimal? SalePrice = null,
+    DateTimeOffset? SaleStartsOn = null,
+    DateTimeOffset? SaleEndsOn = null);
 
 /// <summary>One possible complete combination of a product's options (one choice per group), and whether a variant already exists for it.</summary>
 public sealed record VariantCombinationDto(IReadOnlyList<Guid> OptionIds, IReadOnlyList<string> Labels, bool Exists);

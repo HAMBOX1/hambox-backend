@@ -4,6 +4,8 @@ using HAMBOX.Application.PlatformSettings;
 using HAMBOX.Application.Referrals;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Errors;
+using HAMBOX.Modules.Commerce.Application.Features.Missions;
+using HAMBOX.Modules.Commerce.Application.Loyalty;
 using HAMBOX.Modules.Commerce.Application.Memberships;
 using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Domain.Account;
@@ -50,6 +52,9 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     private readonly PurchasePointsService _purchasePoints;
     private readonly ICommunicationService _communicationService;
     private readonly ILogger<ReferralLifecycleService> _logger;
+    private readonly StarsLedgerService? _stars;
+    private readonly LoyaltyRankService? _ranks;
+    private readonly MissionService? _missions;
 
     public ReferralLifecycleService(
         ICommerceDbContext db,
@@ -57,8 +62,14 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
         ReferralRewardService rewardService,
         PurchasePointsService purchasePoints,
         ICommunicationService communicationService,
-        ILogger<ReferralLifecycleService> logger)
+        ILogger<ReferralLifecycleService> logger,
+        StarsLedgerService? stars = null,
+        LoyaltyRankService? ranks = null,
+        MissionService? missions = null)
     {
+        _ranks = ranks;
+        _missions = missions;
+        _stars = stars;
         _db = db;
         _platformSettings = platformSettings;
         _rewardService = rewardService;
@@ -67,8 +78,80 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Credits the referral rewards to the one Stars balance: the referrer's reward, the invitee's welcome Stars and a
+    /// one-time milestone bonus (Give &amp; Get). Each is idempotent per referral, and a configured hold keeps it Pending.
+    /// </summary>
+    private async Task GrantReferralStarsAsync(
+        ReferralHistoryEntry entry, Order order, int referrerStars, ReferralSettingsPayload settings, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var held = settings.HoldDays > 0;
+        var status = held ? StarsStatus.Pending : StarsStatus.Available;
+        DateTimeOffset? availableOn = held ? now.AddDays(settings.HoldDays) : null;
+
+        await _stars!.CreditAsync(
+            entry.ReferrerUserId, PointsTransactionType.ReferralReward, referrerStars,
+            $"Referral reward (order {order.OrderNumber}).", $"referral:{entry.Id:N}", status, availableOn,
+            reference: entry.Id.ToString(), cancellationToken: cancellationToken);
+
+        var features = await _platformSettings.GetAsync<FeatureCenterSettingsPayload>(PlatformSettingsCategoryKeys.Features, cancellationToken);
+        if (!features.ReferralGiveAndGet)
+        {
+            return;
+        }
+
+        if (settings.InviteeStars > 0)
+        {
+            await _stars.CreditAsync(
+                entry.ReferredUserId, PointsTransactionType.ReferralReward, settings.InviteeStars,
+                "Welcome Stars for joining through a referral.", $"referral:{entry.Id:N}:invitee", status, availableOn,
+                reference: entry.Id.ToString(), cancellationToken: cancellationToken);
+        }
+
+        if (settings.MilestoneReferrals > 0 && settings.MilestoneBonusStars > 0)
+        {
+            var rewarded = await _db.ReferralHistoryEntries.CountAsync(
+                h => h.ReferrerUserId == entry.ReferrerUserId && h.Status == ReferralStatus.Rewarded, cancellationToken);
+            if (rewarded == settings.MilestoneReferrals)
+            {
+                await _stars.CreditAsync(
+                    entry.ReferrerUserId, PointsTransactionType.Bonus, settings.MilestoneBonusStars,
+                    $"Bonus for {settings.MilestoneReferrals} successful referrals.",
+                    $"referral-milestone:{entry.ReferrerUserId}:{settings.MilestoneReferrals}", status, availableOn,
+                    reference: entry.Id.ToString(), cancellationToken: cancellationToken);
+            }
+        }
+    }
+
+    private async Task ClawBackInviteeStarsAsync(ReferralHistoryEntry entry, CancellationToken cancellationToken)
+    {
+        var invitee = await _db.PointsTransactions.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.IdempotencyKey == $"referral:{entry.Id:N}:invitee", cancellationToken);
+        if (invitee is not null && invitee.Status != StarsStatus.Cancelled)
+        {
+            await _stars!.DebitAsync(
+                entry.ReferredUserId, PointsTransactionType.Reversed, invitee.Points, "Referral reward reversed.",
+                $"referral-reverse:{entry.Id:N}:invitee", entry.Id.ToString(), cancellationToken);
+        }
+    }
+
+    private Task ClawBackStarsAsync(ReferralHistoryEntry entry, int points, CancellationToken cancellationToken) =>
+        _stars is null
+            ? Task.CompletedTask
+            : ClawBackBothSidesAsync(entry, points, cancellationToken);
+
+    private async Task ClawBackBothSidesAsync(ReferralHistoryEntry entry, int points, CancellationToken cancellationToken)
+    {
+        await _stars!.DebitAsync(
+            entry.ReferrerUserId, PointsTransactionType.Reversed, points, "Referral reward reversed.",
+            $"referral-reverse:{entry.Id:N}", entry.Id.ToString(), cancellationToken);
+        await ClawBackInviteeStarsAsync(entry, cancellationToken);
+    }
+
     public async Task<bool> ReferralCodeExistsAsync(string referralCode, CancellationToken cancellationToken = default) =>
-        await _db.ReferralProfiles.AnyAsync(p => p.ReferralCode == referralCode, cancellationToken);
+        await _db.ReferralProfiles.AnyAsync(p => p.ReferralCode == referralCode, cancellationToken)
+        || await _db.ReferralLegacyCodes.AnyAsync(c => c.Code == referralCode.ToUpper(), cancellationToken);
 
     /// <summary>Referrals from one address that look like farming. Both thresholds are deliberately conservative.</summary>
     public const int SameIpReferralsBeforeReview = 2;
@@ -91,6 +174,19 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
 
         var referrer = await _db.ReferralProfiles
             .FirstOrDefaultAsync(p => p.ReferralCode == referralCode, cancellationToken);
+
+        // A retired PRIME code resolves to its owner's current profile, so it earns under the unified rules.
+        if (referrer is null)
+        {
+            var legacyOwner = await _db.ReferralLegacyCodes.AsNoTracking()
+                .Where(c => c.Code == referralCode.ToUpper())
+                .Select(c => c.OwnerUserId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (legacyOwner is not null)
+            {
+                referrer = await _db.ReferralProfiles.FirstOrDefaultAsync(p => p.UserId == legacyOwner, cancellationToken);
+            }
+        }
 
         // referrer.UserId == referredUserId (self-referral) is structurally unreachable here — the
         // referred user is a brand-new registration that can't already own the code being redeemed —
@@ -171,6 +267,21 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     public async Task<ReferralQualificationOutcome> ProcessOrderCompletedAsync(Order order, CancellationToken cancellationToken)
     {
         await _purchasePoints.AwardForOrderAsync(order, cancellationToken);
+        if (_stars is not null)
+        {
+            await _stars.SettleForOrderAsync(order.Id, cancellationToken);
+        }
+
+        if (_ranks is not null)
+        {
+            await _ranks.EvaluateAsync(order.UserId, cancellationToken);
+        }
+
+        if (_missions is not null)
+        {
+            await _missions.EvaluateAsync(order.UserId, cancellationToken);
+        }
+
         return await QualifyReferralAsync(order, cancellationToken);
     }
 
@@ -218,6 +329,23 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
             return ReferralQualificationOutcome.Ineligible;
         }
 
+        // Qualifying needs a real order: below the configured minimum it simply stays Pending for a later, larger one.
+        if (settings.MinOrderUsd > 0m && order.Subtotal - order.DiscountAmount < settings.MinOrderUsd)
+        {
+            return ReferralQualificationOutcome.Ineligible;
+        }
+
+        if (settings.MaxRewardedPerReferrer > 0
+            && await _db.ReferralHistoryEntries.CountAsync(
+                h => h.ReferrerUserId == entry.ReferrerUserId && h.Status == ReferralStatus.Rewarded, cancellationToken)
+                >= settings.MaxRewardedPerReferrer)
+        {
+            await TryTransitionAsync(
+                entry, entry.MarkExpired, ReferralAuditAction.Expired, points: null, performedByUserId: "system",
+                details: "The referrer reached the maximum number of rewarded referrals.", cancellationToken);
+            return ReferralQualificationOutcome.Ineligible;
+        }
+
         var qualified = await TryTransitionAsync(
             entry,
             entry.MarkQualified,
@@ -260,6 +388,12 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
 
         if (rewarded)
         {
+            // One balance: the referral reward is also a Stars ledger credit (idempotent per referral).
+            if (_stars is not null)
+            {
+                await GrantReferralStarsAsync(entry, order, awardedPoints, settings, cancellationToken);
+            }
+
             await _communicationService.SendAsync(new CommunicationRequest(
                 UserId: entry.ReferrerUserId,
                 TemplateKey: "ReferralRewardEarned",
@@ -283,6 +417,16 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
     {
         // Same seam as ProcessOrderCompletedAsync: a cancelled/refunded order gives back its purchase points too.
         await _purchasePoints.ReverseForOrderAsync(order, refundedAmountUsd: null, cancellationToken);
+        if (_stars is not null)
+        {
+            await _stars.ReleaseForOrderAsync(order.Id, order.UserId, cancellationToken);
+        }
+
+        if (_ranks is not null)
+        {
+            await _ranks.EvaluateAsync(order.UserId, cancellationToken);
+        }
+
 
         var entry = await _db.ReferralHistoryEntries
             .FirstOrDefaultAsync(h => h.ReferredUserId == order.UserId, cancellationToken);
@@ -320,6 +464,7 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
                 if (reversed && pointsToClawBack > 0)
                 {
                     await _rewardService.ReverseAsync(entry.ReferrerUserId, pointsToClawBack, cancellationToken);
+                    await ClawBackStarsAsync(entry, pointsToClawBack, cancellationToken);
                 }
 
                 break;
@@ -380,6 +525,7 @@ public sealed class ReferralLifecycleService : IReferralRedemptionService
                 if (pointsToClawBack > 0)
                 {
                     await _rewardService.ReverseAsync(entry.ReferrerUserId, pointsToClawBack, cancellationToken);
+                    await ClawBackStarsAsync(entry, pointsToClawBack, cancellationToken);
                 }
 
                 return Result.Success();

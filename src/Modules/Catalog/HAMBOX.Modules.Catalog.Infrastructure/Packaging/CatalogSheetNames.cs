@@ -11,6 +11,7 @@ internal static class CatalogSheetNames
     {
         "Products", "Variant Groups", "Variant Options", "Variants", "Inventory Codes", "Inventory", "Codes",
         "Categories", "Collections", "Instructions", "README", "Notes", "Lists", "Summary",
+        "Pricing", "Stock", "Product Filters",
     };
 
     /// <summary>Excel allows at most 31 characters and none of <c>[ ] : * ? / \</c>; a name is not changed to fit, since the tab name IS the category.</summary>

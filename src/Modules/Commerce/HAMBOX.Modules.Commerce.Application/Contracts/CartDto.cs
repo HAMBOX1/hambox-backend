@@ -28,7 +28,11 @@ public sealed record CartTotalsDto(
     int ItemCount,
     IReadOnlyList<AppliedPromotionDto> AppliedPromotions,
     IReadOnlyList<string> ValidationErrors,
-    string? AppliedCouponCode);
+    string? AppliedCouponCode,
+    int StarsRedeemed = 0,
+    decimal StarsDiscount = 0m,
+    int StarsAvailable = 0,
+    int StarsRequested = 0);
 
 /// <summary>
 /// Represents an applied promotion in cart totals.

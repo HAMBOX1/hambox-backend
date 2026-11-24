@@ -98,6 +98,7 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         builder.Property(x => x.ComparePrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.CostPrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.MemberPrice).HasColumnType("decimal(18,2)");
+        builder.Property(x => x.SalePrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.DescriptionHtml).HasColumnType("nvarchar(max)");
         builder.Property(x => x.ShowDescriptionInline).HasDefaultValue(false);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);

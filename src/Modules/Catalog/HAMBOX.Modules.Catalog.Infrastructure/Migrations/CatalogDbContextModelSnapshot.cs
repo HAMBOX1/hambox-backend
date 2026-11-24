@@ -108,6 +108,10 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("DescriptionAr")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<string>("DescriptionHtml")
                         .HasColumnType("nvarchar(max)");
 
@@ -131,6 +135,11 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsDraft")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
@@ -1559,6 +1568,15 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("SaleEndsOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("SalePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("SaleStartsOn")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("ShowDescriptionInline")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -1696,6 +1714,14 @@ namespace HAMBOX.Modules.Catalog.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdditionalDescriptionAr")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("AdditionalDescriptionEn")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<string>("BadgeColor")
                         .HasMaxLength(7)

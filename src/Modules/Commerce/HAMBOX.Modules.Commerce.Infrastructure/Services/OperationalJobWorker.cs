@@ -107,6 +107,10 @@ internal sealed class OperationalJobWorker(
         recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.scan-back-in-stock-alerts", OperationalJobTypes.ScanBackInStockAlerts, TimeSpan.FromMinutes(5)));
         recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.process-stars-lifecycle", OperationalJobTypes.ProcessStarsLifecycle, TimeSpan.FromHours(1)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
+            "commerce.process-membership-lifecycle", OperationalJobTypes.ProcessMembershipLifecycle, TimeSpan.FromHours(1)));
+        recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.scan-price-drop-alerts", OperationalJobTypes.ScanPriceDropAlerts, TimeSpan.FromMinutes(5)));
         recurringJobScheduler.Register(new RecurringJobDefinition(
             "commerce.reconcile-dot-payments", OperationalJobTypes.ReconcileDotPayments, TimeSpan.FromMinutes(5), Priority: BackgroundJobPriority.High));

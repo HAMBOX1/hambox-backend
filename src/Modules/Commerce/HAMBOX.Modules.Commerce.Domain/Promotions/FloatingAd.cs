@@ -72,6 +72,12 @@ public sealed class FloatingAd : Entity
     /// <summary>When true the card shows a live countdown to <see cref="EndsOnUtc"/> (which must then be set).</summary>
     public bool ShowCountdown { get; private set; }
 
+    /// <summary>Only signed-in customers at or above this loyalty rank see the ad; null = no rank condition.</summary>
+    public string? MinRankKey { get; private set; }
+
+    public void SetMinRank(string? minRankKey) =>
+        MinRankKey = string.IsNullOrWhiteSpace(minRankKey) ? null : minRankKey.Trim().ToLowerInvariant();
+
     public static FloatingAd Create(
         string titleEn,
         string? titleAr,

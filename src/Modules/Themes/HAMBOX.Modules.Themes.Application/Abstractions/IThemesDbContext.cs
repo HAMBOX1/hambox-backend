@@ -10,6 +10,7 @@ public interface IThemesDbContext
     DbSet<ThemeVersion> ThemeVersions { get; }
     DbSet<ThemeSchedule> ThemeSchedules { get; }
     DbSet<ThemeAssignment> ThemeAssignments { get; }
+    DbSet<UserThemePreference> UserThemePreferences { get; }
     DbSet<ThemeAsset> ThemeAssets { get; }
     DbSet<ThemeAuditLog> ThemeAuditLogs { get; }
     DbSet<ThemePreviewSession> ThemePreviewSessions { get; }

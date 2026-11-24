@@ -43,10 +43,30 @@ public sealed class ProductVariant : AggregateRoot, IAuditable, ISoftDeletable
     /// or <see cref="MemberPrice"/> as a percentage markup in the admin pricing UI. Purely informational
     /// at checkout time; never itself charged to a customer.</summary>
     public decimal? CostPrice { get; private set; }
-    /// <summary>A discounted sale price for members of an eligible plan — set alongside
-    /// <see cref="PriceOverride"/> but not yet consumed by <see cref="Services.EffectivePriceResolver"/>
-    /// or checkout; wiring it to an actual membership-plan discount is a separate, later change.</summary>
+    /// <summary>The ELITE member price: charged at checkout (by Commerce's cart line validation, not by
+    /// <see cref="Services.EffectivePriceResolver"/>) to customers with an active ELITE subscription when it is lower
+    /// than the price they would otherwise pay.</summary>
     public decimal? MemberPrice { get; private set; }
+
+    /// <summary>A temporary price below the normal one. It applies only between <see cref="SaleStartsOn"/> and <see cref="SaleEndsOn"/> (either may be open-ended).</summary>
+    public decimal? SalePrice { get; private set; }
+
+    public DateTimeOffset? SaleStartsOn { get; private set; }
+
+    public DateTimeOffset? SaleEndsOn { get; private set; }
+
+    public void SetSale(decimal? salePrice, DateTimeOffset? startsOn, DateTimeOffset? endsOn)
+    {
+        SalePrice = salePrice;
+        SaleStartsOn = salePrice is null ? null : startsOn;
+        SaleEndsOn = salePrice is null ? null : endsOn;
+    }
+
+    /// <summary>The sale price when one is set and <paramref name="now"/> is inside its window; otherwise null.</summary>
+    public decimal? ActiveSalePrice(DateTimeOffset now) =>
+        SalePrice is { } price && (SaleStartsOn is null || SaleStartsOn <= now) && (SaleEndsOn is null || now <= SaleEndsOn)
+            ? price
+            : null;
     public int SortOrder { get; private set; }
     public ProductVariantStatus Status { get; private set; }
     public bool IsVisible { get; private set; }

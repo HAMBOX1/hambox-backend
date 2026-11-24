@@ -10,6 +10,13 @@ using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.MarkAll
 using HAMBOX.Modules.Commerce.Application.Features.Account.Notifications.MarkNotificationRead;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Orders.GetOrders;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Points.GetPointsHistory;
+using HAMBOX.Modules.Commerce.Application.Features.Archive;
+using HAMBOX.Modules.Commerce.Application.Features.Cosmetics;
+using HAMBOX.Modules.Commerce.Application.Features.Loyalty;
+using HAMBOX.Modules.Commerce.Application.Features.Missions;
+using HAMBOX.Modules.Commerce.Application.Features.Rewards;
+using HAMBOX.Modules.Commerce.Application.Features.Memberships.Codes;
+using HAMBOX.Modules.Commerce.Application.Features.Memberships.Gift;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Points.GetPointsSummary;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Referral.GetReferralDashboard;
 using HAMBOX.Modules.Commerce.Application.Features.Account.Referral.GetReferralHistory;
@@ -287,6 +294,64 @@ internal static class AccountEndpoints
                 type))))
         .WithName("GetPointsHistory");
 
+        group.MapGet("rewards", async (ISender sender) =>
+            ToResult(await sender.Send(new GetRewardCatalogQuery())))
+        .WithName("GetRewardCatalog");
+
+        group.MapPost("rewards/{id:guid}/redeem", async (
+            Guid id, [FromBody] RedeemRewardRequest? body, System.Security.Claims.ClaimsPrincipal user, ISender sender) =>
+            ToResult(await sender.Send(new RedeemRewardCommand(id, body?.Country, CheckoutEmail.Resolve(user, string.Empty)))))
+        .WithName("RedeemReward");
+
+        group.MapGet("rewards/redemptions", async (ISender sender) =>
+            ToResult(await sender.Send(new GetMyRedemptionsQuery())))
+        .WithName("GetMyRewardRedemptions");
+
+        group.MapPut("rewards/{id:guid}/goal", async (Guid id, [FromBody] StarsGoalRequest body, ISender sender) =>
+            ToResult(await sender.Send(new SetStarsGoalCommand(id, body.Saved))))
+        .WithName("SetStarsGoal");
+
+        group.MapPost("archive/claim", async (ISender sender) =>
+            ToResult(await sender.Send(new ClaimArchiveCommand())))
+        .WithName("ClaimArchive");
+
+        group.MapGet("missions", async (ISender sender) =>
+            ToResult(await sender.Send(new GetMyMissionsQuery())))
+        .WithName("GetMyMissions");
+
+        group.MapGet("profile-style", async (ISender sender) =>
+            ToResult(await sender.Send(new GetMyProfileStyleQuery())))
+        .WithName("GetMyProfileStyle");
+
+        group.MapPut("profile-style", async ([FromBody] EquipRequest body, ISender sender) =>
+            ToResult(await sender.Send(new EquipProfileStyleCommand(body.FrameId, body.BadgeId, body.AnimationId))))
+        .WithName("EquipProfileStyle");
+
+        group.MapPost("profile-style/{id:guid}/buy", async (Guid id, ISender sender) =>
+            ToResult(await sender.Send(new BuyCosmeticCommand(id))))
+        .WithName("BuyProfileStyleItem");
+
+        group.MapGet("loyalty", async (ISender sender) =>
+            ToResult(await sender.Send(new GetMyLoyaltyQuery())))
+        .WithName("GetMyLoyalty");
+
+        group.MapGet("membership/gift", async (ISender sender) =>
+            ToResult(await sender.Send(new GetMonthlyGiftQuery())))
+        .WithName("GetMonthlyGift");
+
+        group.MapPost("membership/gift/{rewardId:guid}/claim", async (
+            Guid rewardId, [FromBody] RedeemRewardRequest? body, System.Security.Claims.ClaimsPrincipal user, ISender sender) =>
+            ToResult(await sender.Send(new ClaimMonthlyGiftCommand(rewardId, body?.Country, CheckoutEmail.Resolve(user, string.Empty)))))
+        .WithName("ClaimMonthlyGift");
+
+        group.MapGet("membership/vault", async (ISender sender) =>
+            ToResult(await sender.Send(new GetVaultQuery())))
+        .WithName("GetEliteVault");
+
+        group.MapPost("membership/redeem-code", async ([FromBody] RedeemCodeRequest body, ISender sender) =>
+            ToResult(await sender.Send(new RedeemMembershipCodeCommand(body.Code))))
+        .WithName("RedeemMembershipCode");
+
         group.MapGet("membership", async (ISender sender) =>
             ToResult(await sender.Send(new GetCurrentMembershipQuery())))
         .WithName("GetCurrentMembership");
@@ -368,6 +433,9 @@ internal static class AccountEndpoints
 }
 
 internal sealed record WishlistItemRequest(Guid ProductId);
+internal sealed record RedeemCodeRequest(string Code);
+internal sealed record RedeemRewardRequest(string? Country);
+internal sealed record StarsGoalRequest(bool Saved);
 internal sealed record RevealLicenseKeyRequest(string? OtpCode);
 internal sealed record CreateReviewRequest(Guid ProductId, Guid OrderId, int Rating, string Comment);
 internal sealed record UpdateReviewRequest(int Rating, string Comment);

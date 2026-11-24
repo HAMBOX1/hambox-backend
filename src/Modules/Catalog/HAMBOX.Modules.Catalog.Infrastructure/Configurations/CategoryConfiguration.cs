@@ -46,6 +46,8 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasMaxLength(500);
 
         builder.Property(c => c.IconUrl).HasMaxLength(500);
+        builder.Property(c => c.IsDraft).HasDefaultValue(false);
+        builder.Property(c => c.DescriptionAr).HasMaxLength(2000);
 
         builder.Property(c => c.ImageStorageKey)
             .HasMaxLength(500);

@@ -29,7 +29,9 @@ public sealed record CustomerListItemDto(
     DateTime? MembershipExpiresOnUtc,
     int PointsBalance,
     string? ReferralCode,
-    string? ReferralTier);
+    string? ReferralTier,
+    int StarsPending = 0,
+    string? RankKey = null);
 
 /// <param name="Member">null = everyone, true = only customers with an active membership, false = only those without.</param>
 public sealed record GetCustomersQuery(
@@ -39,7 +41,8 @@ public sealed record GetCustomersQuery(
     string? Status,
     bool? Member,
     DateTimeOffset? RegisteredFromUtc,
-    DateTimeOffset? RegisteredToUtc) : IRequest<Result<PagedResult<CustomerListItemDto>>>;
+    DateTimeOffset? RegisteredToUtc,
+    string? Rank = null) : IRequest<Result<PagedResult<CustomerListItemDto>>>;
 
 internal sealed class GetCustomersQueryHandler(IIdentityDbContext db, ICustomerActivityReader activity)
     : IRequestHandler<GetCustomersQuery, Result<PagedResult<CustomerListItemDto>>>
@@ -82,6 +85,15 @@ internal sealed class GetCustomersQueryHandler(IIdentityDbContext db, ICustomerA
             query = wantsMember ? query.Where(u => memberIds.Contains(u.Id)) : query.Where(u => !memberIds.Contains(u.Id));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.Rank))
+        {
+            var rankIds = (await activity.GetUserIdsByRankAsync(request.Rank, cancellationToken))
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
+            query = query.Where(u => rankIds.Contains(u.Id));
+        }
+
         var total = await query.CountAsync(cancellationToken);
         var page = await query
             .OrderByDescending(u => u.CreatedOnUtc)
@@ -104,7 +116,7 @@ internal sealed class GetCustomersQueryHandler(IIdentityDbContext db, ICustomerA
                 u.PreferredLanguage, u.PreferredCurrency, u.CreatedOnUtc,
                 a?.OrderCount ?? 0, a?.PaidOrderCount ?? 0, a?.PaidSpendUsd ?? 0m, a?.LastOrderOnUtc,
                 a?.MembershipPlan, a?.MembershipStatus, a?.MembershipExpiresOnUtc,
-                a?.PointsBalance ?? 0, a?.ReferralCode, a?.ReferralTier);
+                a?.PointsBalance ?? 0, a?.ReferralCode, a?.ReferralTier, a?.StarsPending ?? 0, a?.RankKey);
         }).ToList();
 
         return Result.Success(new PagedResult<CustomerListItemDto>(items, request.PageNumber, request.PageSize, total));

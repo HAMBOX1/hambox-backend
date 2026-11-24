@@ -1,6 +1,7 @@
 using HAMBOX.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Abstractions;
 using HAMBOX.Modules.Commerce.Application.Contracts;
+using HAMBOX.Modules.Commerce.Application.Points;
 using HAMBOX.Modules.Commerce.Application.Services;
 using HAMBOX.SharedKernel.Results;
 using MediatR;
@@ -18,7 +19,8 @@ public sealed record GetCheckoutTotalsPreviewQuery(string? GuestSessionId, strin
 internal sealed class GetCheckoutTotalsPreviewQueryHandler(
     ICommerceDbContext commerceDbContext,
     ICurrentUserService currentUserService,
-    CartResponseBuilder cartResponseBuilder) : IRequestHandler<GetCheckoutTotalsPreviewQuery, Result<CartTotalsDto>>
+    CartResponseBuilder cartResponseBuilder,
+    StarsLedgerService? starsLedger = null) : IRequestHandler<GetCheckoutTotalsPreviewQuery, Result<CartTotalsDto>>
 {
     public async Task<Result<CartTotalsDto>> Handle(GetCheckoutTotalsPreviewQuery request, CancellationToken cancellationToken)
     {
@@ -35,6 +37,10 @@ internal sealed class GetCheckoutTotalsPreviewQueryHandler(
 
         var (subtotal, discountAmount, taxAmount, totalAmount, evaluation) =
             await cartResponseBuilder.BuildOrderAmountsAsync(cart, request.Country, cancellationToken, request.PaymentMethod);
+
+        var starsAvailable = starsLedger is not null && currentUserService.IsAuthenticated && currentUserService.UserId is { } uid
+            ? (await starsLedger.GetBalanceAsync(uid, cancellationToken)).Available
+            : 0;
 
         return Result.Success(new CartTotalsDto(
             subtotal,
@@ -53,6 +59,10 @@ internal sealed class GetCheckoutTotalsPreviewQueryHandler(
                     p.Description))
                 .ToList(),
             evaluation.ValidationErrors,
-            cart.AppliedCouponCode));
+            cart.AppliedCouponCode,
+            evaluation.StarsRedeemed,
+            evaluation.StarsDiscount,
+            starsAvailable,
+            cart.StarsToRedeem));
     }
 }

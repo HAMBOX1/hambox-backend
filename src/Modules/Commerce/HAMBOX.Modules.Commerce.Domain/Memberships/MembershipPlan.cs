@@ -44,6 +44,9 @@ public sealed class MembershipPlan : AggregateRoot
     public string? Description { get; private set; }
     public decimal Price { get; private set; }
     public int DurationDays { get; private set; }
+
+    /// <summary>When above zero the plan runs for this many calendar months (1, 6, 12…) instead of <see cref="DurationDays"/>.</summary>
+    public int DurationMonths { get; private set; }
     public int SortOrder { get; private set; }
     public string? BadgeLabel { get; private set; }
     public string? ThemeKey { get; private set; }
@@ -106,6 +109,15 @@ public sealed class MembershipPlan : AggregateRoot
         ThemeKey = themeKey?.Trim();
     }
 
+    public void SetDurationMonths(int months)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(months);
+        DurationMonths = months;
+    }
+
+    /// <summary>The exact moment a period starting at <paramref name="from"/> ends: same clock time N months later, or N days.</summary>
+    public DateTime ExpiryFrom(DateTime from) => DurationMonths > 0 ? from.AddMonths(DurationMonths) : from.AddDays(DurationDays);
+
     public void Activate() => Status = MembershipPlanStatus.Active;
 
     public void Archive()
@@ -119,6 +131,7 @@ public sealed class MembershipPlan : AggregateRoot
     public MembershipPlan Duplicate(string newName, string newSlug)
     {
         var copy = Create(newName, newSlug, Description, Price, DurationDays, SortOrder, BadgeLabel, ThemeKey);
+        copy.SetDurationMonths(DurationMonths);
         foreach (var benefit in _benefits)
         {
             copy.AddBenefit(benefit.BenefitType, benefit.Value, benefit.DisplayName, benefit.SortOrder);
